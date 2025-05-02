@@ -8,7 +8,6 @@ from .geometry import Shape
 from .prefixed_name import PrefixedName
 from .spatial_types import TransformationMatrix
 from .utils import IDGenerator
-import spatial_types as cas
 
 
 id_generator = IDGenerator()

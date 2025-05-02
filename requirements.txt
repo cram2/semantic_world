@@ -1,6 +1,8 @@
-networkx
-numpy
-trimesh
+networkx~=3.4.2
+numpy~=1.26.4
+trimesh~=4.6.8
 typing_extensions
 urdf-parser-py
-matplotlib
+matplotlib<3.8.0
+typing_extensions~=4.13.2
+casadi~=3.7.0

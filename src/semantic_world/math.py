@@ -2,12 +2,6 @@ from typing import Tuple, Union, Dict, Type, Optional, List
 
 import numpy as np
 
-from giskardpy.data_types.data_types import Derivatives
-from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
-from giskardpy.utils.decorators import memoize
-
-
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
     x0, y0, z0, w0 = quaternion0
     x1, y1, z1, w1 = quaternion1
