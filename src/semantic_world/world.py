@@ -5,15 +5,12 @@ from typing_extensions import List, Optional
 import networkx as nx
 
 from .geometry import Shape
+from .prefixed_name import PrefixedName
+from .spatial_types import TransformationMatrix
 from .utils import IDGenerator
-import spatial_types as cas
 
 
 id_generator = IDGenerator()
-
-@dataclass
-class PrefixedName:
-    ...
 
 @dataclass
 class WorldEntity:
@@ -76,12 +73,12 @@ class Connection(WorldEntity):
     Represents a connection between two bodies in the world.
     """
 
-    parent: Body = None
+    parent: Body
     """
     The parent link of the joint.
     """
 
-    child: Body = None
+    child: Body
     """
     The child link of the joint.
     """
@@ -90,6 +87,11 @@ class Connection(WorldEntity):
     """
     The origin of the joint.
     """
+
+    def __post_init__(self):
+        if self.origin is None:
+            name = self.parent.name.name + "_T_" + self.child.name.name
+            self.origin = TransformationMatrix(reference_frame=PrefixedName(prefix=self.parent.name.prefix, name=name))
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -102,7 +104,7 @@ class World:
     The nodes represent bodies in the world, and the edges represent joins between them.
     """
 
-    root: Body = field(default=Body(name="map", origin=PoseStamped()), kw_only=True)
+    root: Body = field(default=Body(name=PrefixedName(prefix="world", name="root")), kw_only=True)
     """
     The root link of the world.
     """
@@ -114,12 +116,25 @@ class World:
     and the edges represent connections between them.
     """
 
+    _model_version: int = 0
+    """
+    The version of the model. This increases whenever a change to the kinematic model is made. Mostly triggered
+    by adding/removing bodes and connections.
+    """
+
+    _state_version = 0
+    """
+    The version of the state. This increases whenever a change to the state of the kinematic model is made. 
+    Mostly triggered by updating connection values.
+    """
+
     def __post_init__(self):
         self.add_body(self.root)
 
     def validate(self):
         """
         Validate the world.
+
         The world must be a tree.
         """
         if not nx.is_tree(self.kinematic_structure):
@@ -127,32 +142,48 @@ class World:
 
     @property
     def bodies(self) -> List[Body]:
+        """
+        :return: A list of all bodies in the world.
+        """
         return list(self.kinematic_structure.nodes())
 
     @property
     def connections(self) -> List[Connection]:
-        return [self.kinematic_structure.get_edge_data(*edge)[Connection.__name__] for edge in self.kinematic_structure.edges()]
+        return [self.kinematic_structure.get_edge_data(*edge)[Connection.__name__]
+                for edge in self.kinematic_structure.edges()]
 
     def add_body(self, body: Body):
         """
-        Add a link to the world.
+        Add a body to the world.
+
+        :param body: The body to add.
         """
         self.kinematic_structure.add_node(body)
         body._world = self
+        self._model_version += 1
 
     def add_connection(self, connection: Connection):
         """
-        Add a joint to the world.
+        Add a connection to the world.
+
+        :param connection: The connection to add.
         """
         self.add_body(connection.parent)
         self.add_body(connection.child)
         kwargs = {Connection.__name__: connection}
         self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
+        self._model_version += 1
 
-    def get_joint(self, parent: Body, child: Body) -> Connection:
+    def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
 
-    def plot_structure(self):
+    def get_body_by_name(self, name: str) -> Body:
+        return [body for body in self.bodies if body.name.name == name][0]
+
+    def get_body_by_prefix_name(self, name: PrefixedName) -> Body:
+        return [body for body in self.bodies if body.name == name][0]
+
+    def plot_kinematic_structure(self):
         """
         Plots the kinematic structure of the world.
         The plot shows bodies as nodes and connections as edges in a directed graph.
@@ -175,14 +206,14 @@ class World:
         nx.draw_networkx_edges(self.kinematic_structure, pos,
                                edge_color='gray',
                                arrows=True,
-                               arrowsize=20)
+                               arrowsize=50)
 
         # Add link names as labels
-        labels = {node: node.name for node in self.kinematic_structure.nodes()}
+        labels = {node: node.name.name for node in self.kinematic_structure.nodes()}
         nx.draw_networkx_labels(self.kinematic_structure, pos, labels)
 
         # Add joint types as edge labels
-        edge_labels = {(edge[0], edge[1]): edge[2]['Joint'].type.name
+        edge_labels = {(edge[0], edge[1]): edge[2][Connection.__name__].__class__.__name__
                        for edge in self.kinematic_structure.edges(data=True)}
         nx.draw_networkx_edge_labels(self.kinematic_structure, pos, edge_labels)
 
