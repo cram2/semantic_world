@@ -59,6 +59,7 @@ class CompiledFunction:
             parameters = expression.free_symbols()
 
         self.str_params = [str(x) for x in parameters]
+        self.params = parameters
         if len(parameters) > 0:
             parameters = [Expression(parameters).s]
 

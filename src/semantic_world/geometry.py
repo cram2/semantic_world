@@ -62,7 +62,7 @@ class Mesh(Shape):
     Filename of the mesh.
     """
 
-    scale: Scale = Scale()
+    scale: Scale = field(default_factory=Scale)
     """
     Scale of the mesh.
     """
@@ -109,5 +109,5 @@ class Box(Primitive):
     """
     A box shape. Pivot point is at the center of the box.
     """
-    scale: Scale = Scale()
+    scale: Scale = field(default_factory=Scale)
 
