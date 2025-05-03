@@ -1,13 +1,16 @@
 import keyword
 
+import casadi as ca
 import hypothesis.strategies as st
 import numpy as np
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
-from giskardpy.middleware import get_middleware
-from giskardpy.utils.math import shortest_angular_distance
+from semantic_world.spatial_types import Expression, if_else
+
+# from giskardpy.middleware import get_middleware
+# from giskardpy.utils.math import shortest_angular_distance
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -25,6 +28,46 @@ def random_angle():
     return st.floats(-np.pi, np.pi)
 
 
+def fmod(a, b):
+    a = Expression(a).s
+    b = Expression(b).s
+    return Expression(ca.fmod(a, b))
+
+
+def if_greater(a, b, if_result, else_result):
+    a = Expression(a).s
+    b = Expression(b).s
+    return if_else(ca.gt(a, b), if_result, else_result)
+
+
+def normalize_angle_positive(angle):
+    """
+    Normalizes the angle to be 0 to 2*pi
+    It takes and returns radians.
+    """
+    return fmod(fmod(angle, 2.0 * ca.pi) + 2.0 * ca.pi, 2.0 * ca.pi)
+
+
+def normalize_angle(angle):
+    """
+    Normalizes the angle to be -pi to +pi
+    It takes and returns radians.
+    """
+    a = normalize_angle_positive(angle)
+    return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
+
+
+def shortest_angular_distance(from_angle, to_angle):
+    """
+    Given 2 angles, this returns the shortest angular
+    difference.  The inputs and outputs are of course radians.
+
+    The result would always be -pi <= result <= pi. Adding the result
+    to "from" will always get you an equivalent angle to "to".
+    """
+    return normalize_angle(to_angle - from_angle)
+
+
 def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis, decimal=3):
     try:
         np.testing.assert_array_almost_equal(actual_axis, expected_axis, decimal=decimal)
@@ -40,9 +83,8 @@ def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis,
             assert not np.any(np.isnan(actual_axis))
             assert not np.any(np.isnan(expected_axis))
 
-def compare_orientations(actual_orientation: np.ndarray,
-                         desired_orientation: np.ndarray,
-                         decimal: int = 2) -> None:
+
+def compare_orientations(actual_orientation: np.ndarray, desired_orientation: np.ndarray, decimal: int = 2) -> None:
     q1 = actual_orientation
     q2 = desired_orientation
     try:
@@ -55,6 +97,7 @@ def compare_orientations(actual_orientation: np.ndarray,
         np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
         np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
         np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
+
 
 @composite
 def variable_name(draw):
@@ -80,8 +123,8 @@ def rnd_joint_state(draw, joint_limits):
 @composite
 def rnd_joint_state2(draw, joint_limits):
     muh = draw(joint_limits)
-    muh = {jn: ((ll if ll is not None else pi * 2), (ul if ul is not None else pi * 2))
-           for (jn, (ll, ul)) in muh.items()}
+    muh = {jn: ((ll if ll is not None else pi * 2), (ul if ul is not None else pi * 2)) for (jn, (ll, ul)) in
+           muh.items()}
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in muh.items()}
 
 
@@ -135,9 +178,8 @@ def sq_matrix(draw):
 def unit_vector(length, elements=None):
     if elements is None:
         elements = float_no_nan_no_inf()
-    vector = st.lists(elements,
-                      min_size=length,
-                      max_size=length).filter(lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)
+    vector = st.lists(elements, min_size=length, max_size=length).filter(
+        lambda x: SMALL_NUMBER < np.linalg.norm(x) < BIG_NUMBER)
 
     def normalize(v):
         v = [round(x, 4) for x in v]
@@ -156,5 +198,4 @@ def quaternion():
 def pykdl_frame_to_numpy(pykdl_frame):
     return np.array([[pykdl_frame.M[0, 0], pykdl_frame.M[0, 1], pykdl_frame.M[0, 2], pykdl_frame.p[0]],
                      [pykdl_frame.M[1, 0], pykdl_frame.M[1, 1], pykdl_frame.M[1, 2], pykdl_frame.p[1]],
-                     [pykdl_frame.M[2, 0], pykdl_frame.M[2, 1], pykdl_frame.M[2, 2], pykdl_frame.p[2]],
-                     [0, 0, 0, 1]])
+                     [pykdl_frame.M[2, 0], pykdl_frame.M[2, 1], pykdl_frame.M[2, 2], pykdl_frame.p[2]], [0, 0, 0, 1]])
