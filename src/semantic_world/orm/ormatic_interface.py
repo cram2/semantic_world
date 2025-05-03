@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Float, ForeignKey, Integer, MetaData, String, Table
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy.orm import RelationshipProperty, registry, relationship
 import semantic_world.geometry
+import semantic_world.world
 
 metadata = MetaData()
 
@@ -22,29 +23,60 @@ t_Scale = Table(
     Column('z', Float, nullable=False)
 )
 
+t_WorldEntity = Table(
+    'WorldEntity', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('polymorphic_type', String)
+)
+
+t_Body = Table(
+    'Body', metadata,
+    Column('id', ForeignKey('WorldEntity.id'), primary_key=True)
+)
+
+t_View = Table(
+    'View', metadata,
+    Column('id', ForeignKey('WorldEntity.id'), primary_key=True)
+)
+
+t_Connection = Table(
+    'Connection', metadata,
+    Column('id', ForeignKey('WorldEntity.id'), primary_key=True),
+    Column('parent_id', ForeignKey('Body.id'), nullable=False),
+    Column('child_id', ForeignKey('Body.id'), nullable=False)
+)
+
 t_Shape = Table(
     'Shape', metadata,
     Column('id', Integer, primary_key=True),
+    Column('body_visual_id', ForeignKey('Body.id')),
+    Column('body_collision_id', ForeignKey('Body.id')),
     Column('polymorphic_type', String)
+)
+
+t_World = Table(
+    'World', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('root_id', ForeignKey('Body.id'), nullable=False)
 )
 
 t_Mesh = Table(
     'Mesh', metadata,
     Column('id', ForeignKey('Shape.id'), primary_key=True),
     Column('filename', String, nullable=False),
-    Column('scale_id', ForeignKey('Scale.id'))
+    Column('scale_id', ForeignKey('Scale.id'), nullable=False)
 )
 
 t_Primitive = Table(
     'Primitive', metadata,
     Column('id', ForeignKey('Shape.id'), primary_key=True),
-    Column('color_id', ForeignKey('Color.id'))
+    Column('color_id', ForeignKey('Color.id'), nullable=False)
 )
 
 t_Box = Table(
     'Box', metadata,
     Column('id', ForeignKey('Primitive.id'), primary_key=True),
-    Column('scale_id', ForeignKey('Scale.id'))
+    Column('scale_id', ForeignKey('Scale.id'), nullable=False)
 )
 
 t_Cylinder = Table(
@@ -68,12 +100,24 @@ m_Scale = mapper_registry.map_imperatively(semantic_world.geometry.Scale, t_Scal
 
 m_Shape = mapper_registry.map_imperatively(semantic_world.geometry.Shape, t_Shape, polymorphic_on = "polymorphic_type", polymorphic_identity = "Shape")
 
-m_Mesh = mapper_registry.map_imperatively(semantic_world.geometry.Mesh, t_Mesh, properties = dict(scale=relationship("Scale", foreign_keys=[t_Mesh.c.scale_id])), polymorphic_identity = "Mesh", inherits = m_Shape)
+m_World = mapper_registry.map_imperatively(semantic_world.world.World, t_World, properties = dict(root=relationship('Body',foreign_keys=[t_World.c.root_id])))
 
-m_Primitive = mapper_registry.map_imperatively(semantic_world.geometry.Primitive, t_Primitive, properties = dict(color=relationship("Color", foreign_keys=[t_Primitive.c.color_id])), polymorphic_identity = "Primitive", inherits = m_Shape)
+m_WorldEntity = mapper_registry.map_imperatively(semantic_world.world.WorldEntity, t_WorldEntity, polymorphic_on = "polymorphic_type", polymorphic_identity = "WorldEntity")
+
+m_Mesh = mapper_registry.map_imperatively(semantic_world.geometry.Mesh, t_Mesh, properties = dict(scale=relationship('Scale',foreign_keys=[t_Mesh.c.scale_id])), polymorphic_identity = "Mesh", inherits = m_Shape)
+
+m_Primitive = mapper_registry.map_imperatively(semantic_world.geometry.Primitive, t_Primitive, properties = dict(color=relationship('Color',foreign_keys=[t_Primitive.c.color_id])), polymorphic_identity = "Primitive", inherits = m_Shape)
+
+m_Body = mapper_registry.map_imperatively(semantic_world.world.Body, t_Body, properties = dict(visual=relationship('Shape',foreign_keys=[t_Shape.c.body_visual_id]), 
+collision=relationship('Shape',foreign_keys=[t_Shape.c.body_collision_id])), polymorphic_identity = "Body", inherits = m_WorldEntity)
+
+m_View = mapper_registry.map_imperatively(semantic_world.world.View, t_View, polymorphic_identity = "View", inherits = m_WorldEntity)
+
+m_Connection = mapper_registry.map_imperatively(semantic_world.world.Connection, t_Connection, properties = dict(parent=relationship('Body',foreign_keys=[t_Connection.c.parent_id]), 
+child=relationship('Body',foreign_keys=[t_Connection.c.child_id])), polymorphic_identity = "Connection", inherits = m_WorldEntity)
 
 m_Sphere = mapper_registry.map_imperatively(semantic_world.geometry.Sphere, t_Sphere, polymorphic_identity = "Sphere", inherits = m_Primitive)
 
 m_Cylinder = mapper_registry.map_imperatively(semantic_world.geometry.Cylinder, t_Cylinder, polymorphic_identity = "Cylinder", inherits = m_Primitive)
 
-m_Box = mapper_registry.map_imperatively(semantic_world.geometry.Box, t_Box, properties = dict(scale=relationship("Scale", foreign_keys=[t_Box.c.scale_id])), polymorphic_identity = "Box", inherits = m_Primitive)
+m_Box = mapper_registry.map_imperatively(semantic_world.geometry.Box, t_Box, properties = dict(scale=relationship('Scale',foreign_keys=[t_Box.c.scale_id])), polymorphic_identity = "Box", inherits = m_Primitive)
