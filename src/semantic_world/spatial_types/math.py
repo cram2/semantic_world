@@ -2,7 +2,7 @@ from typing import Tuple, Union, List
 
 import numpy as np
 
-from semantic_world.derivatives import Derivatives
+from .derivatives import Derivatives
 
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:

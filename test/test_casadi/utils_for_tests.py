@@ -7,7 +7,7 @@ from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
-from semantic_world.spatial_types import Expression, if_else
+from semantic_world.spatial_types.spatial_types import Expression, if_else
 
 # from giskardpy.middleware import get_middleware
 # from giskardpy.utils.math import shortest_angular_distance

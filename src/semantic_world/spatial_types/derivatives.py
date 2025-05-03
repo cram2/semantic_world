@@ -3,6 +3,9 @@ from enum import IntEnum
 
 
 class Derivatives(IntEnum):
+    """
+    Enumaration of interpretation for the order of derivativeson the spatial positions
+    """
     position = 0
     velocity = 1
     acceleration = 2

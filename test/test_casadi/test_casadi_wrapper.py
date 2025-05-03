@@ -1,11 +1,11 @@
 import math
 import unittest
 from datetime import timedelta
-import semantic_world.math as giskard_math
+import semantic_world.spatial_types.math as giskard_math
 import hypothesis.strategies as st
 import numpy as np
 from hypothesis import given, assume, settings
-import semantic_world.spatial_types as cas
+import semantic_world.spatial_types.spatial_types as cas
 from test_casadi.utils_for_tests import float_no_nan_no_inf, quaternion, random_angle, unit_vector, compare_axis_angle, \
     angle_positive, vector, lists_of_same_length, compare_orientations, sq_matrix, float_no_nan_no_inf_min_max
 

@@ -8,7 +8,7 @@ import casadi as ca  # type: ignore
 
 from scipy import sparse as sp
 
-from .prefixed_name import PrefixedName
+from ..prefixed_name import PrefixedName
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, float, Quaternion]
@@ -20,6 +20,8 @@ pi: float
 
 def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
 
+class ReferenceFrameMixin:
+    reference_frame: PrefixedName
 
 class StackedCompiledFunction:
     compiled_f: CompiledFunction

@@ -2,7 +2,7 @@ from typing import Dict, Callable, Type, Optional, overload, Union, Iterable, Tu
 
 import numpy as np
 
-import semantic_world.spatial_types as cas
+import semantic_world.spatial_types.spatial_types as cas
 
 Provider = Union[float, Callable[[], float]]
 

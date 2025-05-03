@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 import pytest
 
-import semantic_world.spatial_types as cas
-from semantic_world.symbol_manager import symbol_manager
+import semantic_world.spatial_types.spatial_types as cas
+from semantic_world.spatial_types.symbol_manager import symbol_manager
 
 
 class TestSymbolManager(unittest.TestCase):

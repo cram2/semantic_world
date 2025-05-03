@@ -40,9 +40,24 @@ class Color:
 
 @dataclass
 class Scale:
-    x: float = 0
-    y: float = 0
-    z: float = 0
+    """
+    Dataclass for storing the scale of geometric objects.
+    """
+
+    x: float = 1.
+    """
+    The scale in the x direction.
+    """
+
+    y: float = 1.
+    """
+    The scale in the y direction.
+    """
+
+    z: float = 1.
+    """
+    The scale in the z direction.
+    """
 
 @dataclass
 class Shape(ABC):

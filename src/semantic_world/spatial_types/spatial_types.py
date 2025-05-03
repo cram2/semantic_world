@@ -12,7 +12,7 @@ from typing import Union, TypeVar
 import casadi as ca
 import numpy as np
 
-from .prefixed_name import PrefixedName
+from ..prefixed_name import PrefixedName
 
 builtin_max = builtins.max
 builtin_min = builtins.min
