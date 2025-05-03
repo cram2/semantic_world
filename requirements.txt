@@ -8,3 +8,4 @@ casadi~=3.7.0
 hypothesis
 pytest
 scipy
+ormatic

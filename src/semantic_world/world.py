@@ -83,7 +83,7 @@ class Connection(WorldEntity):
     The child link of the joint.
     """
 
-    origin: cas.TransformationMatrix = None
+    origin: TransformationMatrix = None
     """
     The origin of the joint.
     """
