@@ -6,7 +6,7 @@ from functools import cached_property
 
 import trimesh
 
-from .pose import Vector3, Pose, PoseStamped
+from .spatial_types import TransformationMatrix
 from .utils import IDGenerator
 
 id_generator = IDGenerator()
@@ -39,11 +39,32 @@ class Color:
     """
 
 @dataclass
+class Scale:
+    """
+    Dataclass for storing the scale of geometric objects.
+    """
+
+    x: float = 1.
+    """
+    The scale in the x direction.
+    """
+
+    y: float = 1.
+    """
+    The scale in the y direction.
+    """
+
+    z: float = 1.
+    """
+    The scale in the z direction.
+    """
+
+@dataclass
 class Shape(ABC):
     """
     Base class for all shapes in the world.
     """
-    origin: PoseStamped = field(default_factory=PoseStamped)
+    origin: TransformationMatrix
 
 @dataclass
 class Mesh(Shape):
@@ -56,7 +77,7 @@ class Mesh(Shape):
     Filename of the mesh.
     """
 
-    scale: Vector3 = field(default_factory=Vector3)
+    scale: Scale = field(default_factory=Scale)
     """
     Scale of the mesh.
     """
@@ -90,22 +111,12 @@ class Sphere(Primitive):
 
 
 @dataclass
-class Capsule(Sphere):
-    """
-    A capsule shape.
-    """
-
-    length: float = 1.0
-    """
-    Length of the capsule.
-    """
-
-
-@dataclass
-class Cylinder(Capsule):
+class Cylinder(Primitive):
     """
     A cylinder shape.
     """
+    width: float = 0.5
+    height: float = 0.5
 
 
 @dataclass
@@ -113,18 +124,5 @@ class Box(Primitive):
     """
     A box shape. Pivot point is at the center of the box.
     """
-    length: float = 1.0
-    """
-    Length of the box.
-    """
-
-    width: float = 1.0
-    """
-    Width of the box. 
-    """
-
-    height: float = 1.0
-    """
-    Height of the box.
-    """
+    scale: Scale = field(default_factory=Scale)
 
