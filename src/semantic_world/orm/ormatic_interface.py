@@ -1,6 +1,9 @@
+from semantic_world.orm.model import TransformationMatrixType
+
 from sqlalchemy import Column, Float, ForeignKey, Integer, MetaData, String, Table
 from sqlalchemy.orm import RelationshipProperty, registry, relationship
 import semantic_world.geometry
+import semantic_world.prefixed_name
 import semantic_world.world
 
 metadata = MetaData()
@@ -13,6 +16,13 @@ t_Color = Table(
     Column('G', Float, nullable=False),
     Column('B', Float, nullable=False),
     Column('A', Float, nullable=False)
+)
+
+t_PrefixedName = Table(
+    'PrefixedName', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('name', String, nullable=False),
+    Column('prefix', String)
 )
 
 t_Scale = Table(
@@ -31,7 +41,8 @@ t_WorldEntity = Table(
 
 t_Body = Table(
     'Body', metadata,
-    Column('id', ForeignKey('WorldEntity.id'), primary_key=True)
+    Column('id', ForeignKey('WorldEntity.id'), primary_key=True),
+    Column('name_id', ForeignKey('PrefixedName.id'), nullable=False)
 )
 
 t_View = Table(
@@ -43,12 +54,14 @@ t_Connection = Table(
     'Connection', metadata,
     Column('id', ForeignKey('WorldEntity.id'), primary_key=True),
     Column('parent_id', ForeignKey('Body.id'), nullable=False),
-    Column('child_id', ForeignKey('Body.id'), nullable=False)
+    Column('child_id', ForeignKey('Body.id'), nullable=False),
+    Column('origin', TransformationMatrixType, nullable=False)
 )
 
 t_Shape = Table(
     'Shape', metadata,
     Column('id', Integer, primary_key=True),
+    Column('origin', TransformationMatrixType, nullable=False),
     Column('body_visual_id', ForeignKey('Body.id')),
     Column('body_collision_id', ForeignKey('Body.id')),
     Column('polymorphic_type', String)
@@ -98,23 +111,27 @@ m_Color = mapper_registry.map_imperatively(semantic_world.geometry.Color, t_Colo
 
 m_Scale = mapper_registry.map_imperatively(semantic_world.geometry.Scale, t_Scale, )
 
-m_Shape = mapper_registry.map_imperatively(semantic_world.geometry.Shape, t_Shape, polymorphic_on = "polymorphic_type", polymorphic_identity = "Shape")
+m_Shape = mapper_registry.map_imperatively(semantic_world.geometry.Shape, t_Shape, properties = dict(origin=t_Shape.c.origin), polymorphic_on = "polymorphic_type", polymorphic_identity = "Shape")
 
 m_World = mapper_registry.map_imperatively(semantic_world.world.World, t_World, properties = dict(root=relationship('Body',foreign_keys=[t_World.c.root_id])))
 
 m_WorldEntity = mapper_registry.map_imperatively(semantic_world.world.WorldEntity, t_WorldEntity, polymorphic_on = "polymorphic_type", polymorphic_identity = "WorldEntity")
 
+m_PrefixedName = mapper_registry.map_imperatively(semantic_world.prefixed_name.PrefixedName, t_PrefixedName, )
+
 m_Mesh = mapper_registry.map_imperatively(semantic_world.geometry.Mesh, t_Mesh, properties = dict(scale=relationship('Scale',foreign_keys=[t_Mesh.c.scale_id])), polymorphic_identity = "Mesh", inherits = m_Shape)
 
 m_Primitive = mapper_registry.map_imperatively(semantic_world.geometry.Primitive, t_Primitive, properties = dict(color=relationship('Color',foreign_keys=[t_Primitive.c.color_id])), polymorphic_identity = "Primitive", inherits = m_Shape)
 
-m_Body = mapper_registry.map_imperatively(semantic_world.world.Body, t_Body, properties = dict(visual=relationship('Shape',foreign_keys=[t_Shape.c.body_visual_id]), 
+m_Body = mapper_registry.map_imperatively(semantic_world.world.Body, t_Body, properties = dict(name=relationship('PrefixedName',foreign_keys=[t_Body.c.name_id]), 
+visual=relationship('Shape',foreign_keys=[t_Shape.c.body_visual_id]), 
 collision=relationship('Shape',foreign_keys=[t_Shape.c.body_collision_id])), polymorphic_identity = "Body", inherits = m_WorldEntity)
 
 m_View = mapper_registry.map_imperatively(semantic_world.world.View, t_View, polymorphic_identity = "View", inherits = m_WorldEntity)
 
 m_Connection = mapper_registry.map_imperatively(semantic_world.world.Connection, t_Connection, properties = dict(parent=relationship('Body',foreign_keys=[t_Connection.c.parent_id]), 
-child=relationship('Body',foreign_keys=[t_Connection.c.child_id])), polymorphic_identity = "Connection", inherits = m_WorldEntity)
+child=relationship('Body',foreign_keys=[t_Connection.c.child_id]), 
+origin=t_Connection.c.origin), polymorphic_identity = "Connection", inherits = m_WorldEntity)
 
 m_Sphere = mapper_registry.map_imperatively(semantic_world.geometry.Sphere, t_Sphere, polymorphic_identity = "Sphere", inherits = m_Primitive)
 

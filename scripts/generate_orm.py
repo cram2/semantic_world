@@ -6,7 +6,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import registry, Session
 from ormatic.ormatic import logger, ORMatic
 from semantic_world.geometry import Color, Scale, Shape, Mesh, Primitive, Sphere, Cylinder, Box
+from semantic_world.orm.model import custom_types
+from semantic_world.prefixed_name import PrefixedName
 from semantic_world.world import World, WorldEntity, Body, View, Connection
+from semantic_world.spatial_types import Vector3, Point3, RotationMatrix, TransformationMatrix, ReferenceFrameMixin
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the semantic_world package.
@@ -16,7 +19,8 @@ from semantic_world.world import World, WorldEntity, Body, View, Connection
 # information on how to map them.
 # ----------------------------------------------------------------------------------------------------------------------
 
-classes = [Color, Scale, Shape, Mesh, Primitive, Sphere, Cylinder, Box, World, WorldEntity, Body, View, Connection]
+classes = [Color, Scale, Shape, Mesh, Primitive, Sphere, Cylinder, Box, World, WorldEntity, Body, View, Connection,
+           PrefixedName]
 
 def generate_orm():
     """
@@ -34,7 +38,7 @@ def generate_orm():
     session = Session(engine)
 
     # Create an ORMatic object with the classes to be mapped
-    ormatic = ORMatic(classes, mapper_registry)
+    ormatic = ORMatic(classes, mapper_registry, custom_types)
 
     # Generate the ORM classes
     ormatic.make_all_tables()
