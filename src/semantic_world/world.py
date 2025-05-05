@@ -31,8 +31,8 @@ class WorldEntity:
 @dataclass
 class Body(WorldEntity):
     """
-    Represents a link in the world.
-    A link is a semantic atom. This means that a link cannot be decomposed into meaningful smaller parts.
+    Represents a body in the world.
+    A body is a semantic atom, meaning that it cannot be decomposed into meaningful smaller parts.
     """
 
     name: PrefixedName
@@ -75,17 +75,17 @@ class Connection(WorldEntity):
 
     parent: Body
     """
-    The parent link of the joint.
+    The parent body of the connection.
     """
 
     child: Body
     """
-    The child link of the joint.
+    The child body of the connection.
     """
 
     origin: TransformationMatrix = None
     """
-    The origin of the joint.
+    The origin of the connection.
     """
 
     def __post_init__(self):
