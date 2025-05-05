@@ -30,7 +30,7 @@ jobs:
         cache: pip # Implicitly uses requirements.txt for cache key
 
     - name: Install dependencies
-      run: pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
+      run: pip install -u pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
 
     # (optional) Cache your executed notebooks between runs
     # if you have config:
