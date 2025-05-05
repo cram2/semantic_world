@@ -2,22 +2,6 @@ class WorldException(Exception):
     pass
 
 
-class UnknownGroupException(WorldException, KeyError):
-    pass
-
-
-class UnknownLinkException(WorldException, KeyError):
-    pass
-
-
-class UnknownJointException(WorldException, KeyError):
-    pass
-
-
-class InvalidWorldOperationException(WorldException, KeyError):
-    pass
-
-
 class CorruptShapeException(WorldException):
     pass
 
@@ -32,6 +16,7 @@ class CorruptURDFException(CorruptShapeException):
 
 class TransformException(WorldException):
     pass
+
 
 class DuplicateNameException(WorldException):
     pass

@@ -8,5 +8,5 @@ The package can be installed locally using pip:
 
 ```bash
 git clone git@github.com:tomsch420/semantic_world.git
-pip install semantic-world
+pip install semantic_world
 ```
