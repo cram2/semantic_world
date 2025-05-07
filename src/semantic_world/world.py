@@ -122,7 +122,7 @@ class World:
     by adding/removing bodes and connections.
     """
 
-    _state_version = 0
+    _state_version: int = 0
     """
     The version of the state. This increases whenever a change to the state of the kinematic model is made. 
     Mostly triggered by updating connection values.
