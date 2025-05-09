@@ -1,1 +1,1 @@
-from .spatial_types import RotationMatrix, Vector3, Point3, TransformationMatrix, ReferenceFrameMixin
+from .spatial_types import RotationMatrix, Vector3, Point3, TransformationMatrix, ReferenceFrameMixin, Quaternion

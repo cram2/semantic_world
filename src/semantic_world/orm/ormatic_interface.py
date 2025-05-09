@@ -2,6 +2,7 @@ from semantic_world.orm.model import TransformationMatrixType
 
 from sqlalchemy import Column, Float, ForeignKey, Integer, MetaData, String, Table
 from sqlalchemy.orm import RelationshipProperty, registry, relationship
+import semantic_world.connections
 import semantic_world.geometry
 import semantic_world.prefixed_name
 import semantic_world.world
@@ -73,11 +74,21 @@ t_World = Table(
     Column('root_id', ForeignKey('Body.id'), nullable=False)
 )
 
+t_FixedConnection = Table(
+    'FixedConnection', metadata,
+    Column('id', ForeignKey('Connection.id'), primary_key=True)
+)
+
 t_Mesh = Table(
     'Mesh', metadata,
     Column('id', ForeignKey('Shape.id'), primary_key=True),
     Column('filename', String, nullable=False),
     Column('scale_id', ForeignKey('Scale.id'), nullable=False)
+)
+
+t_MoveableConnection = Table(
+    'MoveableConnection', metadata,
+    Column('id', ForeignKey('Connection.id'), primary_key=True)
 )
 
 t_Primitive = Table(
@@ -97,6 +108,22 @@ t_Cylinder = Table(
     Column('id', ForeignKey('Primitive.id'), primary_key=True),
     Column('width', Float, nullable=False),
     Column('height', Float, nullable=False)
+)
+
+t_FreeVariable = Table(
+    'FreeVariable', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('moveableconnection_free_variables_id', ForeignKey('MoveableConnection.id'))
+)
+
+t_PrismaticConnection = Table(
+    'PrismaticConnection', metadata,
+    Column('id', ForeignKey('MoveableConnection.id'), primary_key=True)
+)
+
+t_RevoluteConnection = Table(
+    'RevoluteConnection', metadata,
+    Column('id', ForeignKey('MoveableConnection.id'), primary_key=True)
 )
 
 t_Sphere = Table(
@@ -119,6 +146,8 @@ m_WorldEntity = mapper_registry.map_imperatively(semantic_world.world.WorldEntit
 
 m_PrefixedName = mapper_registry.map_imperatively(semantic_world.prefixed_name.PrefixedName, t_PrefixedName, )
 
+m_FreeVariable = mapper_registry.map_imperatively(semantic_world.connections.FreeVariable, t_FreeVariable, )
+
 m_Mesh = mapper_registry.map_imperatively(semantic_world.geometry.Mesh, t_Mesh, properties = dict(scale=relationship('Scale',foreign_keys=[t_Mesh.c.scale_id])), polymorphic_identity = "Mesh", inherits = m_Shape)
 
 m_Primitive = mapper_registry.map_imperatively(semantic_world.geometry.Primitive, t_Primitive, properties = dict(color=relationship('Color',foreign_keys=[t_Primitive.c.color_id])), polymorphic_identity = "Primitive", inherits = m_Shape)
@@ -138,3 +167,11 @@ m_Sphere = mapper_registry.map_imperatively(semantic_world.geometry.Sphere, t_Sp
 m_Cylinder = mapper_registry.map_imperatively(semantic_world.geometry.Cylinder, t_Cylinder, polymorphic_identity = "Cylinder", inherits = m_Primitive)
 
 m_Box = mapper_registry.map_imperatively(semantic_world.geometry.Box, t_Box, properties = dict(scale=relationship('Scale',foreign_keys=[t_Box.c.scale_id])), polymorphic_identity = "Box", inherits = m_Primitive)
+
+m_FixedConnection = mapper_registry.map_imperatively(semantic_world.connections.FixedConnection, t_FixedConnection, polymorphic_identity = "FixedConnection", inherits = m_Connection)
+
+m_MoveableConnection = mapper_registry.map_imperatively(semantic_world.connections.MoveableConnection, t_MoveableConnection, properties = dict(free_variables=relationship('FreeVariable',foreign_keys=[t_FreeVariable.c.moveableconnection_free_variables_id])), polymorphic_identity = "MoveableConnection", inherits = m_Connection)
+
+m_PrismaticConnection = mapper_registry.map_imperatively(semantic_world.connections.PrismaticConnection, t_PrismaticConnection, polymorphic_identity = "PrismaticConnection", inherits = m_MoveableConnection)
+
+m_RevoluteConnection = mapper_registry.map_imperatively(semantic_world.connections.RevoluteConnection, t_RevoluteConnection, polymorphic_identity = "RevoluteConnection", inherits = m_MoveableConnection)
