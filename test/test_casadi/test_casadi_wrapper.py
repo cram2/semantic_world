@@ -348,7 +348,6 @@ class TestRotationMatrix(unittest.TestCase):
                                                                      [axis, angle]),
                                              giskard_math.rotation_matrix_from_axis_angle(np.array(axis), angle))
 
-    @unittest.skip("Simon has to fix this")
     @given(quaternion())
     def test_axis_angle_from_matrix(self, q):
         m = giskard_math.rotation_matrix_from_quaternion(*q)
@@ -358,7 +357,6 @@ class TestRotationMatrix(unittest.TestCase):
         compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
         assert actual_axis[-1] == 0
 
-    @unittest.skip("Simon has to fix this")
     @given(unit_vector(length=3),
            angle_positive())
     def test_axis_angle_from_matrix2(self, expected_axis, expected_angle):
@@ -672,7 +670,6 @@ class TestQuaternion(unittest.TestCase):
         r2 = giskard_math.quaternion_conjugate(q)
         self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
 
-    @unittest.skip("Simon has to fix this")
     @given(quaternion(),
            quaternion())
     def test_quaternion_diff(self, q1, q2):
@@ -680,7 +677,6 @@ class TestQuaternion(unittest.TestCase):
         q4 = cas.compile_and_execute(cas.quaternion_diff, [q1, q2])
         self.assertTrue(np.isclose(q3, q4).all() or np.isclose(q3, -q4).all(), msg='{} != {}'.format(q1, q4))
 
-    @unittest.skip("Simon has to fix this")
     @given(quaternion())
     def test_axis_angle_from_quaternion(self, q):
         axis2, angle2 = giskard_math.axis_angle_from_quaternion(*q)
@@ -689,7 +685,6 @@ class TestQuaternion(unittest.TestCase):
         compare_axis_angle(angle, axis[:3], angle2, axis2, 2)
         assert axis[-1] == 0
 
-    @unittest.skip("Simon has to fix this")
     def test_axis_angle_from_quaternion2(self):
         q = [0, 0, 0, 1.0000001]
         axis2, angle2 = giskard_math.axis_angle_from_quaternion(*q)
@@ -1721,7 +1716,6 @@ class TestCASWrapper(unittest.TestCase):
         m = giskard_math.rotation_matrix_from_quaternion(*q)
         np.testing.assert_array_almost_equal(cas.compile_and_execute(cas.trace, [m]), np.trace(m))
 
-    @unittest.skip("Simon has to fix this")
     @given(quaternion(),
            quaternion())
     def test_rotation_distance(self, q1, q2):
@@ -1737,7 +1731,6 @@ class TestCASWrapper(unittest.TestCase):
             self.assertAlmostEqual(giskard_math.shortest_angular_distance(actual_angle, -expected_angle),
                                    0, places=3)
 
-    @unittest.skip("Simon has to fix this")
     @given(random_angle(),
            random_angle(),
            random_angle())
