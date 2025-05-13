@@ -10,11 +10,13 @@ class URDFParserTestCase(unittest.TestCase):
     table = os.path.join(urdf_dir, "table.urdf")
     kitchen = os.path.join(urdf_dir, "kitchen-small.urdf")
     apartment = os.path.join(urdf_dir, "apartment.urdf")
+    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
 
     def setUp(self):
         self.table_parser = URDFParser(self.table)
         self.kitchen_parser = URDFParser(self.kitchen)
         self.apartment_parser = URDFParser(self.apartment)
+        self.pr2_parser = URDFParser(self.pr2)
 
     def test_table_parsing(self):
         world = self.table_parser.parse()
@@ -32,6 +34,12 @@ class URDFParserTestCase(unittest.TestCase):
 
     def test_apartment_parsing(self):
         world = self.apartment_parser.parse()
+        world.validate()
+        self.assertTrue(len(world.bodies) > 0)
+        self.assertTrue(len(world.connections) > 0)
+
+    def test_pr2_parsing(self):
+        world = self.pr2_parser.parse()
         world.validate()
         self.assertTrue(len(world.bodies) > 0)
         self.assertTrue(len(world.connections) > 0)
