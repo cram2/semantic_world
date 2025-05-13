@@ -5,7 +5,7 @@ from typing import Optional
 @dataclass
 class PrefixedName:
     name: str
-    prefix: Optional[str] = "world"
+    prefix: Optional[str] = 'world'
 
     def __hash__(self):
         return hash((self.prefix, self.name))

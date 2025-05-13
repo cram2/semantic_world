@@ -36,6 +36,7 @@ class StackedCompiledFunction:
 
 class CompiledFunction:
     str_params: List[str]
+    params: List[Symbol]
     compiled_f: ca.Function
     buf: ca.FunctionBuffer
     f_eval: functools.partial
