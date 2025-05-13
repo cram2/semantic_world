@@ -93,15 +93,16 @@ class URDFParser:
         root = [link for link in links if link.name.name == parsed.get_root()][0]
         world = World(root=root)
 
-        joints = []
-        for joint in parsed.joints:
-            parent = [link for link in links if link.name.name == joint.parent][0]
-            child = [link for link in links if link.name.name == joint.child][0]
-            parsed_joint = self.parse_joint(joint, parent, child, world)
-            joints.append(parsed_joint)
+        with world.modify_world():
+            joints = []
+            for joint in parsed.joints:
+                parent = [link for link in links if link.name.name == joint.parent][0]
+                child = [link for link in links if link.name.name == joint.child][0]
+                parsed_joint = self.parse_joint(joint, parent, child, world)
+                joints.append(parsed_joint)
 
-        [world.add_connection(joint) for joint in joints]
-        [world.add_body(link) for link in links]
+            [world.add_connection(joint) for joint in joints]
+            [world.add_body(link) for link in links]
 
         return world
 

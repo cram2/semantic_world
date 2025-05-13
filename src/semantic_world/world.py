@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import wraps
 from typing import Dict, Tuple, OrderedDict, Union
 
 import networkx as nx
@@ -20,7 +21,7 @@ from .world_entity import Body, Connection
 id_generator = IDGenerator()
 
 
-class TravelCompanion:
+class WorldVisitor:
     def link_call(self, body: Body) -> bool:
         """
         :return: return True to stop climbing up the branch
@@ -32,6 +33,54 @@ class TravelCompanion:
         :return: return True to stop climbing up the branch
         """
         return False
+
+
+class ResetJointStateContextManager:
+    def __init__(self, world: World):
+        self.world = world
+
+    def __enter__(self):
+        self.position_state = self.world.position_state.copy()
+        self.velocity_state = self.world.velocity_state.copy()
+        self.acceleration_state = self.world.acceleration_state.copy()
+        self.jerk_state = self.world.jerk_state.copy()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.world.position_state = self.position_state
+            self.world.velocity_state = self.velocity_state
+            self.world.acceleration_state = self.acceleration_state
+            self.world.jerk_state = self.jerk_state
+            self.world.notify_state_change()
+
+
+class WorldModelUpdateContextManager:
+    first: bool = True
+
+    def __init__(self, world: World):
+        self.world = world
+
+    def __enter__(self):
+        if self.world.context_manager_active:
+            self.first = False
+        self.world.context_manager_active = True
+        return self.world
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.first:
+            self.world.context_manager_active = False
+            if exc_type is None:
+                self.world._notify_model_change()
+
+
+def modifies_world(func):
+    @wraps(func)
+    def wrapper(self: World, *args, **kwargs):
+        with self.modify_world():
+            result = func(self, *args, **kwargs)
+            return result
+
+    return wrapper
 
 
 @dataclass
@@ -73,9 +122,12 @@ class World:
     Mostly triggered by updating connection values.
     """
 
+    context_manager_active: bool = False
+
     def __post_init__(self):
         self.add_body(self.root)
 
+    @modifies_world
     def create_free_variable(self,
                              name: PrefixedName,
                              lower_limits: Dict[Derivatives, float],
@@ -104,6 +156,35 @@ class World:
         if not nx.is_tree(self.kinematic_structure):
             raise ValueError("The world is not a tree.")
 
+    def modify_world(self):
+        return WorldModelUpdateContextManager(self)
+
+    def reset_joint_state_context(self):
+        return ResetJointStateContextManager(self)
+
+    def notify_state_change(self):
+        """
+        If you have changed the state of the world, call this function to trigger necessary events and increase
+        the state version.
+        """
+        # clear_memo(self.compute_fk)
+        # clear_memo(self.compute_fk_with_collision_offset_np)
+        self._recompute_fks()
+        self._state_version += 1
+
+    def _notify_model_change(self):
+        """
+        Call this function if you have changed the model of the world to trigger necessary events and increase
+        the model version number.
+        """
+        if not self.context_manager_active:
+            # self._fix_tree_structure()
+            # self.reset_cache()
+            self.init_all_fks()
+            # self._cleanup_unused_free_variable()
+            self.notify_state_change()
+            self._model_version += 1
+
     @property
     def bodies(self) -> List[Body]:
         """
@@ -123,6 +204,7 @@ class World:
         return [self.kinematic_structure.get_edge_data(*edge)[Connection.__name__]
                 for edge in self.kinematic_structure.edges()]
 
+    @modifies_world
     def add_body(self, body: Body):
         """
         Add a body to the world.
@@ -133,6 +215,7 @@ class World:
         body._world = self
         self._model_version += 1
 
+    @modifies_world
     def add_connection(self, connection: Connection):
         """
         Add a connection to the world.
@@ -293,13 +376,13 @@ class World:
         plt.axis('off')  # Hide axes
         plt.show()
 
-    def _travel_branch(self, body: Body, companion: TravelCompanion):
+    def _travel_branch(self, body: Body, companion: WorldVisitor):
         """
         Do a depth first search on a branch starting at link_name.
         Use companion to do whatever you want. It link_call and joint_call are called on every link/joint it sees.
         The traversion is stopped once they return False.
         :param body: starting point of the search
-        :param companion: payload. Implement your own Travelcompanion for your purpose.
+        :param companion: payload. Implement your own WorldVisitor for your purpose.
         """
         if companion.link_call(body):
             return
@@ -311,7 +394,7 @@ class World:
             self._travel_branch(child_body, companion)
 
     def init_all_fks(self):
-        class ExpressionCompanion(TravelCompanion):
+        class FKVisitor(WorldVisitor):
             idx_start: Dict[PrefixedName, int]
             compiled_collision_fks: cas.CompiledFunction
             compiled_all_fks: cas.CompiledFunction
@@ -380,7 +463,7 @@ class World:
 
                 return root_T_map @ map_T_tip
 
-        new_fks = ExpressionCompanion(self)
+        new_fks = FKVisitor(self)
         self._travel_branch(self.root, new_fks)
         new_fks.compile_fks()
         self._fk_computer = new_fks

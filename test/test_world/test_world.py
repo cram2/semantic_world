@@ -158,8 +158,6 @@ class PR2WorldTests(unittest.TestCase):
                           'l_gripper_l_finger_tip_link']
 
     def test_compute_fk_np(self):
-        self.world.init_all_fks()
-        self.world._recompute_fks()
         tip = self.world.get_body_by_name('r_gripper_tool_frame').name
         root = self.world.get_body_by_name('l_gripper_tool_frame').name
         fk = self.world.compute_fk_np(root, tip)
