@@ -95,12 +95,19 @@ class Connection(WorldEntity):
 
     def __post_init__(self):
         if self.origin is None:
-            name = self.parent.name.name + "_T_" + self.child.name.name
-            self.origin = TransformationMatrix(reference_frame=PrefixedName(prefix=self.parent.name.prefix, name=name),
-                                               child_frame=PrefixedName(prefix=self.child.name.prefix, name=name))
+            self.origin = TransformationMatrix()
+        self.origin.reference_frame = self.parent.name
+        self.origin.child_frame = self.child.name
 
     def __hash__(self):
         return hash((self.parent, self.child))
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+    @property
+    def name(self):
+        return PrefixedName(f'{self.parent.name.name}_T_{self.child.name.name}', prefix=self.child.name.prefix)
 
     # @memoize
     def parent_T_child_as_pos_quaternion(self) -> Expression:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Tuple, OrderedDict
+from typing import Dict, Tuple, OrderedDict, Union
 
 import networkx as nx
 import numpy as np
@@ -21,13 +21,13 @@ id_generator = IDGenerator()
 
 
 class TravelCompanion:
-    def link_call(self, link_name: PrefixedName) -> bool:
+    def link_call(self, body: Body) -> bool:
         """
         :return: return True to stop climbing up the branch
         """
         return False
 
-    def connection_call(self, joint_name: PrefixedName) -> bool:
+    def connection_call(self, connection: Connection) -> bool:
         """
         :return: return True to stop climbing up the branch
         """
@@ -148,11 +148,18 @@ class World:
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
 
-    def get_body_by_name(self, name: str) -> Body:
-        return [body for body in self.bodies if body.name.name == name][0]
-
-    def get_body_by_prefix_name(self, name: PrefixedName) -> Body:
-        return [body for body in self.bodies if body.name == name][0]
+    def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
+        if isinstance(name, PrefixedName):
+            if name.prefix is not None:
+                matches = [body for body in self.bodies if body.name == name]
+            else:
+                matches = [body for body in self.bodies if body.name.name == name.name]
+        else:
+            matches = [body for body in self.bodies if body.name.name == name]
+        assert len(matches) <= 1, f'Multiple bodies with name {name} found'
+        if matches:
+            return matches[0]
+        raise ValueError(f'Body with name {name} not found')
 
     def get_connection_by_name(self, name: str) -> Connection:
         return [c for c in self.connections if c.origin.reference_frame.name == name][0]
@@ -167,23 +174,16 @@ class World:
                       add_joints: bool,
                       add_links: bool,
                       add_fixed_joints: bool,
-                      add_non_controlled_joints: bool) -> List[PrefixedName]:
+                      add_non_controlled_joints: bool) -> List[Union[Body, Connection]]:
         """
         Computes a chain between root_link_name and tip_link_name. Only works if root_link_name is above tip_link_name
         in the world.
-        :param root_link_name:
-        :param tip_link_name:
-        :param add_joints:
-        :param add_links:
-        :param add_fixed_joints: only used if add_joints == True
-        :param add_non_controlled_joints: only used if add_joints == True
-        :return:
         """
         if root_link_name == tip_link_name:
             return []
 
-        root_body = self.get_body_by_prefix_name(root_link_name)
-        tip_body = self.get_body_by_prefix_name(tip_link_name)
+        root_body = self.get_body_by_name(root_link_name)
+        tip_body = self.get_body_by_name(tip_link_name)
 
         if not (root_body in self.bodies and tip_body in self.bodies):
             raise ValueError("Root or tip link not found in world")
@@ -196,18 +196,18 @@ class World:
         result = []
         for i in range(len(path) - 1):
             if add_links:
-                result.append(path[i].name)
+                result.append(path[i])
             if add_joints:
                 connection = self.get_connection(path[i], path[i + 1])
                 if isinstance(connection, FixedConnection):
                     if add_fixed_joints:
-                        result.append(connection.origin.reference_frame)
+                        result.append(connection)
                 else:
                     if add_non_controlled_joints:
-                        result.append(connection.origin.reference_frame)
+                        result.append(connection)
 
         if add_links:
-            result.append(path[-1].name)
+            result.append(path[-1])
 
         return result
 
@@ -219,7 +219,7 @@ class World:
                             add_links: bool,
                             add_fixed_joints: bool,
                             add_non_controlled_joints: bool) \
-            -> Tuple[List[PrefixedName], List[PrefixedName], List[PrefixedName]]:
+            -> Tuple[List[Union[Body, Connection]], List[Union[Body, Connection]], List[Union[Body, Connection]]]:
         """
         Computes the chain between root_link_name and tip_link_name. Can handle chains that start and end anywhere
         in the tree.
@@ -244,12 +244,12 @@ class World:
         else:
             i += 1
         connection = tip_chain[i - 1]
-        root_chain = self.compute_chain(connection, root_link_name, add_joints, add_links, add_fixed_joints,
+        root_chain = self.compute_chain(connection.name, root_link_name, add_joints, add_links, add_fixed_joints,
                                         add_non_controlled_joints)
         if add_links:
             root_chain = root_chain[1:]
         root_chain = root_chain[::-1]
-        tip_chain = self.compute_chain(connection, tip_link_name, add_joints, add_links, add_fixed_joints,
+        tip_chain = self.compute_chain(connection.name, tip_link_name, add_joints, add_links, add_fixed_joints,
                                        add_non_controlled_joints)
         if add_links:
             tip_chain = tip_chain[1:]
@@ -293,23 +293,22 @@ class World:
         plt.axis('off')  # Hide axes
         plt.show()
 
-    def _travel_branch(self, body_name: PrefixedName, companion: TravelCompanion):
+    def _travel_branch(self, body: Body, companion: TravelCompanion):
         """
         Do a depth first search on a branch starting at link_name.
         Use companion to do whatever you want. It link_call and joint_call are called on every link/joint it sees.
         The traversion is stopped once they return False.
-        :param body_name: starting point of the search 
+        :param body: starting point of the search
         :param companion: payload. Implement your own Travelcompanion for your purpose.
         """
-        current_body = self.get_body_by_prefix_name(body_name)
-        if companion.link_call(current_body.name):
+        if companion.link_call(body):
             return
 
-        for _, child_body, edge_data in self.kinematic_structure.edges(current_body, data=True):
+        for _, child_body, edge_data in self.kinematic_structure.edges(body, data=True):
             connection = edge_data[Connection.__name__]
-            if companion.connection_call(connection.origin.reference_frame):
+            if companion.connection_call(connection):
                 continue
-            self._travel_branch(child_body.name, companion)
+            self._travel_branch(child_body, companion)
 
     def init_all_fks(self):
         class ExpressionCompanion(TravelCompanion):
@@ -325,8 +324,7 @@ class World:
                 self.fks_exprs = {self.world.root.name: cas.TransformationMatrix()}
                 self.tf = OrderedDict()
 
-            def connection_call(self, joint_name: PrefixedName) -> bool:
-                connection = self.world.get_connection_by_prefix_name(joint_name)
+            def connection_call(self, connection: Connection) -> bool:
                 map_T_parent = self.fks_exprs[connection.parent.name]
                 self.fks_exprs[connection.child.name] = map_T_parent.dot(connection.origin)
                 self.tf[(connection.parent.name, connection.child.name)] = connection.parent_T_child_as_pos_quaternion()
@@ -383,7 +381,7 @@ class World:
                 return root_T_map @ map_T_tip
 
         new_fks = ExpressionCompanion(self)
-        self._travel_branch(self.root.name, new_fks)
+        self._travel_branch(self.root, new_fks)
         new_fks.compile_fks()
         self._fk_computer = new_fks
 

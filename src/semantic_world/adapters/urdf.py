@@ -90,7 +90,8 @@ class URDFParser:
                 parsed = urdf.URDF.from_xml_string(hacky_urdf_parser_fix(file.read()))
 
         links = [self.parse_link(link) for link in parsed.links]
-        world = World(root=links[0])
+        root = [link for link in links if link.name.name == parsed.get_root()][0]
+        world = World(root=root)
 
         joints = []
         for joint in parsed.joints:

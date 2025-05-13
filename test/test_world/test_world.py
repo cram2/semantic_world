@@ -1,7 +1,10 @@
+import os
 import unittest
+import pytest
 
 import numpy as np
 
+from semantic_world.adapters.urdf import URDFParser
 from semantic_world.connections import PrismaticConnection, RevoluteConnection
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
@@ -82,6 +85,88 @@ class WorldTestCase(unittest.TestCase):
                                                            [-0.841471, 0.540302, 0., -0.841471],
                                                            [0., 0., 1., 0.],
                                                            [0., 0., 0., 1.]]))
+
+
+class PR2WorldTests(unittest.TestCase):
+    urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
+    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
+
+    def setUp(self):
+        pr2_parser = URDFParser(self.pr2)
+        self.world = pr2_parser.parse()
+
+    def test_get_chain(self):
+        root_link = 'base_footprint'
+        tip_link = 'r_gripper_tool_frame'
+        real = self.world.compute_chain(root_link_name=PrefixedName(root_link),
+                                        tip_link_name=PrefixedName(tip_link),
+                                        add_joints=True,
+                                        add_links=True,
+                                        add_fixed_joints=True,
+                                        add_non_controlled_joints=True)
+        real = [x.name for x in real]
+        assert real == [PrefixedName(name='base_footprint', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='base_footprint_T_base_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='base_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='base_link_T_torso_lift_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='torso_lift_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='torso_lift_link_T_r_shoulder_pan_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_shoulder_pan_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_shoulder_pan_link_T_r_shoulder_lift_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_shoulder_lift_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_shoulder_lift_link_T_r_upper_arm_roll_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_upper_arm_roll_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_upper_arm_roll_link_T_r_upper_arm_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_upper_arm_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_upper_arm_link_T_r_elbow_flex_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_elbow_flex_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_elbow_flex_link_T_r_forearm_roll_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_forearm_roll_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_forearm_roll_link_T_r_forearm_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_forearm_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_forearm_link_T_r_wrist_flex_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_wrist_flex_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_wrist_flex_link_T_r_wrist_roll_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_wrist_roll_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_wrist_roll_link_T_r_gripper_palm_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_gripper_palm_link', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_gripper_palm_link_T_r_gripper_tool_frame', prefix='pr2_kinematic_tree'),
+                        PrefixedName(name='r_gripper_tool_frame', prefix='pr2_kinematic_tree')]
+
+    def test_get_chain2(self):
+        with pytest.raises(ValueError):
+            self.world.compute_chain(PrefixedName('l_gripper_tool_frame'),
+                                     PrefixedName('r_gripper_tool_frame'),
+                                     add_joints=True, add_links=True, add_fixed_joints=True,
+                                     add_non_controlled_joints=True)
+
+    def test_get_split_chain(self):
+        chain1, connection, chain2 = self.world.compute_split_chain(PrefixedName('l_gripper_r_finger_tip_link'),
+                                                                    PrefixedName('l_gripper_l_finger_tip_link'),
+                                                                    add_joints=True, add_links=True,
+                                                                    add_fixed_joints=True,
+                                                                    add_non_controlled_joints=True)
+        chain1 = [n.name.name for n in chain1]
+        connection = [n.name.name for n in connection]
+        chain2 = [n.name.name for n in chain2]
+        assert chain1 == ['l_gripper_r_finger_tip_link', 'l_gripper_r_finger_link_T_l_gripper_r_finger_tip_link',
+                          'l_gripper_r_finger_link',
+                          'l_gripper_palm_link_T_l_gripper_r_finger_link']
+        assert connection == ['l_gripper_palm_link']
+        assert chain2 == ['l_gripper_palm_link_T_l_gripper_l_finger_link', 'l_gripper_l_finger_link',
+                          'l_gripper_l_finger_link_T_l_gripper_l_finger_tip_link',
+                          'l_gripper_l_finger_tip_link']
+
+    def test_compute_fk_np(self):
+        self.world.init_all_fks()
+        self.world._recompute_fks()
+        tip = self.world.get_body_by_name('r_gripper_tool_frame').name
+        root = self.world.get_body_by_name('l_gripper_tool_frame').name
+        fk = self.world.compute_fk_np(root, tip)
+        np.testing.assert_array_almost_equal(fk, np.array([[9.679241e-01, 0.000000e+00, 1.241770e-29, -3.445810e-02],
+                                                           [0.000000e+00, 9.679241e-01, 0.000000e+00, -3.699206e-01],
+                                                           [0.000000e+00, 0.000000e+00, 9.679241e-01, 0.000000e+00],
+                                                           [0.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00]]))
 
 
 if __name__ == '__main__':

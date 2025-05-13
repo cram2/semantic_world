@@ -43,6 +43,7 @@ class URDFParserTestCase(unittest.TestCase):
         world.validate()
         self.assertTrue(len(world.bodies) > 0)
         self.assertTrue(len(world.connections) > 0)
+        self.assertTrue(world.root.name.name == 'base_footprint')
 
 
 if __name__ == '__main__':
