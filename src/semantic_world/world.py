@@ -104,9 +104,9 @@ class World:
 
     free_variables: Dict[PrefixedName, FreeVariable] = field(default_factory=dict)
 
-    _state: np.ndarray = field(default_factory=lambda: np.empty((0, 4), dtype=float))
+    _state: np.ndarray = field(default_factory=lambda: np.empty((4, 0), dtype=float))
     """
-    2d array where columns are derivatives and rows are free variable values for that derivative.
+    2d array where rows are derivatives and columns are free variable values for that derivative.
     """
 
     _model_version: int = 0
@@ -145,10 +145,14 @@ class World:
             upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
                                                         evaluated=True)
             initial_value = min(max(0, lower_limit), upper_limit)
-        full_initial_state = np.array([initial_value, 0, 0, 0], dtype=float)
-        self._state = np.vstack((self._state, full_initial_state))
+        full_initial_state = np.array([initial_value, 0, 0, 0], dtype=float).reshape((4, 1))
+        self._state = np.hstack((self._state, full_initial_state))
         self.free_variables[name] = free_variable
         return free_variable
+
+    @modifies_world
+    def create_virtual_free_variable(self, name: PrefixedName) -> FreeVariable:
+        return self.create_free_variable(name=name, lower_limits={}, upper_limits={})
 
     def validate(self):
         """
@@ -243,6 +247,7 @@ class World:
         self.add_body(connection.parent)
         self.add_body(connection.child)
         kwargs = {Connection.__name__: connection}
+        connection._world = self
         self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
@@ -454,7 +459,7 @@ class World:
 
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.subs = self.world._state[:, 0]
+                self.subs = self.world._state[Derivatives.position]
                 self.fks = self.compiled_all_fks.fast_call(self.subs)
 
             def compute_tf(self):
@@ -545,9 +550,9 @@ class World:
             raise ValueError(
                 f"Commands length {len(commands)} does not match number of free variables {len(self.free_variables)}")
 
-        self._state[:, derivative] = commands
+        self._state[derivative] = commands
 
         for i in range(derivative - 1, -1, -1):
-            self._state[:, i] += self._state[:, i + 1] * dt
+            self._state[i] += self._state[i + 1] * dt
 
         self.notify_state_change()

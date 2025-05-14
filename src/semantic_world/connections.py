@@ -3,8 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, TYPE_CHECKING, Tuple
 
+import numpy as np
+
 import semantic_world.spatial_types.spatial_types as cas
 from .free_variable import FreeVariable
+from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .world_entity import Connection
 
@@ -20,6 +23,14 @@ class FixedConnection(Connection):
 class MoveableConnection(Connection):
     """
     Base class for moveable connections.
+    """
+    free_variables: List[FreeVariable] = field(default_factory=list)
+
+
+@dataclass
+class VirtualConnection(Connection):
+    """
+    Base class for virtual connections.
     """
     free_variables: List[FreeVariable] = field(default_factory=list)
 
@@ -76,3 +87,50 @@ class RevoluteConnection(MoveableConnection):
         rotation_axis = cas.Vector3(self.axis)
         parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, motor_expression)
         self.origin = self.origin.dot(cas.TransformationMatrix(parent_R_child))
+
+
+@dataclass
+class Connection6DoF(VirtualConnection):
+    x: FreeVariable = field(default=None)
+    y: FreeVariable = field(default=None)
+    z: FreeVariable = field(default=None)
+
+    qx: FreeVariable = field(default=None)
+    qy: FreeVariable = field(default=None)
+    qz: FreeVariable = field(default=None)
+    qw: FreeVariable = field(default=None)
+
+    def __post_init__(self):
+        if self.x is None:
+            self.x = self._world.create_virtual_free_variable(name=PrefixedName('x', self.name))
+        if self.y is None:
+            self.y = self._world.create_virtual_free_variable(name=PrefixedName('y', self.name))
+        if self.z is None:
+            self.z = self._world.create_virtual_free_variable(name=PrefixedName('z', self.name))
+        if self.qx is None:
+            self.qx = self._world.create_virtual_free_variable(name=PrefixedName('qx', self.name))
+        if self.qy is None:
+            self.qy = self._world.create_virtual_free_variable(name=PrefixedName('qy', self.name))
+        if self.qz is None:
+            self.qz = self._world.create_virtual_free_variable(name=PrefixedName('qz', self.name))
+        if self.qw is None:
+            self.qw = self._world.create_virtual_free_variable(name=PrefixedName('qw', self.name))
+
+        self._world._state[Derivatives.position][self.qw.state_idx] = 1.
+        parent_P_child = cas.Point3((self.x.get_symbol(Derivatives.position),
+                                     self.y.get_symbol(Derivatives.position),
+                                     self.z.get_symbol(Derivatives.position)))
+        parent_R_child = cas.Quaternion((self.qx.get_symbol(Derivatives.position),
+                                         self.qy.get_symbol(Derivatives.position),
+                                         self.qz.get_symbol(Derivatives.position),
+                                         self.qw.get_symbol(Derivatives.position))).to_rotation_matrix()
+        self.origin = cas.TransformationMatrix.from_point_rotation_matrix(parent_P_child, parent_R_child)
+
+    def update_transform(self, position: np.ndarray, orientation: np.ndarray) -> None:
+        self._world._state[Derivatives.position][self.x.state_idx] = position[0]
+        self._world._state[Derivatives.position][self.y.state_idx] = position[1]
+        self._world._state[Derivatives.position][self.z.state_idx] = position[2]
+        self._world._state[Derivatives.position][self.qx.state_idx] = orientation[0]
+        self._world._state[Derivatives.position][self.qy.state_idx] = orientation[1]
+        self._world._state[Derivatives.position][self.qz.state_idx] = orientation[2]
+        self._world._state[Derivatives.position][self.qw.state_idx] = orientation[3]

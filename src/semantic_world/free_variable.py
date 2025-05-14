@@ -36,7 +36,7 @@ class FreeVariable:
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             s = cas.Symbol(f'{self.name}_{derivative}')
             self._symbols[derivative] = s
-            symbol_manager.register_symbol(s, lambda d=derivative: self.world._state[self.state_idx, d])
+            symbol_manager.register_symbol(s, lambda d=derivative: self.world._state[d, self.state_idx])
 
         self.position_name = str(self._symbols[Derivatives.position])
         self.default_lower_limits = self.lower_limits
