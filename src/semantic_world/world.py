@@ -491,6 +491,30 @@ class World:
     def _recompute_fks(self) -> None:
         self._fk_computer.recompute()
 
+    def compose_forward_kinematics_expression(self, root_body: PrefixedName, tip_body: PrefixedName) -> cas.Expression:
+        """
+        :param root_body: The root body in the kinematic chain.
+            It determines the starting point of the forward kinematics calculation.
+        :param tip_body: The tip body in the kinematic chain.
+            It determines the endpoint of the forward kinematics calculation.
+        :return: An expression representing the computed forward kinematics of the tip body relative to the root body.
+        """
+
+        fk = cas.TransformationMatrix()
+        root_chain, _, tip_chain = self.compute_split_chain(root_body, tip_body, add_joints=True, add_links=False,
+                                                            add_fixed_joints=True, add_non_controlled_joints=True)
+        connection: Connection
+        for connection in root_chain:
+            a = connection.origin
+            ai = a.inverse()
+            fk = fk.dot(ai)
+        for connection in tip_chain:
+            a = connection.origin
+            fk = fk.dot(a)
+        fk.reference_frame = root_body
+        fk.child_frame = tip_body
+        return fk
+
     def compute_fk_np(self, root_body: PrefixedName, tip_body: PrefixedName) -> np.ndarray:
         """
         Computes the forward kinematics from the root body to the tip body.

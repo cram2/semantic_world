@@ -29,15 +29,14 @@ class FreeVariable:
 
     def __post_init__(self):
         self._symbols = {}
-        self.state_idx = len(self.world.free_variables) - 1
+        self.state_idx = len(self.world.free_variables)
         self.name = self.name
 
         # Create symbols for all derivatives in one loop
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             s = cas.Symbol(f'{self.name}_{derivative}')
             self._symbols[derivative] = s
-            symbol_manager.register_symbol(s, lambda d=derivative: 
-                getattr(self.world, f"{d.name.lower()}_state")[self.state_idx])
+            symbol_manager.register_symbol(s, lambda d=derivative: self.world._state[self.state_idx, d])
 
         self.position_name = str(self._symbols[Derivatives.position])
         self.default_lower_limits = self.lower_limits

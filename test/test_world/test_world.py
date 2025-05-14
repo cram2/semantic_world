@@ -8,6 +8,7 @@ from semantic_world.adapters.urdf import URDFParser
 from semantic_world.connections import PrismaticConnection, RevoluteConnection
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
+from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.world import World, Body, Connection
 
 
@@ -46,24 +47,26 @@ class WorldTestCase(unittest.TestCase):
         self.world.validate()
         self.assertEqual(len(self.world.connections), 4)
         self.assertEqual(len(self.world.bodies), 5)
-        assert self.world._position_state[0] == 0
+        assert self.world._state[0, 0] == 0
 
     def test_chain(self):
         result = self.world.compute_chain(root_link_name=PrefixedName('root'),
                                           tip_link_name=PrefixedName('l2'),
                                           add_joints=True, add_links=True, add_fixed_joints=True,
                                           add_non_controlled_joints=True)
-        assert result == [PrefixedName('root'), PrefixedName('root_T_l1'), PrefixedName('l1'), PrefixedName('l1_T_l2'),
-                          PrefixedName('l2')]
+        result = [x.name for x in result]
+        assert result == [PrefixedName('root', 'world'), PrefixedName('root_T_l1'), PrefixedName('l1'),
+                          PrefixedName('l1_T_l2'), PrefixedName('l2')]
 
     def test_split_chain(self):
         result = self.world.compute_split_chain(root_link_name=PrefixedName('r2'),
                                                 tip_link_name=PrefixedName('l2'),
                                                 add_joints=True, add_links=True, add_fixed_joints=True,
                                                 add_non_controlled_joints=True)
+        result = tuple([x.name for x in y] for y in result)
         assert result == ([PrefixedName(name='r2'), PrefixedName(name='r1_T_r2'), PrefixedName(name='r1'),
                            PrefixedName(name='root_T_r1')],
-                          [PrefixedName(name='root')],
+                          [PrefixedName(name='root', prefix='world')],
                           [PrefixedName(name='root_T_l1'), PrefixedName(name='l1'), PrefixedName(name='l1_T_l2'),
                            PrefixedName(name='l2')])
 
@@ -79,11 +82,14 @@ class WorldTestCase(unittest.TestCase):
                                                            [0., 0., 1., 0.],
                                                            [0., 0., 0., 1.]]))
 
+    def test_compute_fk_expression(self):
+        self.world._state[0, 0] = 1.
+        self.world.notify_state_change()
         fk = self.world.compute_fk_np(PrefixedName('r2'), PrefixedName('l2'))
-        np.testing.assert_array_almost_equal(fk, np.array([[0.540302, 0.841471, 0., 0.540302],
-                                                           [-0.841471, 0.540302, 0., -0.841471],
-                                                           [0., 0., 1., 0.],
-                                                           [0., 0., 0., 1.]]))
+        fk_expr = self.world.compose_forward_kinematics_expression(PrefixedName('r2'), PrefixedName('l2'))
+        fk_expr_compiled = fk_expr.compile()
+        fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.params))
+        np.testing.assert_array_almost_equal(fk, fk2)
 
     def test_apply_control_commands(self):
         cmd = np.array([100.])
@@ -93,7 +99,6 @@ class WorldTestCase(unittest.TestCase):
         assert self.world._state[0, Derivatives.acceleration] == 100. * dt
         assert self.world._state[0, Derivatives.velocity] == 100. * dt * dt
         assert self.world._state[0, Derivatives.position] == 100. * dt * dt * dt
-
 
 
 class PR2WorldTests(unittest.TestCase):
