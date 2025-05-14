@@ -18,7 +18,7 @@ class WorldEntity:
     A class representing an entity in the world.
     """
 
-    _world: Optional[World] = field(default=None, init=False, repr=False)
+    _world: Optional[World] = field(default=None, repr=False, kw_only=True)
     """
     The backreference to the world this entity belongs to.
     """

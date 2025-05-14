@@ -153,6 +153,7 @@ class URDFParser:
 
         result = connection_type(parent=parent, child=child, origin=parent_T_child,
                                  multiplier=multiplier, offset=offset,
+                                 axis=joint.axis,
                                  free_variable=free_variable)
         return result
 
