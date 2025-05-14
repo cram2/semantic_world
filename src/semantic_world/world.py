@@ -207,6 +207,7 @@ class World:
             # self._cleanup_unused_free_variable()
             self.notify_state_change()
             self._model_version += 1
+            self.validate()
 
     @property
     def bodies(self) -> List[Body]:
@@ -249,6 +250,15 @@ class World:
         kwargs = {Connection.__name__: connection}
         connection._world = self
         self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
+
+    @modifies_world
+    def add_world(self, world: World) -> None:
+        for free_variable in world.free_variables.values():
+            free_variable.state_idx += len(self.free_variables)
+        self.free_variables.update(world.free_variables)
+        self._state = np.hstack((self._state, world._state))
+        for connection in world.connections:
+            self.add_connection(connection)
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
