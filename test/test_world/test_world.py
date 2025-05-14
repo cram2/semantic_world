@@ -42,7 +42,7 @@ class WorldTestCase(unittest.TestCase):
         self.world.validate()
         self.assertEqual(len(self.world.connections), 5)
         self.assertEqual(len(self.world.bodies), 6)
-        assert self.world._state[Derivatives.position, 0] == 0
+        assert self.world.state[Derivatives.position, 0] == 0
 
     def test_chain(self):
         result = self.world.compute_chain(root_link_name=PrefixedName('root'),
@@ -78,9 +78,9 @@ class WorldTestCase(unittest.TestCase):
         fk = self.world.compute_fk_np(PrefixedName('root', 'world'), PrefixedName('bf'))
         np.testing.assert_array_equal(fk, np.eye(4))
 
-        self.world._state[Derivatives.position, 1] = 1.
-        self.world._state[Derivatives.position, -1] = 0
-        self.world._state[Derivatives.position, -2] = 1
+        self.world.state[Derivatives.position, 1] = 1.
+        self.world.state[Derivatives.position, -1] = 0
+        self.world.state[Derivatives.position, -2] = 1
         self.world.notify_state_change()
         np.testing.assert_array_equal(fk, [[-1., 0., 0., 1.],
                                            [0., -1., 0., 0.],
@@ -91,7 +91,7 @@ class WorldTestCase(unittest.TestCase):
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_equal(fk, np.eye(4))
 
-        self.world._state[Derivatives.position, 0] = 1.
+        self.world.state[Derivatives.position, 0] = 1.
         self.world.notify_state_change()
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_almost_equal(fk, np.array([[0.540302, -0.841471, 0., -1.],
@@ -100,7 +100,7 @@ class WorldTestCase(unittest.TestCase):
                                                            [0., 0., 0., 1.]]))
 
     def test_compute_fk_expression(self):
-        self.world._state[Derivatives.position, 0] = 1.
+        self.world.state[Derivatives.position, 0] = 1.
         self.world.notify_state_change()
         fk = self.world.compute_fk_np(PrefixedName('r2'), PrefixedName('l2'))
         fk_expr = self.world.compose_forward_kinematics_expression(PrefixedName('r2'), PrefixedName('l2'))
@@ -112,10 +112,10 @@ class WorldTestCase(unittest.TestCase):
         cmd = np.array([100., 0, 0, 0, 0, 0, 0, 0])
         dt = 0.1
         self.world.apply_control_commands(cmd, dt, Derivatives.jerk)
-        assert self.world._state[Derivatives.jerk, 0] == 100.
-        assert self.world._state[Derivatives.acceleration, 0] == 100. * dt
-        assert self.world._state[Derivatives.velocity, 0] == 100. * dt * dt
-        assert self.world._state[Derivatives.position, 0] == 100. * dt * dt * dt
+        assert self.world.state[Derivatives.jerk, 0] == 100.
+        assert self.world.state[Derivatives.acceleration, 0] == 100. * dt
+        assert self.world.state[Derivatives.velocity, 0] == 100. * dt * dt
+        assert self.world.state[Derivatives.position, 0] == 100. * dt * dt * dt
 
 
 class PR2WorldTests(unittest.TestCase):
@@ -215,6 +215,39 @@ class PR2WorldTests(unittest.TestCase):
                                                             [0.149438, 0., 0.988771, 0.],
                                                             [0., 0., 0., 1.]]))
 
+    def test_apply_control_commands_omni_drive(self):
+        omni_drive: OmniDrive = self.world.get_connection_by_name(PrefixedName(name='root_T_base_footprint',
+                                                                    prefix='pr2_kinematic_tree'))
+        cmd = np.zeros((len(self.world.free_variables)), dtype=float)
+        cmd[-3] = 100
+        cmd[-2] = 100
+        cmd[-1] = 100
+        dt = 0.1
+        self.world.apply_control_commands(cmd, dt, Derivatives.jerk)
+        assert self.world.state[Derivatives.jerk, omni_drive.yaw.state_idx] == 100.
+        assert self.world.state[Derivatives.acceleration, omni_drive.yaw.state_idx] == 100. * dt
+        assert self.world.state[Derivatives.velocity, omni_drive.yaw.state_idx] == 100. * dt * dt
+        assert self.world.state[Derivatives.position, omni_drive.yaw.state_idx] == 100. * dt * dt * dt
+
+        assert self.world.state[Derivatives.jerk, omni_drive.x_vel.state_idx] == 100.
+        assert self.world.state[Derivatives.acceleration, omni_drive.x_vel.state_idx] == 100. * dt
+        assert self.world.state[Derivatives.velocity, omni_drive.x_vel.state_idx] == 100. * dt * dt
+        assert self.world.state[Derivatives.position, omni_drive.x_vel.state_idx] == 0
+
+        assert self.world.state[Derivatives.jerk, omni_drive.y_vel.state_idx] == 100.
+        assert self.world.state[Derivatives.acceleration, omni_drive.y_vel.state_idx] == 100. * dt
+        assert self.world.state[Derivatives.velocity, omni_drive.y_vel.state_idx] == 100. * dt * dt
+        assert self.world.state[Derivatives.position, omni_drive.y_vel.state_idx] == 0
+
+        assert self.world.state[Derivatives.jerk, omni_drive.x.state_idx] == 0.
+        assert self.world.state[Derivatives.acceleration, omni_drive.x.state_idx] == 0.
+        assert self.world.state[Derivatives.velocity, omni_drive.x.state_idx] == 0.8951707486311977
+        assert self.world.state[Derivatives.position, omni_drive.x.state_idx] == 0.08951707486311977
+
+        assert self.world.state[Derivatives.jerk, omni_drive.y.state_idx] == 0.
+        assert self.world.state[Derivatives.acceleration, omni_drive.y.state_idx] == 0.
+        assert self.world.state[Derivatives.velocity, omni_drive.y.state_idx] == 1.094837581924854
+        assert self.world.state[Derivatives.position, omni_drive.y.state_idx] == 0.1094837581924854
 
 if __name__ == '__main__':
     unittest.main()

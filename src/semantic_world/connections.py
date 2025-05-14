@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, TYPE_CHECKING, Tuple
+from typing import List, Tuple
 
 import numpy as np
 
@@ -117,7 +118,7 @@ class Connection6DoF(VirtualConnection):
         if self.qw is None:
             self.qw = self._world.create_virtual_free_variable(name=PrefixedName('qw', self.name))
 
-        self._world._state[Derivatives.position][self.qw.state_idx] = 1.
+        self._world.state[Derivatives.position][self.qw.state_idx] = 1.
         parent_P_child = cas.Point3((self.x.get_symbol(Derivatives.position),
                                      self.y.get_symbol(Derivatives.position),
                                      self.z.get_symbol(Derivatives.position)))
@@ -128,17 +129,23 @@ class Connection6DoF(VirtualConnection):
         self.origin = cas.TransformationMatrix.from_point_rotation_matrix(parent_P_child, parent_R_child)
 
     def update_transform(self, position: np.ndarray, orientation: np.ndarray) -> None:
-        self._world._state[Derivatives.position][self.x.state_idx] = position[0]
-        self._world._state[Derivatives.position][self.y.state_idx] = position[1]
-        self._world._state[Derivatives.position][self.z.state_idx] = position[2]
-        self._world._state[Derivatives.position][self.qx.state_idx] = orientation[0]
-        self._world._state[Derivatives.position][self.qy.state_idx] = orientation[1]
-        self._world._state[Derivatives.position][self.qz.state_idx] = orientation[2]
-        self._world._state[Derivatives.position][self.qw.state_idx] = orientation[3]
+        self._world.state[Derivatives.position][self.x.state_idx] = position[0]
+        self._world.state[Derivatives.position][self.y.state_idx] = position[1]
+        self._world.state[Derivatives.position][self.z.state_idx] = position[2]
+        self._world.state[Derivatives.position][self.qx.state_idx] = orientation[0]
+        self._world.state[Derivatives.position][self.qy.state_idx] = orientation[1]
+        self._world.state[Derivatives.position][self.qz.state_idx] = orientation[2]
+        self._world.state[Derivatives.position][self.qw.state_idx] = orientation[3]
+
+
+class HasUpdateState(ABC):
+    @abstractmethod
+    def update_state(self, dt: float) -> None:
+        pass
 
 
 @dataclass
-class OmniDrive(MoveableConnection):
+class OmniDrive(MoveableConnection, HasUpdateState):
     x: FreeVariable = field(default=None)
     y: FreeVariable = field(default=None)
     z: FreeVariable = field(default=None)
@@ -159,7 +166,7 @@ class OmniDrive(MoveableConnection):
         self.roll = self.roll or self._world.create_virtual_free_variable(name=PrefixedName('roll', self.name))
         self.pitch = self.pitch or self._world.create_virtual_free_variable(name=PrefixedName('pitch', self.name))
         self.yaw = self.yaw or self._world.create_free_variable(
-            name=PrefixedName('yaw_vel', self.name),
+            name=PrefixedName('yaw', self.name),
             lower_limits={Derivatives.velocity: -self.rotation_velocity_limits},
             upper_limits={Derivatives.velocity: self.rotation_velocity_limits})
 
@@ -188,21 +195,21 @@ class OmniDrive(MoveableConnection):
 
     def update_transform(self, position: np.ndarray, orientation: np.ndarray) -> None:
         roll, pitch, yaw = rpy_from_quaternion(*orientation)
-        self._world._state[Derivatives.position, self.x.state_idx] = position[0]
-        self._world._state[Derivatives.position, self.y.state_idx] = position[1]
-        self._world._state[Derivatives.position, self.z.state_idx] = position[2]
-        self._world._state[Derivatives.position, self.roll.state_idx] = roll
-        self._world._state[Derivatives.position, self.pitch.state_idx] = pitch
-        self._world._state[Derivatives.position, self.yaw.state_idx] = yaw
+        self._world.state[Derivatives.position, self.x.state_idx] = position[0]
+        self._world.state[Derivatives.position, self.y.state_idx] = position[1]
+        self._world.state[Derivatives.position, self.z.state_idx] = position[2]
+        self._world.state[Derivatives.position, self.roll.state_idx] = roll
+        self._world.state[Derivatives.position, self.pitch.state_idx] = pitch
+        self._world.state[Derivatives.position, self.yaw.state_idx] = yaw
 
     def update_state(self, dt: float) -> None:
-        state = self._world._state
+        state = self._world.state
         state[Derivatives.position, self.x_vel.state_idx] = 0
         state[Derivatives.position, self.y_vel.state_idx] = 0
 
         x_vel = state[Derivatives.velocity, self.x_vel.state_idx]
         y_vel = state[Derivatives.velocity, self.y_vel.state_idx]
-        delta = state[Derivatives.position, self.yaw.name]
+        delta = state[Derivatives.position, self.yaw.state_idx]
         state[Derivatives.velocity, self.x.state_idx] = (np.cos(delta) * x_vel - np.sin(delta) * y_vel)
         state[Derivatives.position, self.x.state_idx] += state[Derivatives.velocity, self.x.state_idx] * dt
         state[Derivatives.velocity, self.y.state_idx] = (np.sin(delta) * x_vel + np.cos(delta) * y_vel)

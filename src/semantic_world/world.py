@@ -9,7 +9,7 @@ import numpy as np
 from typing_extensions import List
 
 import semantic_world.spatial_types.spatial_types as cas
-from .connections import FixedConnection
+from .connections import FixedConnection, HasUpdateState
 from .free_variable import FreeVariable
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
@@ -104,7 +104,7 @@ class World:
 
     free_variables: Dict[PrefixedName, FreeVariable] = field(default_factory=dict)
 
-    _state: np.ndarray = field(default_factory=lambda: np.empty((4, 0), dtype=float))
+    state: np.ndarray = field(default_factory=lambda: np.empty((4, 0), dtype=float))
     """
     2d array where rows are derivatives and columns are free variable values for that derivative.
     """
@@ -146,7 +146,7 @@ class World:
                                                         evaluated=True)
             initial_value = min(max(0, lower_limit), upper_limit)
         full_initial_state = np.array([initial_value, 0, 0, 0], dtype=float).reshape((4, 1))
-        self._state = np.hstack((self._state, full_initial_state))
+        self.state = np.hstack((self.state, full_initial_state))
         self.free_variables[name] = free_variable
         return free_variable
 
@@ -256,7 +256,7 @@ class World:
         for free_variable in world.free_variables.values():
             free_variable.state_idx += len(self.free_variables)
         self.free_variables.update(world.free_variables)
-        self._state = np.hstack((self._state, world._state))
+        self.state = np.hstack((self.state, world.state))
         for connection in world.connections:
             self.add_connection(connection)
 
@@ -469,7 +469,7 @@ class World:
 
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.subs = self.world._state[Derivatives.position]
+                self.subs = self.world.state[Derivatives.position]
                 self.fks = self.compiled_all_fks.fast_call(self.subs)
 
             def compute_tf(self):
@@ -560,9 +560,11 @@ class World:
             raise ValueError(
                 f"Commands length {len(commands)} does not match number of free variables {len(self.free_variables)}")
 
-        self._state[derivative] = commands
+        self.state[derivative] = commands
 
         for i in range(derivative - 1, -1, -1):
-            self._state[i] += self._state[i + 1] * dt
-
+            self.state[i] += self.state[i + 1] * dt
+        for connection in self.connections:
+            if isinstance(connection, HasUpdateState):
+                connection.update_state(dt)
         self.notify_state_change()

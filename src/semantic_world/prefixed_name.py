@@ -12,3 +12,6 @@ class PrefixedName:
 
     def __str__(self):
         return f"{self.prefix}/{self.name}"
+
+    def __eq__(self, other):
+        return str(self) == str(other)
