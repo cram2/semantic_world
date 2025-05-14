@@ -14,8 +14,7 @@ from .free_variable import FreeVariable
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
-from .spatial_types.symbol_manager import symbol_manager
-from .utils import IDGenerator
+from .utils import IDGenerator, memoize, clear_memo
 from .world_entity import Body, Connection
 
 id_generator = IDGenerator()
@@ -105,10 +104,10 @@ class World:
 
     free_variables: Dict[PrefixedName, FreeVariable] = field(default_factory=dict)
 
-    position_state: list = field(default_factory=list)
-    velocity_state: list = field(default_factory=list)
-    acceleration_state: list = field(default_factory=list)
-    jerk_state: list = field(default_factory=list)
+    position_state: np.ndarray = field(default_factory=lambda: np.array([]))
+    velocity_state: np.ndarray = field(default_factory=lambda: np.array([]))
+    acceleration_state: np.ndarray = field(default_factory=lambda: np.array([]))
+    jerk_state: np.ndarray = field(default_factory=lambda: np.array([]))
 
     _model_version: int = 0
     """
@@ -127,6 +126,9 @@ class World:
     def __post_init__(self):
         self.add_body(self.root)
 
+    def __hash__(self):
+        return hash(id(self))
+
     @modifies_world
     def create_free_variable(self,
                              name: PrefixedName,
@@ -143,7 +145,7 @@ class World:
             upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
                                                         evaluated=True)
             initial_value = min(max(0, lower_limit), upper_limit)
-        self.position_state.append(initial_value)
+        self.position_state = np.append(self.position_state, initial_value)
         self.free_variables[name] = free_variable
         return free_variable
 
@@ -162,6 +164,22 @@ class World:
     def reset_joint_state_context(self):
         return ResetJointStateContextManager(self)
 
+    def reset_cache(self):
+        # super().reset_cache()
+        # clear_memo(self.get_directly_controlled_child_links_with_collisions)
+        # clear_memo(self.get_directly_controlled_child_links_with_collisions)
+        # clear_memo(self.compute_chain_reduced_to_controlled_joints)
+        # clear_memo(self.get_movable_parent_joint)
+        # clear_memo(self.get_controlled_parent_joint_of_link)
+        # clear_memo(self.get_controlled_parent_joint_of_joint)
+        clear_memo(self.compute_split_chain)
+        # clear_memo(self.are_linked)
+        # clear_memo(self.compose_fk_expression)
+        clear_memo(self.compute_chain)
+        # clear_memo(self.is_link_controlled)
+        for free_variable in self.free_variables.values():
+            free_variable.reset_cache()
+
     def notify_state_change(self):
         """
         If you have changed the state of the world, call this function to trigger necessary events and increase
@@ -179,7 +197,7 @@ class World:
         """
         if not self.context_manager_active:
             # self._fix_tree_structure()
-            # self.reset_cache()
+            self.reset_cache()
             self.init_all_fks()
             # self._cleanup_unused_free_variable()
             self.notify_state_change()
@@ -250,7 +268,7 @@ class World:
     def get_connection_by_prefix_name(self, name: PrefixedName) -> Connection:
         return [c for c in self.connections if c.origin.reference_frame == name][0]
 
-    # @memoize
+    @memoize
     def compute_chain(self,
                       root_link_name: PrefixedName,
                       tip_link_name: PrefixedName,
@@ -294,7 +312,7 @@ class World:
 
         return result
 
-    # @memoize
+    @memoize
     def compute_split_chain(self,
                             root_link_name: PrefixedName,
                             tip_link_name: PrefixedName,
@@ -422,11 +440,7 @@ class World:
                         continue
                     collision_fks.append(self.fks_exprs[body.name])
                 collision_fks = cas.vstack(collision_fks)
-                params = set()
-                params.update(all_fks.free_symbols())
-                params.update(collision_fks.free_symbols())
-                params = list(params)
-                self.str_params = [str(v) for v in params]
+                params = [v.get_symbol(Derivatives.position) for v in self.world.free_variables.values()]
                 self.compiled_all_fks = all_fks.compile(parameters=params)
                 self.compiled_collision_fks = collision_fks.compile(parameters=params)
                 self.compiled_tf = tf.compile(parameters=params)
@@ -434,13 +448,13 @@ class World:
 
             def recompute(self):
                 # self.compute_fk_np.memo.clear()
-                self.subs = symbol_manager.resolve_symbols(self.compiled_all_fks.params)
+                self.subs = self.world.position_state
                 self.fks = self.compiled_all_fks.fast_call(self.subs)
 
             def compute_tf(self):
                 return self.compiled_tf.fast_call(self.subs)
 
-            # @memoize
+            @memoize
             def compute_fk_np(self, root: PrefixedName, tip: PrefixedName) -> np.ndarray:
                 root_is_world = root == self.world.root.name
                 tip_is_world = tip == self.world.root.name

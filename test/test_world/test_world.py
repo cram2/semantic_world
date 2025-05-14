@@ -28,18 +28,19 @@ class WorldTestCase(unittest.TestCase):
             PrefixedName('r2')
         )
 
-        dof = self.world.create_free_variable(name=PrefixedName('dof'),
-                                              lower_limits={Derivatives.velocity: -1},
-                                              upper_limits={Derivatives.velocity: 1})
+        with self.world.modify_world():
+            dof = self.world.create_free_variable(name=PrefixedName('dof'),
+                                                  lower_limits={Derivatives.velocity: -1},
+                                                  upper_limits={Derivatives.velocity: 1})
 
-        c_l1_l2 = PrismaticConnection(l1, l2, free_variable=dof, axis=(1, 0, 0))
-        c_r1_r2 = RevoluteConnection(r1, r2, free_variable=dof, axis=(0, 0, 1))
-        c_root_l1 = Connection(self.world.root, l1)
-        c_root_r1 = Connection(self.world.root, r1)
-        self.world.add_connection(c_l1_l2)
-        self.world.add_connection(c_r1_r2)
-        self.world.add_connection(c_root_l1)
-        self.world.add_connection(c_root_r1)
+            c_l1_l2 = PrismaticConnection(l1, l2, free_variable=dof, axis=(1, 0, 0))
+            c_r1_r2 = RevoluteConnection(r1, r2, free_variable=dof, axis=(0, 0, 1))
+            c_root_l1 = Connection(self.world.root, l1)
+            c_root_r1 = Connection(self.world.root, r1)
+            self.world.add_connection(c_l1_l2)
+            self.world.add_connection(c_r1_r2)
+            self.world.add_connection(c_root_l1)
+            self.world.add_connection(c_root_r1)
 
     def test_construction(self):
         self.world.validate()
@@ -67,13 +68,10 @@ class WorldTestCase(unittest.TestCase):
                            PrefixedName(name='l2')])
 
     def test_compute_fk(self):
-        self.world.init_all_fks()
-        self.world._recompute_fks()
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_equal(fk, np.eye(4))
 
         self.world.position_state[0] = 1
-        self.world._recompute_fks()
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_almost_equal(fk, np.array([[0.540302, -0.841471, 0., -1.],
                                                            [0.841471, 0.540302, 0., 0.],

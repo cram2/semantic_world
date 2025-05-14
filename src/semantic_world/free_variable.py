@@ -8,6 +8,7 @@ import semantic_world.spatial_types.spatial_types as cas
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.symbol_manager import symbol_manager
+from .utils import memoize
 
 if TYPE_CHECKING:
     from .world import World
@@ -19,46 +20,36 @@ class FreeVariable:
     Stub class for free variables.
     """
 
-    state_idx: int
+    name: PrefixedName
+    lower_limits: Dict[Derivatives, float]
+    upper_limits: Dict[Derivatives, float]
+    world: World
+    state_idx: int = 0
 
-    def __init__(self,
-                 name: PrefixedName,
-                 lower_limits: Dict[Derivatives, float],
-                 upper_limits: Dict[Derivatives, float],
-                 world: World,
-                 horizon_functions: Optional[Dict[Derivatives, float]] = None):
+
+    def __post_init__(self):
         self._symbols = {}
-        self.state_idx = len(world.free_variables) - 1
-        self.name = name
+        self.state_idx = len(self.world.free_variables) - 1
+        self.name = self.name
 
-        s = cas.Symbol(f'{self.name}_{Derivatives.position}')
-        self._symbols[Derivatives.position] = s
-        symbol_manager.register_symbol(s, lambda: world.position_state[self.state_idx])
-
-        s = cas.Symbol(f'{self.name}_{Derivatives.velocity}')
-        self._symbols[Derivatives.velocity] = s
-        symbol_manager.register_symbol(s, lambda: world.velocity_state[self.state_idx])
-
-        s = cas.Symbol(f'{self.name}_{Derivatives.acceleration}')
-        self._symbols[Derivatives.acceleration] = s
-        symbol_manager.register_symbol(s, lambda: world.acceleration_state[self.state_idx])
-
-        s = cas.Symbol(f'{self.name}_{Derivatives.jerk}')
-        self._symbols[Derivatives.jerk] = s
-        symbol_manager.register_symbol(s, lambda: world.jerk_state[self.state_idx])
+        # Create symbols for all derivatives in one loop
+        for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
+            s = cas.Symbol(f'{self.name}_{derivative}')
+            self._symbols[derivative] = s
+            symbol_manager.register_symbol(s, lambda d=derivative: 
+                getattr(self.world, f"{d.name.lower()}_state")[self.state_idx])
 
         self.position_name = str(self._symbols[Derivatives.position])
-        self.default_lower_limits = lower_limits
-        self.default_upper_limits = upper_limits
+        self.default_lower_limits = self.lower_limits
+        self.default_upper_limits = self.upper_limits
         self.lower_limits = {}
         self.upper_limits = {}
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
         self.horizon_functions = defaultdict(lambda: 0.00001)
-        if horizon_functions is None:
-            horizon_functions = {Derivatives.velocity: 1,
-                                 Derivatives.acceleration: 0.1,
-                                 Derivatives.jerk: 0.1}
+        horizon_functions = {Derivatives.velocity: 1,
+                             Derivatives.acceleration: 0.1,
+                             Derivatives.jerk: 0.1}
         self.horizon_functions.update(horizon_functions)
 
     def get_symbol(self, derivative: Derivatives) -> Union[cas.Symbol, float]:
@@ -74,7 +65,7 @@ class FreeVariable:
             except:
                 pass
 
-    # @memoize
+    @memoize
     def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
             -> Union[cas.Expression, float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
@@ -97,7 +88,7 @@ class FreeVariable:
     def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[cas.Symbol, float], float]):
         self.upper_limits[derivative] = limit
 
-    # @memoize
+    @memoize
     def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
             -> Union[Union[cas.Symbol, float], float]:
         if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
@@ -126,7 +117,7 @@ class FreeVariable:
             upper_limits[derivative] = self.get_upper_limit(derivative, default=False, evaluated=True)
         return upper_limits
 
-    # @memoize
+    @memoize
     def has_position_limits(self) -> bool:
         try:
             lower_limit = self.get_lower_limit(Derivatives.position)
@@ -135,7 +126,7 @@ class FreeVariable:
         except KeyError:
             return False
 
-    # @memoize
+    @memoize
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
         limit = self.get_upper_limit(derivative)
@@ -150,8 +141,5 @@ class FreeVariable:
 
         return weight_scaled * (1 / limit) ** 2
 
-    def __str__(self) -> str:
-        return self.position_name
-
-    def __repr__(self):
-        return str(self)
+    def __hash__(self):
+        return hash(id(self))

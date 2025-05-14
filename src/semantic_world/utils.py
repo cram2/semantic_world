@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
-from functools import lru_cache
-from typing import Any, Tuple
+from copy import deepcopy
+from functools import lru_cache, wraps
+from typing import Any, Tuple, TypeVar, Callable
 from xml.etree import ElementTree as ET
 
 
@@ -77,5 +78,46 @@ def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'g
     # Turn back to string
     return ET.tostring(root, encoding='unicode')
 
+
 def robot_name_from_urdf_string(urdf_string):
     return urdf_string.split('robot name="')[1].split('"')[0]
+
+
+T = TypeVar("T", bound=Callable)
+
+
+def memoize(function: T) -> T:
+    memo = function.memo = {}
+
+    @wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        key = (args, frozenset(kwargs.items()))
+        try:
+            return memo[key]
+        except KeyError:
+            rv = function(*args, **kwargs)
+            memo[key] = rv
+            return rv
+
+    return wrapper
+
+
+def clear_memo(f):
+    if hasattr(f, 'memo'):
+        f.memo.clear()
+
+
+def copy_memoize(function: T) -> T:
+    memo = function.memo = {}
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        key = (args, frozenset(kwargs.items()))
+        try:
+            return deepcopy(memo[key])
+        except KeyError:
+            rv = function(*args, **kwargs)
+            memo[key] = rv
+            return deepcopy(rv)
+
+    return wrapper
