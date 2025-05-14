@@ -46,7 +46,7 @@ class WorldTestCase(unittest.TestCase):
         self.world.validate()
         self.assertEqual(len(self.world.connections), 4)
         self.assertEqual(len(self.world.bodies), 5)
-        assert self.world.position_state[0] == 0
+        assert self.world._position_state[0] == 0
 
     def test_chain(self):
         result = self.world.compute_chain(root_link_name=PrefixedName('root'),
@@ -71,7 +71,8 @@ class WorldTestCase(unittest.TestCase):
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_equal(fk, np.eye(4))
 
-        self.world.position_state[0] = 1
+        self.world._state[0, 0] = 1.
+        self.world.notify_state_change()
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_almost_equal(fk, np.array([[0.540302, -0.841471, 0., -1.],
                                                            [0.841471, 0.540302, 0., 0.],
@@ -83,6 +84,16 @@ class WorldTestCase(unittest.TestCase):
                                                            [-0.841471, 0.540302, 0., -0.841471],
                                                            [0., 0., 1., 0.],
                                                            [0., 0., 0., 1.]]))
+
+    def test_apply_control_commands(self):
+        cmd = np.array([100.])
+        dt = 0.1
+        self.world.apply_control_commands(cmd, dt, Derivatives.jerk)
+        assert self.world._state[0, Derivatives.jerk] == 100.
+        assert self.world._state[0, Derivatives.acceleration] == 100. * dt
+        assert self.world._state[0, Derivatives.velocity] == 100. * dt * dt
+        assert self.world._state[0, Derivatives.position] == 100. * dt * dt * dt
+
 
 
 class PR2WorldTests(unittest.TestCase):
@@ -159,10 +170,10 @@ class PR2WorldTests(unittest.TestCase):
         tip = self.world.get_body_by_name('r_gripper_tool_frame').name
         root = self.world.get_body_by_name('l_gripper_tool_frame').name
         fk = self.world.compute_fk_np(root, tip)
-        np.testing.assert_array_almost_equal(fk, np.array([[9.679241e-01, 0.000000e+00, 1.241770e-29, -3.445810e-02],
-                                                           [0.000000e+00, 9.679241e-01, 0.000000e+00, -3.699206e-01],
-                                                           [0.000000e+00, 0.000000e+00, 9.679241e-01, 0.000000e+00],
-                                                           [0.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00]]))
+        np.testing.assert_array_almost_equal(fk, np.array([[1.0, 0.0, 0.0, -0.0356],
+                                                           [0, 1.0, 0.0, -0.376],
+                                                           [0, 0.0, 1.0, 0.0],
+                                                           [0.0, 0.0, 0.0, 1.0]]))
 
 
 if __name__ == '__main__':

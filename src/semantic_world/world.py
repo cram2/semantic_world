@@ -39,17 +39,17 @@ class ResetJointStateContextManager:
         self.world = world
 
     def __enter__(self):
-        self.position_state = self.world.position_state.copy()
-        self.velocity_state = self.world.velocity_state.copy()
-        self.acceleration_state = self.world.acceleration_state.copy()
-        self.jerk_state = self.world.jerk_state.copy()
+        self.position_state = self.world._position_state.copy()
+        self.velocity_state = self.world._velocity_state.copy()
+        self.acceleration_state = self.world._acceleration_state.copy()
+        self.jerk_state = self.world._jerk_state.copy()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            self.world.position_state = self.position_state
-            self.world.velocity_state = self.velocity_state
-            self.world.acceleration_state = self.acceleration_state
-            self.world.jerk_state = self.jerk_state
+            self.world._position_state = self.position_state
+            self.world._velocity_state = self.velocity_state
+            self.world._acceleration_state = self.acceleration_state
+            self.world._jerk_state = self.jerk_state
             self.world.notify_state_change()
 
 
@@ -104,10 +104,10 @@ class World:
 
     free_variables: Dict[PrefixedName, FreeVariable] = field(default_factory=dict)
 
-    position_state: np.ndarray = field(default_factory=lambda: np.array([]))
-    velocity_state: np.ndarray = field(default_factory=lambda: np.array([]))
-    acceleration_state: np.ndarray = field(default_factory=lambda: np.array([]))
-    jerk_state: np.ndarray = field(default_factory=lambda: np.array([]))
+    _state: np.ndarray = field(default_factory=lambda: np.empty((0, 4), dtype=float))
+    """
+    2d array where columns are derivatives and rows are free variable values for that derivative.
+    """
 
     _model_version: int = 0
     """
@@ -145,7 +145,8 @@ class World:
             upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
                                                         evaluated=True)
             initial_value = min(max(0, lower_limit), upper_limit)
-        self.position_state = np.append(self.position_state, initial_value)
+        full_initial_state = np.array([initial_value, 0, 0, 0], dtype=float)
+        self._state = np.vstack((self._state, full_initial_state))
         self.free_variables[name] = free_variable
         return free_variable
 
@@ -231,7 +232,6 @@ class World:
         """
         self.kinematic_structure.add_node(body)
         body._world = self
-        self._model_version += 1
 
     @modifies_world
     def add_connection(self, connection: Connection):
@@ -244,7 +244,6 @@ class World:
         self.add_body(connection.child)
         kwargs = {Connection.__name__: connection}
         self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
-        self._model_version += 1
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
@@ -262,11 +261,18 @@ class World:
             return matches[0]
         raise ValueError(f'Body with name {name} not found')
 
-    def get_connection_by_name(self, name: str) -> Connection:
-        return [c for c in self.connections if c.origin.reference_frame.name == name][0]
-
-    def get_connection_by_prefix_name(self, name: PrefixedName) -> Connection:
-        return [c for c in self.connections if c.origin.reference_frame == name][0]
+    def get_connection_by_name(self, name: Union[str, PrefixedName]) -> Connection:
+        if isinstance(name, PrefixedName):
+            if name.prefix is not None:
+                matches = [conn for conn in self.connections if conn.name == name]
+            else:
+                matches = [conn for conn in self.connections if conn.name.name == name.name]
+        else:
+            matches = [conn for conn in self.connections if conn.name.name == name]
+        assert len(matches) <= 1, f'Multiple connections with name {name} found'
+        if matches:
+            return matches[0]
+        raise ValueError(f'Connection with name {name} not found')
 
     @memoize
     def compute_chain(self,
@@ -447,8 +453,8 @@ class World:
                 self.idx_start = {body.name: i * 4 for i, body in enumerate(self.world.bodies)}
 
             def recompute(self):
-                # self.compute_fk_np.memo.clear()
-                self.subs = self.world.position_state
+                self.compute_fk_np.memo.clear()
+                self.subs = self.world._state[:, 0]
                 self.fks = self.compiled_all_fks.fast_call(self.subs)
 
             def compute_tf(self):
@@ -482,8 +488,42 @@ class World:
         new_fks.compile_fks()
         self._fk_computer = new_fks
 
-    def _recompute_fks(self):
+    def _recompute_fks(self) -> None:
         self._fk_computer.recompute()
 
-    def compute_fk_np(self, root: PrefixedName, tip: PrefixedName) -> np.ndarray:
-        return self._fk_computer.compute_fk_np(root, tip)
+    def compute_fk_np(self, root_body: PrefixedName, tip_body: PrefixedName) -> np.ndarray:
+        """
+        Computes the forward kinematics from the root body to the tip body.
+
+        This method computes the transformation matrix representing the pose of the
+        tip body relative to the root body, expressed as a numpy ndarray.
+
+        :param root_body: Root body for which the kinematics are computed.
+        :param tip_body: Tip body to which the kinematics are computed.
+        :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
+        """
+        return self._fk_computer.compute_fk_np(root_body, tip_body)
+
+    def apply_control_commands(self, commands: np.ndarray, dt: float, derivative: Derivatives) -> None:
+        """
+        Updates the state of a system by applying control commands at a specified derivative level,
+        followed by backward integration to update lower derivatives.
+
+        :param commands: Control commands to be applied at the specified derivative
+            level. The array length must match the number of free variables
+            in the system.
+        :param dt: Time step used for the integration of lower derivatives.
+        :param derivative: The derivative level to which the control commands are
+            applied.
+        :return: None
+        """
+        if len(commands) != len(self.free_variables):
+            raise ValueError(
+                f"Commands length {len(commands)} does not match number of free variables {len(self.free_variables)}")
+
+        self._state[:, derivative] = commands
+
+        for i in range(derivative - 1, -1, -1):
+            self._state[:, i] += self._state[:, i + 1] * dt
+
+        self.notify_state_change()
