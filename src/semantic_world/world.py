@@ -506,7 +506,8 @@ class World:
     def _recompute_fks(self) -> None:
         self._fk_computer.recompute()
 
-    def compose_forward_kinematics_expression(self, root_body: PrefixedName, tip_body: PrefixedName) -> cas.Expression:
+    def compose_forward_kinematics_expression(self, root_body: PrefixedName, tip_body: PrefixedName) \
+            -> cas.TransformationMatrix:
         """
         :param root_body: The root body in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.

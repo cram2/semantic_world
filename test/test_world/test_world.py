@@ -217,7 +217,7 @@ class PR2WorldTests(unittest.TestCase):
 
     def test_apply_control_commands_omni_drive(self):
         omni_drive: OmniDrive = self.world.get_connection_by_name(PrefixedName(name='root_T_base_footprint',
-                                                                    prefix='pr2_kinematic_tree'))
+                                                                               prefix='pr2_kinematic_tree'))
         cmd = np.zeros((len(self.world.free_variables)), dtype=float)
         cmd[-3] = 100
         cmd[-2] = 100
@@ -248,6 +248,7 @@ class PR2WorldTests(unittest.TestCase):
         assert self.world.state[Derivatives.acceleration, omni_drive.y.state_idx] == 0.
         assert self.world.state[Derivatives.velocity, omni_drive.y.state_idx] == 1.094837581924854
         assert self.world.state[Derivatives.position, omni_drive.y.state_idx] == 0.1094837581924854
+
 
 if __name__ == '__main__':
     unittest.main()
