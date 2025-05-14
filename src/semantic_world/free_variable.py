@@ -21,8 +21,8 @@ class FreeVariable:
     """
 
     name: PrefixedName
-    lower_limits: Dict[Derivatives, float]
-    upper_limits: Dict[Derivatives, float]
+    lower_limits: Dict[Derivatives, Optional[float]]
+    upper_limits: Dict[Derivatives, Optional[float]]
     world: World
     state_idx: int = 0
 
@@ -39,6 +39,12 @@ class FreeVariable:
             symbol_manager.register_symbol(s, lambda d=derivative: self.world._state[d, self.state_idx])
 
         self.position_name = str(self._symbols[Derivatives.position])
+        if Derivatives.acceleration not in self.lower_limits:
+            self.set_lower_limit(Derivatives.acceleration, None)
+            self.set_upper_limit(Derivatives.acceleration, None)
+        if Derivatives.jerk not in self.lower_limits:
+            self.set_lower_limit(Derivatives.jerk, None)
+            self.set_upper_limit(Derivatives.jerk, None)
         self.default_lower_limits = self.lower_limits
         self.default_upper_limits = self.upper_limits
         self.lower_limits = {}
@@ -124,21 +130,6 @@ class FreeVariable:
             return lower_limit is not None and upper_limit is not None
         except KeyError:
             return False
-
-    @memoize
-    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
-                          evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
-        limit = self.get_upper_limit(derivative)
-        if limit is None:
-            return 0.0
-        weight = symbol_manager.evaluate_expr(self.quadratic_weights[derivative])
-        limit = symbol_manager.evaluate_expr(limit)
-
-        start = weight * alpha
-        a = (weight - start) / (prediction_horizon)
-        weight_scaled = a * t + start
-
-        return weight_scaled * (1 / limit) ** 2
 
     def __hash__(self):
         return hash(id(self))

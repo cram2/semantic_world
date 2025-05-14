@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF
+from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, OmniDrive
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
@@ -78,6 +78,15 @@ class WorldTestCase(unittest.TestCase):
         fk = self.world.compute_fk_np(PrefixedName('root', 'world'), PrefixedName('bf'))
         np.testing.assert_array_equal(fk, np.eye(4))
 
+        self.world._state[Derivatives.position, 1] = 1.
+        self.world._state[Derivatives.position, -1] = 0
+        self.world._state[Derivatives.position, -2] = 1
+        self.world.notify_state_change()
+        np.testing.assert_array_equal(fk, [[-1., 0., 0., 1.],
+                                           [0., -1., 0., 0.],
+                                           [0., 0., 1., 0.],
+                                           [0., 0., 0., 1.]])
+
     def test_compute_fk(self):
         fk = self.world.compute_fk_np(PrefixedName('l2'), PrefixedName('r2'))
         np.testing.assert_array_equal(fk, np.eye(4))
@@ -114,8 +123,13 @@ class PR2WorldTests(unittest.TestCase):
     pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
 
     def setUp(self):
-        pr2_parser = URDFParser(self.pr2)
-        self.world = pr2_parser.parse()
+        self.world = World()
+        with self.world.modify_world():
+            pr2_parser = URDFParser(self.pr2)
+            pr2_world = pr2_parser.parse()
+            self.world.add_world(pr2_world)
+            c_root_bf = OmniDrive(parent=self.world.root, child=pr2_world.root, _world=self.world)
+            self.world.add_connection(c_root_bf)
 
     def test_get_chain(self):
         root_link = 'base_footprint'
