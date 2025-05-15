@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Dict, Tuple, OrderedDict, Union
+from typing import Dict, Tuple, OrderedDict, Union, Optional
 
 import networkx as nx
 import numpy as np
@@ -132,27 +132,23 @@ class World:
     @modifies_world
     def create_free_variable(self,
                              name: PrefixedName,
-                             lower_limits: Dict[Derivatives, float],
-                             upper_limits: Dict[Derivatives, float]) -> FreeVariable:
+                             lower_limits: Optional[Dict[Derivatives, float]] = None,
+                             upper_limits: Optional[Dict[Derivatives, float]] = None) -> FreeVariable:
         free_variable = FreeVariable(name=name,
-                                     lower_limits=lower_limits,
-                                     upper_limits=upper_limits,
+                                     _lower_limits=lower_limits,
+                                     _upper_limits=upper_limits,
                                      world=self)
-        initial_value = 0
-        if free_variable.has_position_limits():
-            lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position,
-                                                        evaluated=True)
-            upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position,
-                                                        evaluated=True)
-            initial_value = min(max(0, lower_limit), upper_limit)
-        full_initial_state = np.array([initial_value, 0, 0, 0], dtype=float).reshape((4, 1))
+        initial_position = 0
+        lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position)
+        if lower_limit is not None:
+            initial_position = max(lower_limit, initial_position)
+        upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position)
+        if upper_limit is not None:
+            initial_position = min(upper_limit, initial_position)
+        full_initial_state = np.array([initial_position, 0, 0, 0], dtype=float).reshape((4, 1))
         self.state = np.hstack((self.state, full_initial_state))
         self.free_variables[name] = free_variable
         return free_variable
-
-    @modifies_world
-    def create_virtual_free_variable(self, name: PrefixedName) -> FreeVariable:
-        return self.create_free_variable(name=name, lower_limits={}, upper_limits={})
 
     def validate(self):
         """

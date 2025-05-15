@@ -103,20 +103,13 @@ class Connection6DoF(VirtualConnection):
     qw: FreeVariable = field(default=None)
 
     def __post_init__(self):
-        if self.x is None:
-            self.x = self._world.create_virtual_free_variable(name=PrefixedName('x', self.name))
-        if self.y is None:
-            self.y = self._world.create_virtual_free_variable(name=PrefixedName('y', self.name))
-        if self.z is None:
-            self.z = self._world.create_virtual_free_variable(name=PrefixedName('z', self.name))
-        if self.qx is None:
-            self.qx = self._world.create_virtual_free_variable(name=PrefixedName('qx', self.name))
-        if self.qy is None:
-            self.qy = self._world.create_virtual_free_variable(name=PrefixedName('qy', self.name))
-        if self.qz is None:
-            self.qz = self._world.create_virtual_free_variable(name=PrefixedName('qz', self.name))
-        if self.qw is None:
-            self.qw = self._world.create_virtual_free_variable(name=PrefixedName('qw', self.name))
+        self.x = self.x or self._world.create_free_variable(name=PrefixedName('x', self.name))
+        self.y = self.y or self._world.create_free_variable(name=PrefixedName('y', self.name))
+        self.z = self.z or self._world.create_free_variable(name=PrefixedName('z', self.name))
+        self.qx = self.qx or self._world.create_free_variable(name=PrefixedName('qx', self.name))
+        self.qy = self.qy or self._world.create_free_variable(name=PrefixedName('qy', self.name))
+        self.qz = self.qz or self._world.create_free_variable(name=PrefixedName('qz', self.name))
+        self.qw = self.qw or self._world.create_free_variable(name=PrefixedName('qw', self.name))
 
         self._world.state[Derivatives.position][self.qw.state_idx] = 1.
         parent_P_child = cas.Point3((self.x.get_symbol(Derivatives.position),
@@ -159,12 +152,12 @@ class OmniDrive(MoveableConnection, HasUpdateState):
     rotation_velocity_limits: float = field(default=0.5)
 
     def __post_init__(self):
-        self.x = self.x or self._world.create_virtual_free_variable(name=PrefixedName('x', self.name))
-        self.y = self.y or self._world.create_virtual_free_variable(name=PrefixedName('y', self.name))
-        self.z = self.z or self._world.create_virtual_free_variable(name=PrefixedName('z', self.name))
+        self.x = self.x or self._world.create_free_variable(name=PrefixedName('x', self.name))
+        self.y = self.y or self._world.create_free_variable(name=PrefixedName('y', self.name))
+        self.z = self.z or self._world.create_free_variable(name=PrefixedName('z', self.name))
 
-        self.roll = self.roll or self._world.create_virtual_free_variable(name=PrefixedName('roll', self.name))
-        self.pitch = self.pitch or self._world.create_virtual_free_variable(name=PrefixedName('pitch', self.name))
+        self.roll = self.roll or self._world.create_free_variable(name=PrefixedName('roll', self.name))
+        self.pitch = self.pitch or self._world.create_free_variable(name=PrefixedName('pitch', self.name))
         self.yaw = self.yaw or self._world.create_free_variable(
             name=PrefixedName('yaw', self.name),
             lower_limits={Derivatives.velocity: -self.rotation_velocity_limits},

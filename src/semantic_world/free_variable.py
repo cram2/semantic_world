@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional, Union, TYPE_CHECKING
 
 import semantic_world.spatial_types.spatial_types as cas
@@ -17,45 +17,70 @@ if TYPE_CHECKING:
 @dataclass
 class FreeVariable:
     """
-    Stub class for free variables.
+    A class representing a free variable in a world model with associated derivatives and limits.
+    
+    This class manages a variable that can freely change within specified limits, tracking its position,
+    velocity, acceleration, and jerk. It maintains symbolic representations for each derivative order
+    and provides methods to get and set limits for these derivatives.
     """
 
     name: PrefixedName
-    lower_limits: Dict[Derivatives, Optional[float]]
-    upper_limits: Dict[Derivatives, Optional[float]]
+    """
+    The identifier for this free variable
+    """
     world: World
-    state_idx: int = 0
+    """
+    The world model this variable belongs to
+    """
 
+    _lower_limits: Dict[Derivatives, Optional[float]] = field(default=None)
+    _upper_limits: Dict[Derivatives, Optional[float]] = field(default=None)
+    """
+    Lower and upper bounds for each derivative
+    """
+
+    _lower_limits_overwrite: Dict[Derivatives, Optional[float]] = field(default_factory=dict)
+    _upper_limits_overwrite: Dict[Derivatives, Optional[float]] = field(default_factory=dict)
+    """
+    Temporary lower and upper bound overwrites
+    """
+
+    state_idx: int = field(default=None, init=False)
+    """
+    Index of this variable in the world state
+    """
+
+    _symbols: Dict[Derivatives, cas.Symbol] = field(default_factory=dict, init=False)
+    """
+    Symbolic representations for each derivative
+    """
 
     def __post_init__(self):
-        self._symbols = {}
+        self._lower_limits = self._lower_limits or defaultdict(lambda: None)
+        self._upper_limits = self._upper_limits or defaultdict(lambda: None)
         self.state_idx = len(self.world.free_variables)
-        self.name = self.name
 
-        # Create symbols for all derivatives in one loop
+        # Register symbols for all derivatives in one loop
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             s = cas.Symbol(f'{self.name}_{derivative}')
             self._symbols[derivative] = s
             symbol_manager.register_symbol(s, lambda d=derivative: self.world.state[d, self.state_idx])
 
-        self.position_name = str(self._symbols[Derivatives.position])
-        if Derivatives.acceleration not in self.lower_limits:
-            self.set_lower_limit(Derivatives.acceleration, None)
-            self.set_upper_limit(Derivatives.acceleration, None)
-        if Derivatives.jerk not in self.lower_limits:
-            self.set_lower_limit(Derivatives.jerk, None)
-            self.set_upper_limit(Derivatives.jerk, None)
-        self.default_lower_limits = self.lower_limits
-        self.default_upper_limits = self.upper_limits
-        self.lower_limits = {}
-        self.upper_limits = {}
-        assert max(self._symbols.keys()) == len(self._symbols) - 1
+    @property
+    def position_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.position)
 
-        self.horizon_functions = defaultdict(lambda: 0.00001)
-        horizon_functions = {Derivatives.velocity: 1,
-                             Derivatives.acceleration: 0.1,
-                             Derivatives.jerk: 0.1}
-        self.horizon_functions.update(horizon_functions)
+    @property
+    def velocity_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.velocity)
+
+    @property
+    def acceleration_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.acceleration)
+
+    @property
+    def jerk_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.jerk)
 
     def get_symbol(self, derivative: Derivatives) -> Union[cas.Symbol, float]:
         try:
@@ -71,63 +96,41 @@ class FreeVariable:
                 pass
 
     @memoize
-    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
-            -> Union[cas.Expression, float]:
-        if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
-            expr = cas.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
-        elif derivative in self.default_lower_limits:
-            expr = self.default_lower_limits[derivative]
-        elif derivative in self.lower_limits:
-            expr = self.lower_limits[derivative]
+    def get_lower_limit(self, derivative: Derivatives) -> Optional[float]:
+        if derivative in self._lower_limits and derivative in self._lower_limits_overwrite:
+            lower_limit = cas.max(self._lower_limits[derivative], self._lower_limits_overwrite[derivative])
+        elif derivative in self._lower_limits:
+            lower_limit = self._lower_limits[derivative]
+        elif derivative in self._lower_limits_overwrite:
+            lower_limit = self._lower_limits_overwrite[derivative]
         else:
-            raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {derivative}')
-        if evaluated:
-            if expr is None:
-                return None
-            return float(symbol_manager.evaluate_expr(expr))
-        return expr
-
-    def set_lower_limit(self, derivative: Derivatives, limit: Union[cas.Expression, float]):
-        self.lower_limits[derivative] = limit
-
-    def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[cas.Symbol, float], float]):
-        self.upper_limits[derivative] = limit
+            return None
+        return lower_limit
 
     @memoize
-    def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
-            -> Union[Union[cas.Symbol, float], float]:
-        if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
-            expr = cas.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
-        elif derivative in self.default_upper_limits:
-            expr = self.default_upper_limits[derivative]
-        elif derivative in self.upper_limits:
-            expr = self.upper_limits[derivative]
+    def get_upper_limit(self, derivative: Derivatives) -> Optional[float]:
+        if derivative in self._upper_limits and derivative in self._upper_limits_overwrite:
+            upper_limit = cas.min(self._upper_limits[derivative], self._upper_limits_overwrite[derivative])
+        elif derivative in self._upper_limits:
+            upper_limit = self._upper_limits[derivative]
+        elif derivative in self._upper_limits_overwrite:
+            upper_limit = self._upper_limits_overwrite[derivative]
         else:
-            raise KeyError(f'Free variable {self} doesn\'t have upper limit for derivative of order {derivative}')
-        if evaluated:
-            if expr is None:
-                return None
-            return symbol_manager.evaluate_expr(expr)
-        return expr
+            return None
+        return upper_limit
 
-    def get_lower_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
-        lower_limits = {}
-        for derivative in Derivatives.range(Derivatives.position, max_derivative):
-            lower_limits[derivative] = self.get_lower_limit(derivative, default=False, evaluated=True)
-        return lower_limits
+    def set_lower_limit(self, derivative: Derivatives, limit: float):
+        self._lower_limits_overwrite[derivative] = limit
 
-    def get_upper_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
-        upper_limits = {}
-        for derivative in Derivatives.range(Derivatives.position, max_derivative):
-            upper_limits[derivative] = self.get_upper_limit(derivative, default=False, evaluated=True)
-        return upper_limits
+    def set_upper_limit(self, derivative: Derivatives, limit: float):
+        self._upper_limits_overwrite[derivative] = limit
 
     @memoize
     def has_position_limits(self) -> bool:
         try:
             lower_limit = self.get_lower_limit(Derivatives.position)
             upper_limit = self.get_upper_limit(Derivatives.position)
-            return lower_limit is not None and upper_limit is not None
+            return lower_limit is not None or upper_limit is not None
         except KeyError:
             return False
 
