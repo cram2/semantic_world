@@ -87,8 +87,8 @@ t_Mesh = Table(
     Column('scale_id', ForeignKey('Scale.id'), nullable=False)
 )
 
-t_MoveableConnection = Table(
-    'MoveableConnection', metadata,
+t_ActiveConnection = Table(
+    'ActiveConnection', metadata,
     Column('id', ForeignKey('Connection.id'), primary_key=True)
 )
 
@@ -111,20 +111,20 @@ t_Cylinder = Table(
     Column('height', Float, nullable=False)
 )
 
-t_FreeVariable = Table(
-    'FreeVariable', metadata,
+t_DegreeOfFreedom = Table(
+    'DegreeOfFreedom', metadata,
     Column('id', Integer, primary_key=True),
-    Column('moveableconnection_free_variables_id', ForeignKey('MoveableConnection.id'))
+    Column('activeconnection_active_dofs_id', ForeignKey('ActiveConnection.id'))
 )
 
 t_PrismaticConnection = Table(
     'PrismaticConnection', metadata,
-    Column('id', ForeignKey('MoveableConnection.id'), primary_key=True)
+    Column('id', ForeignKey('ActiveConnection.id'), primary_key=True)
 )
 
 t_RevoluteConnection = Table(
     'RevoluteConnection', metadata,
-    Column('id', ForeignKey('MoveableConnection.id'), primary_key=True)
+    Column('id', ForeignKey('ActiveConnection.id'), primary_key=True)
 )
 
 t_Connection6DoF = Table(
@@ -134,7 +134,12 @@ t_Connection6DoF = Table(
 
 t_OmniDrive = Table(
     'OmniDrive', metadata,
-    Column('id', ForeignKey('MoveableConnection.id'), primary_key=True)
+    Column('id', ForeignKey('ActiveConnection.id'), primary_key=True)
+)
+
+t_PassiveConnection = Table(
+    'PassiveConnection', metadata,
+    Column('id', ForeignKey('Connection.id'), primary_key=True)
 )
 
 t_Sphere = Table(
@@ -157,20 +162,20 @@ m_WorldEntity = mapper_registry.map_imperatively(semantic_world.world_entity.Wor
 
 m_PrefixedName = mapper_registry.map_imperatively(semantic_world.prefixed_name.PrefixedName, t_PrefixedName, )
 
-m_FreeVariable = mapper_registry.map_imperatively(semantic_world.connections.FreeVariable, t_FreeVariable, )
+m_DegreeOfFreedom = mapper_registry.map_imperatively(semantic_world.connections.DegreeOfFreedom, t_DegreeOfFreedom, )
 
 m_Mesh = mapper_registry.map_imperatively(semantic_world.geometry.Mesh, t_Mesh, properties = dict(scale=relationship('Scale',foreign_keys=[t_Mesh.c.scale_id])), polymorphic_identity = "Mesh", inherits = m_Shape)
 
 m_Primitive = mapper_registry.map_imperatively(semantic_world.geometry.Primitive, t_Primitive, properties = dict(color=relationship('Color',foreign_keys=[t_Primitive.c.color_id])), polymorphic_identity = "Primitive", inherits = m_Shape)
 
-m_Body = mapper_registry.map_imperatively(semantic_world.world.Body, t_Body, properties = dict(name=relationship('PrefixedName',foreign_keys=[t_Body.c.name_id]), 
-visual=relationship('Shape',foreign_keys=[t_Shape.c.body_visual_id]), 
+m_Body = mapper_registry.map_imperatively(semantic_world.world.Body, t_Body, properties = dict(name=relationship('PrefixedName',foreign_keys=[t_Body.c.name_id]),
+visual=relationship('Shape',foreign_keys=[t_Shape.c.body_visual_id]),
 collision=relationship('Shape',foreign_keys=[t_Shape.c.body_collision_id])), polymorphic_identity = "Body", inherits = m_WorldEntity)
 
 m_View = mapper_registry.map_imperatively(semantic_world.world_entity.View, t_View, polymorphic_identity = "View", inherits = m_WorldEntity)
 
 m_Connection = mapper_registry.map_imperatively(semantic_world.world_entity.Connection, t_Connection, properties = dict(parent=relationship('Body',foreign_keys=[t_Connection.c.parent_id]),
-child=relationship('Body',foreign_keys=[t_Connection.c.child_id]), 
+child=relationship('Body',foreign_keys=[t_Connection.c.child_id]),
 origin=t_Connection.c.origin), polymorphic_identity = "Connection", inherits = m_WorldEntity)
 
 m_Sphere = mapper_registry.map_imperatively(semantic_world.geometry.Sphere, t_Sphere, polymorphic_identity = "Sphere", inherits = m_Primitive)
@@ -181,12 +186,15 @@ m_Box = mapper_registry.map_imperatively(semantic_world.geometry.Box, t_Box, pro
 
 m_FixedConnection = mapper_registry.map_imperatively(semantic_world.connections.FixedConnection, t_FixedConnection, polymorphic_identity = "FixedConnection", inherits = m_Connection)
 
-m_MoveableConnection = mapper_registry.map_imperatively(semantic_world.connections.MoveableConnection, t_MoveableConnection, properties = dict(free_variables=relationship('FreeVariable',foreign_keys=[t_FreeVariable.c.moveableconnection_free_variables_id])), polymorphic_identity = "MoveableConnection", inherits = m_Connection)
+m_ActiveConnection = mapper_registry.map_imperatively(semantic_world.connections.ActiveConnection, t_ActiveConnection, properties = dict(active_dofs=relationship('DegreeOfFreedom', foreign_keys=[t_DegreeOfFreedom.c.activeconnection_active_dofs_id])), polymorphic_identity ="ActiveConnection", inherits = m_Connection)
 
-m_PrismaticConnection = mapper_registry.map_imperatively(semantic_world.connections.PrismaticConnection, t_PrismaticConnection, polymorphic_identity = "PrismaticConnection", inherits = m_MoveableConnection)
+m_PassiveConnection = mapper_registry.map_imperatively(semantic_world.connections.PassiveConnection, t_PassiveConnection, polymorphic_identity="PassiveConnection", inherits=m_Connection)
 
-m_RevoluteConnection = mapper_registry.map_imperatively(semantic_world.connections.RevoluteConnection, t_RevoluteConnection, polymorphic_identity = "RevoluteConnection", inherits = m_MoveableConnection)
+m_PrismaticConnection = mapper_registry.map_imperatively(semantic_world.connections.PrismaticConnection, t_PrismaticConnection, polymorphic_identity = "PrismaticConnection", inherits = m_ActiveConnection)
+
+m_RevoluteConnection = mapper_registry.map_imperatively(semantic_world.connections.RevoluteConnection, t_RevoluteConnection, polymorphic_identity = "RevoluteConnection", inherits = m_ActiveConnection)
 
 m_Connection6DoF = mapper_registry.map_imperatively(semantic_world.connections.Connection6DoF, t_Connection6DoF, polymorphic_identity="Connection6DoF", inherits=m_Connection)
 
-m_OmniDrive = mapper_registry.map_imperatively(semantic_world.connections.OmniDrive, t_OmniDrive, polymorphic_identity="OmniDrive", inherits=m_MoveableConnection)
+m_OmniDrive = mapper_registry.map_imperatively(semantic_world.connections.OmniDrive, t_OmniDrive, polymorphic_identity="OmniDrive", inherits=m_ActiveConnection)
+

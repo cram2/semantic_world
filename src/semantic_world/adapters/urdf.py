@@ -145,16 +145,16 @@ class URDFParser:
         else:
             free_variable_name = PrefixedName(joint.name)
 
-        if free_variable_name in world.free_variables:
-            free_variable = world.free_variables[free_variable_name]
+        if free_variable_name in world.degrees_of_freedom:
+            dof = world.degrees_of_freedom[free_variable_name]
         else:
-            free_variable = world.create_free_variable(name=PrefixedName(joint.name),
-                                                       lower_limits=lower_limits, upper_limits=upper_limits)
+            dof = world.create_degree_of_freedom(name=PrefixedName(joint.name),
+                                                 lower_limits=lower_limits, upper_limits=upper_limits)
 
         result = connection_type(parent=parent, child=child, origin=parent_T_child,
                                  multiplier=multiplier, offset=offset,
                                  axis=joint.axis,
-                                 free_variable=free_variable)
+                                 dof=dof)
         return result
 
     def parse_link(self, link: urdf.Link) -> Body:

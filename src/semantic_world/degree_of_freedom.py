@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class FreeVariable:
+class DegreeOfFreedom:
     """
-    A class representing a free variable in a world model with associated derivatives and limits.
+    A class representing a degree of freedom in a world model with associated derivatives and limits.
     
     This class manages a variable that can freely change within specified limits, tracking its position,
     velocity, acceleration, and jerk. It maintains symbolic representations for each derivative order
@@ -50,7 +50,7 @@ class FreeVariable:
     Index of this variable in the world state
     """
 
-    _symbols: Dict[Derivatives, cas.Symbol] = field(default_factory=dict, init=False)
+    _derivative_symbols: Dict[Derivatives, cas.Symbol] = field(default_factory=dict, init=False)
     """
     Symbolic representations for each derivative
     """
@@ -58,12 +58,12 @@ class FreeVariable:
     def __post_init__(self):
         self._lower_limits = self._lower_limits or defaultdict(lambda: None)
         self._upper_limits = self._upper_limits or defaultdict(lambda: None)
-        self.state_idx = len(self.world.free_variables)
+        self.state_idx = len(self.world.degrees_of_freedom)
 
         # Register symbols for all derivatives in one loop
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             s = cas.Symbol(f'{self.name}_{derivative}')
-            self._symbols[derivative] = s
+            self._derivative_symbols[derivative] = s
             symbol_manager.register_symbol(s, lambda d=derivative: self.world.state[d, self.state_idx])
 
     @property
@@ -84,7 +84,7 @@ class FreeVariable:
 
     def get_symbol(self, derivative: Derivatives) -> Union[cas.Symbol, float]:
         try:
-            return self._symbols[derivative]
+            return self._derivative_symbols[derivative]
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {derivative}')
 

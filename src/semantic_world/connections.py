@@ -7,7 +7,7 @@ from typing import List, Tuple
 import numpy as np
 
 import semantic_world.spatial_types.spatial_types as cas
-from .free_variable import FreeVariable
+from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import rpy_from_quaternion
@@ -17,32 +17,32 @@ from .world_entity import Connection
 @dataclass
 class FixedConnection(Connection):
     """
-    A connection that has 0 degrees of freedom.
+    Has 0 degrees of freedom.
     """
 
 
 @dataclass
-class MoveableConnection(Connection):
+class ActiveConnection(Connection):
     """
-    Base class for moveable connections.
+    Has active degrees of freedom.
     """
-    free_variables: List[FreeVariable] = field(default_factory=list, init=False)
+    active_dofs: List[DegreeOfFreedom] = field(default_factory=list, init=False)
 
 
 @dataclass
-class VirtualConnection(Connection):
+class PassiveConnection(Connection):
     """
-    Base class for virtual connections.
+    Has passive degrees of freedom.
     """
-    free_variables: List[FreeVariable] = field(default_factory=list, init=False)
+    passive_dofs: List[DegreeOfFreedom] = field(default_factory=list, init=False)
 
 
 @dataclass
-class PrismaticConnection(MoveableConnection):
-    axis: Tuple[float, float, float] = field(default=None)
+class PrismaticConnection(ActiveConnection):
+    axis: Tuple[float, float, float] = field(kw_only=True)
     multiplier: float = 1.0
     offset: float = 0.0
-    free_variable: FreeVariable = field(default=None)
+    dof: DegreeOfFreedom = field(default=None)
 
     def __post_init__(self):
         super().__post_init__()
@@ -55,9 +55,10 @@ class PrismaticConnection(MoveableConnection):
         else:
             self.offset = self.offset
         self.axis = self.axis
-        self.free_variables = [self.free_variable]
+        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(self.name))
+        self.active_dofs = [self.dof]
 
-        motor_expression = self.free_variable.get_symbol(Derivatives.position) * self.multiplier + self.offset
+        motor_expression = self.dof.get_symbol(Derivatives.position) * self.multiplier + self.offset
         translation_axis = cas.Vector3(self.axis) * motor_expression
         parent_T_child = cas.TransformationMatrix.from_xyz_rpy(x=translation_axis[0],
                                                                y=translation_axis[1],
@@ -66,11 +67,11 @@ class PrismaticConnection(MoveableConnection):
 
 
 @dataclass
-class RevoluteConnection(MoveableConnection):
-    axis: Tuple[float, float, float] = field(default=None)
+class RevoluteConnection(ActiveConnection):
+    axis: Tuple[float, float, float] = field(kw_only=True)
     multiplier: float = 1.0
     offset: float = 0.0
-    free_variable: FreeVariable = field(default=None)
+    dof: DegreeOfFreedom = field(default=None)
 
     def __post_init__(self):
         super().__post_init__()
@@ -83,33 +84,35 @@ class RevoluteConnection(MoveableConnection):
         else:
             self.offset = self.offset
         self.axis = self.axis
-        self.free_variables = [self.free_variable]
+        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(self.name))
+        self.active_dofs = [self.dof]
 
-        motor_expression = self.free_variable.get_symbol(Derivatives.position) * self.multiplier + self.offset
+        motor_expression = self.dof.get_symbol(Derivatives.position) * self.multiplier + self.offset
         rotation_axis = cas.Vector3(self.axis)
         parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, motor_expression)
         self.origin = self.origin.dot(cas.TransformationMatrix(parent_R_child))
 
 
 @dataclass
-class Connection6DoF(VirtualConnection):
-    x: FreeVariable = field(default=None)
-    y: FreeVariable = field(default=None)
-    z: FreeVariable = field(default=None)
+class Connection6DoF(PassiveConnection):
+    x: DegreeOfFreedom = field(default=None)
+    y: DegreeOfFreedom = field(default=None)
+    z: DegreeOfFreedom = field(default=None)
 
-    qx: FreeVariable = field(default=None)
-    qy: FreeVariable = field(default=None)
-    qz: FreeVariable = field(default=None)
-    qw: FreeVariable = field(default=None)
+    qx: DegreeOfFreedom = field(default=None)
+    qy: DegreeOfFreedom = field(default=None)
+    qz: DegreeOfFreedom = field(default=None)
+    qw: DegreeOfFreedom = field(default=None)
 
     def __post_init__(self):
-        self.x = self.x or self._world.create_free_variable(name=PrefixedName('x', self.name))
-        self.y = self.y or self._world.create_free_variable(name=PrefixedName('y', self.name))
-        self.z = self.z or self._world.create_free_variable(name=PrefixedName('z', self.name))
-        self.qx = self.qx or self._world.create_free_variable(name=PrefixedName('qx', self.name))
-        self.qy = self.qy or self._world.create_free_variable(name=PrefixedName('qy', self.name))
-        self.qz = self.qz or self._world.create_free_variable(name=PrefixedName('qz', self.name))
-        self.qw = self.qw or self._world.create_free_variable(name=PrefixedName('qw', self.name))
+        self.x = self.x or self._world.create_degree_of_freedom(name=PrefixedName('x', self.name))
+        self.y = self.y or self._world.create_degree_of_freedom(name=PrefixedName('y', self.name))
+        self.z = self.z or self._world.create_degree_of_freedom(name=PrefixedName('z', self.name))
+        self.qx = self.qx or self._world.create_degree_of_freedom(name=PrefixedName('qx', self.name))
+        self.qy = self.qy or self._world.create_degree_of_freedom(name=PrefixedName('qy', self.name))
+        self.qz = self.qz or self._world.create_degree_of_freedom(name=PrefixedName('qz', self.name))
+        self.qw = self.qw or self._world.create_degree_of_freedom(name=PrefixedName('qw', self.name))
+        self.passive_dofs = [self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw]
 
         self._world.state[Derivatives.position][self.qw.state_idx] = 1.
         parent_P_child = cas.Point3((self.x.get_symbol(Derivatives.position),
@@ -138,40 +141,41 @@ class HasUpdateState(ABC):
 
 
 @dataclass
-class OmniDrive(MoveableConnection, HasUpdateState):
-    x: FreeVariable = field(default=None)
-    y: FreeVariable = field(default=None)
-    z: FreeVariable = field(default=None)
-    roll: FreeVariable = field(default=None)
-    pitch: FreeVariable = field(default=None)
-    yaw: FreeVariable = field(default=None)
-    x_vel: FreeVariable = field(default=None)
-    y_vel: FreeVariable = field(default=None)
+class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
+    x: DegreeOfFreedom = field(default=None)
+    y: DegreeOfFreedom = field(default=None)
+    z: DegreeOfFreedom = field(default=None)
+    roll: DegreeOfFreedom = field(default=None)
+    pitch: DegreeOfFreedom = field(default=None)
+    yaw: DegreeOfFreedom = field(default=None)
+    x_vel: DegreeOfFreedom = field(default=None)
+    y_vel: DegreeOfFreedom = field(default=None)
 
     translation_velocity_limits: float = field(default=0.6)
     rotation_velocity_limits: float = field(default=0.5)
 
     def __post_init__(self):
-        self.x = self.x or self._world.create_free_variable(name=PrefixedName('x', self.name))
-        self.y = self.y or self._world.create_free_variable(name=PrefixedName('y', self.name))
-        self.z = self.z or self._world.create_free_variable(name=PrefixedName('z', self.name))
+        self.x = self.x or self._world.create_degree_of_freedom(name=PrefixedName('x', self.name))
+        self.y = self.y or self._world.create_degree_of_freedom(name=PrefixedName('y', self.name))
+        self.z = self.z or self._world.create_degree_of_freedom(name=PrefixedName('z', self.name))
 
-        self.roll = self.roll or self._world.create_free_variable(name=PrefixedName('roll', self.name))
-        self.pitch = self.pitch or self._world.create_free_variable(name=PrefixedName('pitch', self.name))
-        self.yaw = self.yaw or self._world.create_free_variable(
+        self.roll = self.roll or self._world.create_degree_of_freedom(name=PrefixedName('roll', self.name))
+        self.pitch = self.pitch or self._world.create_degree_of_freedom(name=PrefixedName('pitch', self.name))
+        self.yaw = self.yaw or self._world.create_degree_of_freedom(
             name=PrefixedName('yaw', self.name),
             lower_limits={Derivatives.velocity: -self.rotation_velocity_limits},
             upper_limits={Derivatives.velocity: self.rotation_velocity_limits})
 
-        self.x_vel = self.x_vel or self._world.create_free_variable(
+        self.x_vel = self.x_vel or self._world.create_degree_of_freedom(
             name=PrefixedName('x_vel', self.name),
             lower_limits={Derivatives.velocity: -self.translation_velocity_limits},
             upper_limits={Derivatives.velocity: self.translation_velocity_limits})
-        self.y_vel = self.y_vel or self._world.create_free_variable(
+        self.y_vel = self.y_vel or self._world.create_degree_of_freedom(
             name=PrefixedName('y_vel', self.name),
             lower_limits={Derivatives.velocity: -self.translation_velocity_limits},
             upper_limits={Derivatives.velocity: self.translation_velocity_limits})
-        self.free_variables = [self.x_vel, self.y_vel, self.yaw]
+        self.active_dofs = [self.x_vel, self.y_vel, self.yaw]
+        self.passive_dofs = [self.x, self.y, self.z, self.roll, self.pitch]
 
         odom_T_bf = cas.TransformationMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                           y=self.y.get_symbol(Derivatives.position),

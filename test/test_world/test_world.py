@@ -5,7 +5,8 @@ import pytest
 import numpy as np
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, OmniDrive
+from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, OmniDrive, \
+    FixedConnection
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
@@ -23,14 +24,14 @@ class WorldTestCase(unittest.TestCase):
         r2 = Body(PrefixedName('r2'))
 
         with self.world.modify_world():
-            dof = self.world.create_free_variable(name=PrefixedName('dof'),
-                                                  lower_limits={Derivatives.velocity: -1},
-                                                  upper_limits={Derivatives.velocity: 1})
+            dof = self.world.create_degree_of_freedom(name=PrefixedName('dof'),
+                                                      lower_limits={Derivatives.velocity: -1},
+                                                      upper_limits={Derivatives.velocity: 1})
 
-            c_l1_l2 = PrismaticConnection(l1, l2, free_variable=dof, axis=(1, 0, 0))
-            c_r1_r2 = RevoluteConnection(r1, r2, free_variable=dof, axis=(0, 0, 1))
-            bf_root_l1 = Connection(bf, l1)
-            bf_root_r1 = Connection(bf, r1)
+            c_l1_l2 = PrismaticConnection(l1, l2, dof=dof, axis=(1, 0, 0))
+            c_r1_r2 = RevoluteConnection(r1, r2, dof=dof, axis=(0, 0, 1))
+            bf_root_l1 = FixedConnection(bf, l1)
+            bf_root_r1 = FixedConnection(bf, r1)
             c_root_bf = Connection6DoF(parent=self.world.root, child=bf, _world=self.world)
             self.world.add_connection(c_root_bf)
             self.world.add_connection(c_l1_l2)
@@ -218,7 +219,7 @@ class PR2WorldTests(unittest.TestCase):
     def test_apply_control_commands_omni_drive(self):
         omni_drive: OmniDrive = self.world.get_connection_by_name(PrefixedName(name='root_T_base_footprint',
                                                                                prefix='pr2_kinematic_tree'))
-        cmd = np.zeros((len(self.world.free_variables)), dtype=float)
+        cmd = np.zeros((len(self.world.degrees_of_freedom)), dtype=float)
         cmd[-3] = 100
         cmd[-2] = 100
         cmd[-1] = 100

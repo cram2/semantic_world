@@ -10,7 +10,7 @@ from typing_extensions import List
 
 import semantic_world.spatial_types.spatial_types as cas
 from .connections import FixedConnection, HasUpdateState
-from .free_variable import FreeVariable
+from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
@@ -102,11 +102,11 @@ class World:
     and the edges represent connections between them.
     """
 
-    free_variables: Dict[PrefixedName, FreeVariable] = field(default_factory=dict)
+    degrees_of_freedom: Dict[PrefixedName, DegreeOfFreedom] = field(default_factory=dict)
 
     state: np.ndarray = field(default_factory=lambda: np.empty((4, 0), dtype=float))
     """
-    2d array where rows are derivatives and columns are free variable values for that derivative.
+    2d array where rows are derivatives and columns are dof values for that derivative.
     """
 
     _model_version: int = 0
@@ -130,25 +130,25 @@ class World:
         return hash(id(self))
 
     @modifies_world
-    def create_free_variable(self,
-                             name: PrefixedName,
-                             lower_limits: Optional[Dict[Derivatives, float]] = None,
-                             upper_limits: Optional[Dict[Derivatives, float]] = None) -> FreeVariable:
-        free_variable = FreeVariable(name=name,
-                                     _lower_limits=lower_limits,
-                                     _upper_limits=upper_limits,
-                                     world=self)
+    def create_degree_of_freedom(self,
+                                 name: PrefixedName,
+                                 lower_limits: Optional[Dict[Derivatives, float]] = None,
+                                 upper_limits: Optional[Dict[Derivatives, float]] = None) -> DegreeOfFreedom:
+        dof = DegreeOfFreedom(name=name,
+                              _lower_limits=lower_limits,
+                              _upper_limits=upper_limits,
+                              world=self)
         initial_position = 0
-        lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position)
+        lower_limit = dof.get_lower_limit(derivative=Derivatives.position)
         if lower_limit is not None:
             initial_position = max(lower_limit, initial_position)
-        upper_limit = free_variable.get_upper_limit(derivative=Derivatives.position)
+        upper_limit = dof.get_upper_limit(derivative=Derivatives.position)
         if upper_limit is not None:
             initial_position = min(upper_limit, initial_position)
         full_initial_state = np.array([initial_position, 0, 0, 0], dtype=float).reshape((4, 1))
         self.state = np.hstack((self.state, full_initial_state))
-        self.free_variables[name] = free_variable
-        return free_variable
+        self.degrees_of_freedom[name] = dof
+        return dof
 
     def validate(self):
         """
@@ -178,8 +178,8 @@ class World:
         # clear_memo(self.compose_fk_expression)
         clear_memo(self.compute_chain)
         # clear_memo(self.is_link_controlled)
-        for free_variable in self.free_variables.values():
-            free_variable.reset_cache()
+        for dof in self.degrees_of_freedom.values():
+            dof.reset_cache()
 
     def notify_state_change(self):
         """
@@ -200,7 +200,7 @@ class World:
             # self._fix_tree_structure()
             self.reset_cache()
             self.init_all_fks()
-            # self._cleanup_unused_free_variable()
+            # self._cleanup_unused_dofs()
             self.notify_state_change()
             self._model_version += 1
             self.validate()
@@ -249,9 +249,9 @@ class World:
 
     @modifies_world
     def add_world(self, world: World) -> None:
-        for free_variable in world.free_variables.values():
-            free_variable.state_idx += len(self.free_variables)
-        self.free_variables.update(world.free_variables)
+        for dof in world.degrees_of_freedom.values():
+            dof.state_idx += len(self.degrees_of_freedom)
+        self.degrees_of_freedom.update(world.degrees_of_freedom)
         self.state = np.hstack((self.state, world.state))
         for connection in world.connections:
             self.add_connection(connection)
@@ -457,7 +457,7 @@ class World:
                         continue
                     collision_fks.append(self.fks_exprs[body.name])
                 collision_fks = cas.vstack(collision_fks)
-                params = [v.get_symbol(Derivatives.position) for v in self.world.free_variables.values()]
+                params = [v.get_symbol(Derivatives.position) for v in self.world.degrees_of_freedom.values()]
                 self.compiled_all_fks = all_fks.compile(parameters=params)
                 self.compiled_collision_fks = collision_fks.compile(parameters=params)
                 self.compiled_tf = tf.compile(parameters=params)
@@ -553,9 +553,9 @@ class World:
             applied.
         :return: None
         """
-        if len(commands) != len(self.free_variables):
+        if len(commands) != len(self.degrees_of_freedom):
             raise ValueError(
-                f"Commands length {len(commands)} does not match number of free variables {len(self.free_variables)}")
+                f"Commands length {len(commands)} does not match number of free variables {len(self.degrees_of_freedom)}")
 
         self.state[derivative] = commands
 
