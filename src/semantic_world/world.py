@@ -9,7 +9,7 @@ import numpy as np
 from typing_extensions import List
 
 import semantic_world.spatial_types.spatial_types as cas
-from .connections import FixedConnection, HasUpdateState
+from .connections import HasUpdateState
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
@@ -21,7 +21,7 @@ id_generator = IDGenerator()
 
 
 class WorldVisitor:
-    def link_call(self, body: Body) -> bool:
+    def body_call(self, body: Body) -> bool:
         """
         :return: return True to stop climbing up the branch
         """
@@ -34,22 +34,16 @@ class WorldVisitor:
         return False
 
 
-class ResetJointStateContextManager:
+class ResetStateContextManager:
     def __init__(self, world: World):
         self.world = world
 
     def __enter__(self):
-        self.position_state = self.world._position_state.copy()
-        self.velocity_state = self.world._velocity_state.copy()
-        self.acceleration_state = self.world._acceleration_state.copy()
-        self.jerk_state = self.world._jerk_state.copy()
+        self.state = self.world.state.copy()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            self.world._position_state = self.position_state
-            self.world._velocity_state = self.velocity_state
-            self.world._acceleration_state = self.acceleration_state
-            self.world._jerk_state = self.jerk_state
+            self.world.state = self.state
             self.world.notify_state_change()
 
 
@@ -92,7 +86,7 @@ class World:
 
     root: Body = field(default=Body(name=PrefixedName(prefix="world", name="root")), kw_only=True)
     """
-    The root link of the world.
+    The root body of the world.
     """
 
     kinematic_structure: nx.DiGraph = field(default_factory=nx.DiGraph, kw_only=True, repr=False)
@@ -162,8 +156,8 @@ class World:
     def modify_world(self) -> WorldModelUpdateContextManager:
         return WorldModelUpdateContextManager(self)
 
-    def reset_joint_state_context(self) -> ResetJointStateContextManager:
-        return ResetJointStateContextManager(self)
+    def reset_state_context(self) -> ResetStateContextManager:
+        return ResetStateContextManager(self)
 
     def reset_cache(self) -> None:
         # super().reset_cache()
@@ -330,7 +324,7 @@ class World:
     @memoize
     def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
         body_chain = self.compute_chain_of_bodies(root, tip)
-        return [self.get_connection(body_chain[i], body_chain[i + 1]) for i in range(len(body_chain)-1)]
+        return [self.get_connection(body_chain[i], body_chain[i + 1]) for i in range(len(body_chain) - 1)]
 
     @memoize
     def compute_split_chain_of_bodies(self, root: Body, tip: Body) -> Tuple[List[Body], List[Body], List[Body]]:
@@ -361,7 +355,7 @@ class World:
         return root_chain, [common_ancestor], tip_chain
 
     @memoize
-    def compute_split_chain_of_connections(self, root: Body, tip: Body)\
+    def compute_split_chain_of_connections(self, root: Body, tip: Body) \
             -> Tuple[List[Connection], List[Connection]]:
         """
         Computes split chains of connections between 'root' and 'tip' bodies. Returns tuple of two Connection lists:
@@ -424,22 +418,22 @@ class World:
         plt.axis('off')  # Hide axes
         plt.show()
 
-    def _travel_branch(self, body: Body, companion: WorldVisitor) -> None:
+    def _travel_branch(self, body: Body, visitor: WorldVisitor) -> None:
         """
-        Do a depth first search on a branch starting at link_name.
-        Use companion to do whatever you want. It link_call and joint_call are called on every link/joint it sees.
+        Do a depth first search on a branch starting at body.
+        Use visitor to do whatever you want. It body_call and connection_call are called on every body/connection it sees.
         The traversion is stopped once they return False.
         :param body: starting point of the search
-        :param companion: payload. Implement your own WorldVisitor for your purpose.
+        :param visitor: payload. Implement your own WorldVisitor for your purpose.
         """
-        if companion.link_call(body):
+        if visitor.body_call(body):
             return
 
         for _, child_body, edge_data in self.kinematic_structure.edges(body, data=True):
             connection = edge_data[Connection.__name__]
-            if companion.connection_call(connection):
+            if visitor.connection_call(connection):
                 continue
-            self._travel_branch(child_body, companion)
+            self._travel_branch(child_body, visitor)
 
     def init_all_fks(self) -> None:
         class FKVisitor(WorldVisitor):
