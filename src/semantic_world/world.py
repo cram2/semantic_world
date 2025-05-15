@@ -14,7 +14,7 @@ from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
-from .utils import IDGenerator, memoize, clear_memo
+from .utils import IDGenerator, memoize, clear_memo, copy_memoize
 from .world_entity import Body, Connection
 
 id_generator = IDGenerator()
@@ -150,7 +150,7 @@ class World:
         self.degrees_of_freedom[name] = dof
         return dof
 
-    def validate(self):
+    def validate(self) -> None:
         """
         Validate the world.
 
@@ -159,13 +159,13 @@ class World:
         if not nx.is_tree(self.kinematic_structure):
             raise ValueError("The world is not a tree.")
 
-    def modify_world(self):
+    def modify_world(self) -> WorldModelUpdateContextManager:
         return WorldModelUpdateContextManager(self)
 
-    def reset_joint_state_context(self):
+    def reset_joint_state_context(self) -> ResetJointStateContextManager:
         return ResetJointStateContextManager(self)
 
-    def reset_cache(self):
+    def reset_cache(self) -> None:
         # super().reset_cache()
         # clear_memo(self.get_directly_controlled_child_links_with_collisions)
         # clear_memo(self.get_directly_controlled_child_links_with_collisions)
@@ -173,15 +173,17 @@ class World:
         # clear_memo(self.get_movable_parent_joint)
         # clear_memo(self.get_controlled_parent_joint_of_link)
         # clear_memo(self.get_controlled_parent_joint_of_joint)
-        clear_memo(self.compute_split_chain)
+        clear_memo(self.compute_split_chain_of_bodies)
+        clear_memo(self.compute_split_chain_of_connections)
         # clear_memo(self.are_linked)
         # clear_memo(self.compose_fk_expression)
-        clear_memo(self.compute_chain)
+        clear_memo(self.compute_chain_of_bodies)
+        clear_memo(self.compute_chain_of_connections)
         # clear_memo(self.is_link_controlled)
         for dof in self.degrees_of_freedom.values():
             dof.reset_cache()
 
-    def notify_state_change(self):
+    def notify_state_change(self) -> None:
         """
         If you have changed the state of the world, call this function to trigger necessary events and increase
         the state version.
@@ -191,7 +193,7 @@ class World:
         self._recompute_fks()
         self._state_version += 1
 
-    def _notify_model_change(self):
+    def _notify_model_change(self) -> None:
         """
         Call this function if you have changed the model of the world to trigger necessary events and increase
         the model version number.
@@ -225,7 +227,7 @@ class World:
                 for edge in self.kinematic_structure.edges()]
 
     @modifies_world
-    def add_body(self, body: Body):
+    def add_body(self, body: Body) -> None:
         """
         Add a body to the world.
 
@@ -235,9 +237,9 @@ class World:
         body._world = self
 
     @modifies_world
-    def add_connection(self, connection: Connection):
+    def add_connection(self, connection: Connection) -> None:
         """
-        Add a connection to the world.
+        Add a connection AND the bodies it connects to the world.
 
         :param connection: The connection to add.
         """
@@ -248,7 +250,13 @@ class World:
         self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
 
     @modifies_world
-    def add_world(self, world: World) -> None:
+    def merge_world(self, world: World) -> None:
+        """
+        Merge a world into the existing one by merging degrees of freedom, states, connections, and bodies.
+
+        :param world: The world to be added. 
+        :return: None
+        """
         for dof in world.degrees_of_freedom.values():
             dof.state_idx += len(self.degrees_of_freedom)
         self.degrees_of_freedom.update(world.degrees_of_freedom)
@@ -260,6 +268,17 @@ class World:
         return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
+        """
+        Retrieves a body from the list of bodies based on its name. 
+        If the input is of type `PrefixedName`, it checks whether the prefix is specified and looks for an
+        exact match. Otherwise, it matches based on the name's string representation.
+        If more than one body with the same name is found, an assertion error is raised.
+        If no matching body is found, a `ValueError` is raised.
+
+        :param name: The name of the body to search for. Can be a string or a `PrefixedName` object.
+        :return: The `Body` object that matches the given name.
+        :raises ValueError: If multiple or no bodies with the specified name are found.
+        """
         if isinstance(name, PrefixedName):
             if name.prefix is not None:
                 matches = [body for body in self.bodies if body.name == name]
@@ -267,12 +286,30 @@ class World:
                 matches = [body for body in self.bodies if body.name.name == name.name]
         else:
             matches = [body for body in self.bodies if body.name.name == name]
-        assert len(matches) <= 1, f'Multiple bodies with name {name} found'
+        if len(matches) > 1:
+            raise ValueError(f'Multiple bodies with name {name} found')
         if matches:
             return matches[0]
         raise ValueError(f'Body with name {name} not found')
 
     def get_connection_by_name(self, name: Union[str, PrefixedName]) -> Connection:
+        """
+        Retrieve a connection by its name.
+        This method accepts either a string or a `PrefixedName` instance. 
+        It searches through the list of connections and returns the one 
+        that matches the given name. If the `PrefixedName` contains a prefix, 
+        the method ensures the name, including the prefix, matches an existing 
+        connection. Otherwise, it only considers the unprefixed name. If more than 
+        one connection matches the specified name, or if no connection is found, 
+        an exception is raised.
+
+        :param name: The name of the connection to retrieve. Can be a string or 
+            a `PrefixedName` instance. If a prefix is included in `PrefixedName`, 
+            it will be used for matching.
+        :return: The connection that matches the specified name.
+        :raises ValueError: If multiple connections with the given name are found 
+            or if no connection with the given name exists.
+        """
         if isinstance(name, PrefixedName):
             if name.prefix is not None:
                 matches = [conn for conn in self.connections if conn.name == name]
@@ -280,100 +317,76 @@ class World:
                 matches = [conn for conn in self.connections if conn.name.name == name.name]
         else:
             matches = [conn for conn in self.connections if conn.name.name == name]
-        assert len(matches) <= 1, f'Multiple connections with name {name} found'
+        if len(matches) > 1:
+            raise ValueError(f'Multiple connections with name {name} found')
         if matches:
             return matches[0]
         raise ValueError(f'Connection with name {name} not found')
 
     @memoize
-    def compute_chain(self,
-                      root_link_name: PrefixedName,
-                      tip_link_name: PrefixedName,
-                      add_joints: bool,
-                      add_links: bool,
-                      add_fixed_joints: bool,
-                      add_non_controlled_joints: bool) -> List[Union[Body, Connection]]:
-        """
-        Computes a chain between root_link_name and tip_link_name. Only works if root_link_name is above tip_link_name
-        in the world.
-        """
-        if root_link_name == tip_link_name:
-            return []
-
-        root_body = self.get_body_by_name(root_link_name)
-        tip_body = self.get_body_by_name(tip_link_name)
-
-        if not (root_body in self.bodies and tip_body in self.bodies):
-            raise ValueError("Root or tip link not found in world")
-
-        try:
-            path = nx.shortest_path(self.kinematic_structure, root_body, tip_body)
-        except nx.NetworkXNoPath:
-            raise ValueError(f"No path found between {root_link_name} and {tip_link_name}")
-
-        result = []
-        for i in range(len(path) - 1):
-            if add_links:
-                result.append(path[i])
-            if add_joints:
-                connection = self.get_connection(path[i], path[i + 1])
-                if isinstance(connection, FixedConnection):
-                    if add_fixed_joints:
-                        result.append(connection)
-                else:
-                    if add_non_controlled_joints:
-                        result.append(connection)
-
-        if add_links:
-            result.append(path[-1])
-
-        return result
+    def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
+        return nx.shortest_path(self.kinematic_structure, root, tip)
 
     @memoize
-    def compute_split_chain(self,
-                            root_link_name: PrefixedName,
-                            tip_link_name: PrefixedName,
-                            add_joints: bool,
-                            add_links: bool,
-                            add_fixed_joints: bool,
-                            add_non_controlled_joints: bool) \
-            -> Tuple[List[Union[Body, Connection]], List[Union[Body, Connection]], List[Union[Body, Connection]]]:
+    def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
+        body_chain = self.compute_chain_of_bodies(root, tip)
+        return [self.get_connection(body_chain[i], body_chain[i + 1]) for i in range(len(body_chain)-1)]
+
+    @memoize
+    def compute_split_chain_of_bodies(self, root: Body, tip: Body) -> Tuple[List[Body], List[Body], List[Body]]:
         """
-        Computes the chain between root_link_name and tip_link_name. Can handle chains that start and end anywhere
-        in the tree.
-        :param root_link_name:
-        :param tip_link_name:
-        :param add_joints:
-        :param add_links:
-        :param add_fixed_joints: only used if add_joints == True
-        :param add_non_controlled_joints: only used if add_joints == True
+        Computes the chain between root and tip. Can handle chains that start and end anywhere in the tree.
+        :param root: The root body to start the chain from
+        :param tip: The tip body to end the chain at
         :return: tuple containing
-                    1. chain from root_link_name to the connecting link
-                    2. the connecting link, if add_lins is True
-                    3. chain from connecting link to tip_link_name
+                    1. chain from root to the common ancestor (excluding common ancestor)
+                    2. list containing just the common ancestor
+                    3. chain from common ancestor to tip (excluding common ancestor)
         """
-        if root_link_name == tip_link_name:
-            return [], [], []
-        root_chain = self.compute_chain(self.root.name, root_link_name, False, True, True, True)
-        tip_chain = self.compute_chain(self.root.name, tip_link_name, False, True, True, True)
+        if root == tip:
+            return [], [root], []
+        root_chain = self.compute_chain_of_bodies(self.root, root)
+        tip_chain = self.compute_chain_of_bodies(self.root, tip)
         for i in range(min(len(root_chain), len(tip_chain))):
             if root_chain[i] != tip_chain[i]:
                 break
         else:
             i += 1
-        connection = tip_chain[i - 1]
-        root_chain = self.compute_chain(connection.name, root_link_name, add_joints, add_links, add_fixed_joints,
-                                        add_non_controlled_joints)
-        if add_links:
-            root_chain = root_chain[1:]
+        common_ancestor = tip_chain[i - 1]
+        root_chain = self.compute_chain_of_bodies(common_ancestor, root)
+        root_chain = root_chain[1:]
         root_chain = root_chain[::-1]
-        tip_chain = self.compute_chain(connection.name, tip_link_name, add_joints, add_links, add_fixed_joints,
-                                       add_non_controlled_joints)
-        if add_links:
-            tip_chain = tip_chain[1:]
-        return root_chain, [connection] if add_links else [], tip_chain
+        tip_chain = self.compute_chain_of_bodies(common_ancestor, tip)
+        tip_chain = tip_chain[1:]
+        return root_chain, [common_ancestor], tip_chain
 
-    def plot_kinematic_structure(self):
+    @memoize
+    def compute_split_chain_of_connections(self, root: Body, tip: Body)\
+            -> Tuple[List[Connection], List[Connection]]:
+        """
+        Computes split chains of connections between 'root' and 'tip' bodies. Returns tuple of two Connection lists:
+        (root->common ancestor, tip->common ancestor). Returns empty lists if root==tip.
+
+        :param root: The starting `Body` object for the chain of connections.
+        :param tip: The ending `Body` object for the chain of connections.
+        :return: A tuple of two lists: the first list contains `Connection` objects from the `root` to 
+            the common ancestor, and the second list contains `Connection` objects from the `tip` to the
+            common ancestor.
+        """
+        if root == tip:
+            return [], []
+        root_chain, common_ancestor, tip_chain = self.compute_split_chain_of_bodies(root, tip)
+        root_chain.append(common_ancestor[0])
+        tip_chain.insert(0, common_ancestor[0])
+        root_connections = []
+        for i in range(len(root_chain) - 1):
+            root_connections.append(self.get_connection(root_chain[i + 1], root_chain[i]))
+        tip_connections = []
+        for i in range(len(tip_chain) - 1):
+            tip_connections.append(self.get_connection(tip_chain[i], tip_chain[i + 1]))
+        return root_connections, tip_connections
+
+    def plot_kinematic_structure(self) -> None:
         """
         Plots the kinematic structure of the world.
         The plot shows bodies as nodes and connections as edges in a directed graph.
@@ -411,7 +424,7 @@ class World:
         plt.axis('off')  # Hide axes
         plt.show()
 
-    def _travel_branch(self, body: Body, companion: WorldVisitor):
+    def _travel_branch(self, body: Body, companion: WorldVisitor) -> None:
         """
         Do a depth first search on a branch starting at link_name.
         Use companion to do whatever you want. It link_call and joint_call are called on every link/joint it sees.
@@ -428,7 +441,7 @@ class World:
                 continue
             self._travel_branch(child_body, companion)
 
-    def init_all_fks(self):
+    def init_all_fks(self) -> None:
         class FKVisitor(WorldVisitor):
             idx_start: Dict[PrefixedName, int]
             compiled_collision_fks: cas.CompiledFunction
@@ -472,7 +485,9 @@ class World:
                 return self.compiled_tf.fast_call(self.subs)
 
             @memoize
-            def compute_fk_np(self, root: PrefixedName, tip: PrefixedName) -> np.ndarray:
+            def compute_fk_np(self, root: Body, tip: Body) -> np.ndarray:
+                root = root.name
+                tip = tip.name
                 root_is_world = root == self.world.root.name
                 tip_is_world = tip == self.world.root.name
 
@@ -502,43 +517,40 @@ class World:
     def _recompute_fks(self) -> None:
         self._fk_computer.recompute()
 
-    def compose_forward_kinematics_expression(self, root_body: PrefixedName, tip_body: PrefixedName) \
-            -> cas.TransformationMatrix:
+    @copy_memoize
+    def compose_forward_kinematics_expression(self, root: Body, tip: Body) -> cas.TransformationMatrix:
         """
-        :param root_body: The root body in the kinematic chain.
+        :param root: The root body in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
-        :param tip_body: The tip body in the kinematic chain.
+        :param tip: The tip body in the kinematic chain.
             It determines the endpoint of the forward kinematics calculation.
         :return: An expression representing the computed forward kinematics of the tip body relative to the root body.
         """
 
         fk = cas.TransformationMatrix()
-        root_chain, _, tip_chain = self.compute_split_chain(root_body, tip_body, add_joints=True, add_links=False,
-                                                            add_fixed_joints=True, add_non_controlled_joints=True)
+        root_chain, tip_chain = self.compute_split_chain_of_connections(root, tip)
         connection: Connection
         for connection in root_chain:
-            a = connection.origin
-            ai = a.inverse()
-            fk = fk.dot(ai)
+            tip_T_root = connection.origin.inverse()
+            fk = fk.dot(tip_T_root)
         for connection in tip_chain:
-            a = connection.origin
-            fk = fk.dot(a)
-        fk.reference_frame = root_body
-        fk.child_frame = tip_body
+            fk = fk.dot(connection.origin)
+        fk.reference_frame = root.name
+        fk.child_frame = tip.name
         return fk
 
-    def compute_fk_np(self, root_body: PrefixedName, tip_body: PrefixedName) -> np.ndarray:
+    def compute_fk_np(self, root: Body, tip: Body) -> np.ndarray:
         """
         Computes the forward kinematics from the root body to the tip body.
 
         This method computes the transformation matrix representing the pose of the
         tip body relative to the root body, expressed as a numpy ndarray.
 
-        :param root_body: Root body for which the kinematics are computed.
-        :param tip_body: Tip body to which the kinematics are computed.
+        :param root: Root body for which the kinematics are computed.
+        :param tip: Tip body to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
         """
-        return self._fk_computer.compute_fk_np(root_body, tip_body)
+        return self._fk_computer.compute_fk_np(root, tip)
 
     def apply_control_commands(self, commands: np.ndarray, dt: float, derivative: Derivatives) -> None:
         """
