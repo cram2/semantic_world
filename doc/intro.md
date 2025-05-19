@@ -25,6 +25,7 @@ Physical Objects can be spawned by constructing a {py:class}`semantic_world.worl
 those elements is added by specifying a {py:class}`semantic_world.world.Connection` between bodies.
 
 All those things have to be added to the world for full functionality.
+More information on the kinematic world model can be found [here](kinematic_world.md).
 
 ## Views
 

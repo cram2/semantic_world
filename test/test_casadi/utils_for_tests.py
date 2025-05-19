@@ -7,6 +7,7 @@ from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
+from semantic_world.spatial_types.math import shortest_angular_distance
 from semantic_world.spatial_types.spatial_types import Expression, if_else
 
 # from giskardpy.middleware import get_middleware
@@ -26,46 +27,6 @@ def angle_positive():
 
 def random_angle():
     return st.floats(-np.pi, np.pi)
-
-
-def fmod(a, b):
-    a = Expression(a).s
-    b = Expression(b).s
-    return Expression(ca.fmod(a, b))
-
-
-def if_greater(a, b, if_result, else_result):
-    a = Expression(a).s
-    b = Expression(b).s
-    return if_else(ca.gt(a, b), if_result, else_result)
-
-
-def normalize_angle_positive(angle):
-    """
-    Normalizes the angle to be 0 to 2*pi
-    It takes and returns radians.
-    """
-    return fmod(fmod(angle, 2.0 * ca.pi) + 2.0 * ca.pi, 2.0 * ca.pi)
-
-
-def normalize_angle(angle):
-    """
-    Normalizes the angle to be -pi to +pi
-    It takes and returns radians.
-    """
-    a = normalize_angle_positive(angle)
-    return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
-
-
-def shortest_angular_distance(from_angle, to_angle):
-    """
-    Given 2 angles, this returns the shortest angular
-    difference.  The inputs and outputs are of course radians.
-
-    The result would always be -pi <= result <= pi. Adding the result
-    to "from" will always get you an equivalent angle to "to".
-    """
-    return normalize_angle(to_angle - from_angle)
 
 
 def compare_axis_angle(actual_angle, actual_axis, expected_angle, expected_axis, decimal=3):
@@ -128,36 +89,6 @@ def rnd_joint_state2(draw, joint_limits):
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in muh.items()}
 
 
-def pr2_without_base_urdf():
-    with open('../../../../../PycharmProjects/giskardpy/test/urdfs/pr2.urdf', 'r') as f:
-        urdf_string = f.read()
-    return urdf_string
-
-
-def base_bot_urdf():
-    with open('../../../../../PycharmProjects/giskardpy/test/urdfs/2d_base_bot.urdf', 'r') as f:
-        urdf_string = f.read()
-    return urdf_string
-
-
-def donbot_urdf():
-    with open('../../../../../PycharmProjects/giskardpy/test/urdfs/iai_donbot.urdf', 'r') as f:
-        urdf_string = f.read()
-    return urdf_string
-
-
-def boxy_urdf():
-    with open('../../../../../PycharmProjects/giskardpy/test/urdfs/boxy.urdf', 'r') as f:
-        urdf_string = f.read()
-    return urdf_string
-
-
-def hsr_urdf():
-    with open('urdfs/hsr.urdf', 'r') as f:
-        urdf_string = f.read()
-    return urdf_string
-
-
 def float_no_nan_no_inf(outer_limit=1e5):
     return float_no_nan_no_inf_min_max(-outer_limit, outer_limit)
 
@@ -193,9 +124,3 @@ def unit_vector(length, elements=None):
 
 def quaternion():
     return unit_vector(4, float_no_nan_no_inf(outer_limit=1))
-
-
-def pykdl_frame_to_numpy(pykdl_frame):
-    return np.array([[pykdl_frame.M[0, 0], pykdl_frame.M[0, 1], pykdl_frame.M[0, 2], pykdl_frame.p[0]],
-                     [pykdl_frame.M[1, 0], pykdl_frame.M[1, 1], pykdl_frame.M[1, 2], pykdl_frame.p[1]],
-                     [pykdl_frame.M[2, 0], pykdl_frame.M[2, 1], pykdl_frame.M[2, 2], pykdl_frame.p[2]], [0, 0, 0, 1]])

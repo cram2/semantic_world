@@ -2,7 +2,7 @@ from typing import Dict, Callable, Type, Optional, overload, Union, Iterable, Tu
 
 import numpy as np
 
-import semantic_world.spatial_types.spatial_types as cas
+from . import spatial_types as cas
 
 Provider = Union[float, Callable[[], float]]
 
@@ -97,16 +97,16 @@ class SymbolManager(metaclass=SingletonMeta):
             raise e
 
     def resolve_expr(self, expr: cas.CompiledFunction):
-        symbols = expr.params
+        symbols = expr.symbol_parameters
         return expr.fast_call(self.resolve_symbols(symbols))
 
     def evaluate_expr(self, expr: cas.Expression):
         if isinstance(expr, (int, float)):
             return expr
         f = expr.compile()
-        if len(f.str_params) == 0:
+        if len(f.str_parameters) == 0:
             return expr.to_np()
-        result = f.fast_call(self.resolve_symbols(f.str_params))
+        result = f.fast_call(self.resolve_symbols(f.str_parameters))
         if len(result) == 1:
             return result[0]
         else:
