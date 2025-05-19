@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import wraps
+from functools import wraps, lru_cache
 from typing import Dict, Tuple, OrderedDict, Union, Optional
 
 import networkx as nx
@@ -14,7 +14,7 @@ from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
-from .utils import IDGenerator, memoize, clear_memo, copy_memoize
+from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection
 
 id_generator = IDGenerator()
@@ -96,7 +96,7 @@ class ForwardKinematicsVisitor(WorldVisitor):
         """
         Clears cache and recomputes all forward kinematics. Should be called after a state update.
         """
-        self.compute_forward_kinematics_np.memo.clear()
+        self.compute_forward_kinematics_np.cache_clear()
         self.subs = self.world.state[Derivatives.position]
         self.forward_kinematics_for_all_bodies = self.compiled_all_fks.fast_call(self.subs)
 
@@ -111,7 +111,7 @@ class ForwardKinematicsVisitor(WorldVisitor):
         """
         return self.compiled_tf.fast_call(self.subs)
 
-    @memoize
+    @lru_cache(maxsize=None)
     def compute_forward_kinematics_np(self, root: Body, tip: Body) -> np.ndarray:
         """
         Computes the forward kinematics from the root body to the tip body, root_T_tip.
@@ -295,19 +295,19 @@ class World:
 
     def reset_cache(self) -> None:
         # super().reset_cache()
-        # clear_memo(self.get_directly_controlled_child_links_with_collisions)
-        # clear_memo(self.get_directly_controlled_child_links_with_collisions)
-        # clear_memo(self.compute_chain_reduced_to_controlled_joints)
-        # clear_memo(self.get_movable_parent_joint)
-        # clear_memo(self.get_controlled_parent_joint_of_link)
-        # clear_memo(self.get_controlled_parent_joint_of_joint)
-        clear_memo(self.compute_split_chain_of_bodies)
-        clear_memo(self.compute_split_chain_of_connections)
-        # clear_memo(self.are_linked)
-        # clear_memo(self.compose_fk_expression)
-        clear_memo(self.compute_chain_of_bodies)
-        clear_memo(self.compute_chain_of_connections)
-        # clear_memo(self.is_link_controlled)
+        # self.get_directly_controlled_child_links_with_collisions.cache_clear()
+        # self.get_directly_controlled_child_links_with_collisions.cache_clear()
+        # self.compute_chain_reduced_to_controlled_joints.cache_clear()
+        # self.get_movable_parent_joint.cache_clear()
+        # self.get_controlled_parent_joint_of_link.cache_clear()
+        # self.get_controlled_parent_joint_of_joint.cache_clear()
+        self.compute_split_chain_of_bodies.cache_clear()
+        self.compute_split_chain_of_connections.cache_clear()
+        # self.are_linked.cache_clear()
+        # self.compose_fk_expression.cache_clear()
+        self.compute_chain_of_bodies.cache_clear()
+        self.compute_chain_of_connections.cache_clear()
+        # self.is_link_controlled.cache_clear()
         for dof in self.degrees_of_freedom.values():
             dof.reset_cache()
 
@@ -316,8 +316,8 @@ class World:
         If you have changed the state of the world, call this function to trigger necessary events and increase
         the state version.
         """
-        # clear_memo(self.compute_fk)
-        # clear_memo(self.compute_fk_with_collision_offset_np)
+        # self.compute_fk.cache_clear()
+        # self.compute_fk_with_collision_offset_np.cache_clear()
         self._recompute_forward_kinematics()
         self._state_version += 1
 
@@ -451,16 +451,16 @@ class World:
             return matches[0]
         raise ValueError(f'Connection with name {name} not found')
 
-    @memoize
+    @lru_cache(maxsize=None)
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
         return nx.shortest_path(self.kinematic_structure, root, tip)
 
-    @memoize
+    @lru_cache(maxsize=None)
     def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
         body_chain = self.compute_chain_of_bodies(root, tip)
         return [self.get_connection(body_chain[i], body_chain[i + 1]) for i in range(len(body_chain) - 1)]
 
-    @memoize
+    @lru_cache(maxsize=None)
     def compute_split_chain_of_bodies(self, root: Body, tip: Body) -> Tuple[List[Body], List[Body], List[Body]]:
         """
         Computes the chain between root and tip. Can handle chains that start and end anywhere in the tree.
@@ -488,7 +488,7 @@ class World:
         tip_chain = tip_chain[1:]
         return root_chain, [common_ancestor], tip_chain
 
-    @memoize
+    @lru_cache(maxsize=None)
     def compute_split_chain_of_connections(self, root: Body, tip: Body) \
             -> Tuple[List[Connection], List[Connection]]:
         """
@@ -581,7 +581,7 @@ class World:
     def _recompute_forward_kinematics(self) -> None:
         self._fk_computer.recompute()
 
-    @copy_memoize
+    @copy_lru_cache()
     def compose_forward_kinematics_expression(self, root: Body, tip: Body) -> cas.TransformationMatrix:
         """
         :param root: The root body in the kinematic chain.
