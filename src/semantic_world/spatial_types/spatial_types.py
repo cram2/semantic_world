@@ -31,7 +31,7 @@ class StackedCompiledFunction:
     def __init__(self, expressions, parameters=None, additional_views=None):
         combined_expression = vstack(expressions)
         self.compiled_f = combined_expression.compile(parameters=parameters)
-        self.str_params = self.compiled_f.str_params
+        self.str_params = self.compiled_f.str_parameters
         slices = []
         start = 0
         for expression in expressions[:-1]:
@@ -58,35 +58,35 @@ class CompiledFunction:
         if parameters is None:
             parameters = expression.free_symbols()
 
-        self.str_params = [str(x) for x in parameters]
-        self.params = parameters
+        self.str_parameters = [str(x) for x in parameters]
+        self.symbol_parameters = parameters
         if len(parameters) > 0:
             parameters = [Expression(parameters).s]
 
         if self.sparse:
             expression.s = ca.sparsify(expression.s)
             try:
-                self.compiled_f = ca.Function('f', parameters, [expression.s])
+                self.compiled_casadi_function = ca.Function('f', parameters, [expression.s])
             except Exception:
-                self.compiled_f = ca.Function('f', parameters, expression.s)
-            self.buf, self.f_eval = self.compiled_f.buffer()
+                self.compiled_casadi_function = ca.Function('f', parameters, expression.s)
+            self.function_buffer, self.function_evaluator = self.compiled_casadi_function.buffer()
             self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
             self.out = sp.csc_matrix((np.zeros(expression.s.nnz()), self.csc_indptr, self.csc_indices))
-            self.buf.set_res(0, memoryview(self.out.data))
+            self.function_buffer.set_res(0, memoryview(self.out.data))
         else:
             try:
-                self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
+                self.compiled_casadi_function = ca.Function('f', parameters, [ca.densify(expression.s)])
             except Exception as e:
-                self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
-            self.buf, self.f_eval = self.compiled_f.buffer()
+                self.compiled_casadi_function = ca.Function('f', parameters, ca.densify(expression.s))
+            self.function_buffer, self.function_evaluator = self.compiled_casadi_function.buffer()
             if expression.shape[1] <= 1:
                 shape = expression.shape[0]
             else:
                 shape = expression.shape
             self.out = np.zeros(shape, order='F')
-            self.buf.set_res(0, memoryview(self.out))
-        if len(self.str_params) == 0:
-            self.f_eval()
+            self.function_buffer.set_res(0, memoryview(self.out))
+        if len(self.str_parameters) == 0:
+            self.function_evaluator()
             if self.sparse:
                 result = self.out.toarray()
             else:
@@ -95,7 +95,7 @@ class CompiledFunction:
             self.fast_call = lambda filtered_args: result
 
     def __call__(self, **kwargs):
-        filtered_args = [kwargs[k] for k in self.str_params]
+        filtered_args = [kwargs[k] for k in self.str_parameters]
         filtered_args = np.array(filtered_args, dtype=float)
         return self.fast_call(filtered_args)
 
@@ -103,8 +103,8 @@ class CompiledFunction:
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
-        self.buf.set_arg(0, memoryview(filtered_args))
-        self.f_eval()
+        self.function_buffer.set_arg(0, memoryview(filtered_args))
+        self.function_evaluator()
         return self.out
 
 

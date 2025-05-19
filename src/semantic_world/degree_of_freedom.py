@@ -4,18 +4,16 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Union, TYPE_CHECKING
 
-import semantic_world.spatial_types.spatial_types as cas
+from .spatial_types import spatial_types as cas
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.symbol_manager import symbol_manager
 from .utils import memoize
-
-if TYPE_CHECKING:
-    from .world import World
+from .world_entity import WorldEntity
 
 
 @dataclass
-class DegreeOfFreedom:
+class DegreeOfFreedom(WorldEntity):
     """
     A class representing a degree of freedom in a world model with associated derivatives and limits.
     
@@ -27,10 +25,6 @@ class DegreeOfFreedom:
     name: PrefixedName
     """
     The identifier for this free variable
-    """
-    world: World
-    """
-    The world model this variable belongs to
     """
 
     _lower_limits: Dict[Derivatives, Optional[float]] = field(default=None)
@@ -58,13 +52,13 @@ class DegreeOfFreedom:
     def __post_init__(self):
         self._lower_limits = self._lower_limits or defaultdict(lambda: None)
         self._upper_limits = self._upper_limits or defaultdict(lambda: None)
-        self.state_idx = len(self.world.degrees_of_freedom)
+        self.state_idx = len(self._world.degrees_of_freedom)
 
         # Register symbols for all derivatives in one loop
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             s = cas.Symbol(f'{self.name}_{derivative}')
             self._derivative_symbols[derivative] = s
-            symbol_manager.register_symbol(s, lambda d=derivative: self.world.state[d, self.state_idx])
+            symbol_manager.register_symbol(s, lambda d=derivative: self._world.state[d, self.state_idx])
 
     @property
     def position_symbol(self) -> cas.Symbol:

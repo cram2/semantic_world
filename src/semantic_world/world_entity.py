@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, TYPE_CHECKING
 
-from semantic_world.geometry import Shape
-from semantic_world.prefixed_name import PrefixedName
-from semantic_world.spatial_types.spatial_types import TransformationMatrix, Expression
-import semantic_world.spatial_types.spatial_types as cas
+from .geometry import Shape
+from .prefixed_name import PrefixedName
+from .spatial_types.spatial_types import TransformationMatrix, Expression
+from .spatial_types import spatial_types as cas
 
 if TYPE_CHECKING:
-    from semantic_world.world import World
+    from .world import World
 
 
 @dataclass
@@ -110,7 +110,7 @@ class Connection(WorldEntity):
         return PrefixedName(f'{self.parent.name.name}_T_{self.child.name.name}', prefix=self.child.name.prefix)
 
     # @memoize
-    def parent_T_child_as_pos_quaternion(self) -> Expression:
+    def origin_as_position_quaternion(self) -> Expression:
         position = self.origin.to_position()[:3]
         orientation = self.origin.to_quaternion()
         return cas.vstack([position, orientation]).T

@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 from typing_extensions import List
 
-import semantic_world.spatial_types.spatial_types as cas
+from .spatial_types import spatial_types as cas
 from .connections import HasUpdateState
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
@@ -34,14 +34,137 @@ class WorldVisitor:
         return False
 
 
+class ForwardKinematicsVisitor(WorldVisitor):
+    """
+    Visitor class for collection various forward kinematics expressions in a world model.
+
+    This class is designed to traverse a world, compute the forward kinematics transformations in batches for different
+    use cases.
+    1. Efficient computation of forward kinematics between any bodies in the world.
+    2. Efficient computation of forward kinematics for all bodies with collisions for updating collision checkers.
+    3. Efficient computation of forward kinematics as position and quaternion, useful for ROS tf.
+    """
+
+    compiled_collision_fks: cas.CompiledFunction
+    compiled_all_fks: cas.CompiledFunction
+
+    forward_kinematics_for_all_bodies: np.ndarray
+    """
+    A 2D array containing the stacked forward kinematics expressions for all bodies in the world.
+    Dimensions are ((number of bodies) * 4) x 4.
+    They are computed in batch for efficiency.
+    """
+    body_name_to_forward_kinematics_idx: Dict[PrefixedName, int]
+    """
+    Given a body name, returns the index of the first row in `forward_kinematics_for_all_bodies` that corresponds to that body.
+    """
+
+    def __init__(self, world: World):
+        self.world = world
+        self.child_body_to_fk_expr: Dict[PrefixedName, cas.TransformationMatrix] = {
+            self.world.root.name: cas.TransformationMatrix()}
+        self.tf: Dict[Tuple[PrefixedName, PrefixedName], cas.Expression] = OrderedDict()
+
+    def connection_call(self, connection: Connection) -> bool:
+        """
+        Gathers forward kinematics expressions for a connection.
+        """
+        map_T_parent = self.child_body_to_fk_expr[connection.parent.name]
+        self.child_body_to_fk_expr[connection.child.name] = map_T_parent.dot(connection.origin)
+        self.tf[(connection.parent.name, connection.child.name)] = connection.origin_as_position_quaternion()
+        return False
+
+    def compile_forward_kinematics(self) -> None:
+        """
+        Compiles forward kinematics expressions for fast evaluation.
+        """
+        all_fks = cas.vstack([self.child_body_to_fk_expr[body.name] for body in self.world.bodies])
+        tf = cas.vstack([pose for pose in self.tf.values()])
+        collision_fks = []
+        for body in sorted(self.world.bodies_with_collisions, key=lambda body: body.name):
+            if body == self.world.root:
+                continue
+            collision_fks.append(self.child_body_to_fk_expr[body.name])
+        collision_fks = cas.vstack(collision_fks)
+        params = [v.get_symbol(Derivatives.position) for v in self.world.degrees_of_freedom.values()]
+        self.compiled_all_fks = all_fks.compile(parameters=params)
+        self.compiled_collision_fks = collision_fks.compile(parameters=params)
+        self.compiled_tf = tf.compile(parameters=params)
+        self.idx_start = {body.name: i * 4 for i, body in enumerate(self.world.bodies)}
+
+    def recompute(self) -> None:
+        """
+        Clears cache and recomputes all forward kinematics. Should be called after a state update.
+        """
+        self.compute_forward_kinematics_np.memo.clear()
+        self.subs = self.world.state[Derivatives.position]
+        self.forward_kinematics_for_all_bodies = self.compiled_all_fks.fast_call(self.subs)
+
+    def compute_tf(self) -> np.ndarray:
+        """
+        Computes a (number of bodies) x 7 matrix of forward kinematics in position/quaternion format.
+        The rows are ordered by body name.
+        The first 3 entries are position values, the last 4 entires are quaternion values in x, y, z, w order.
+
+        This is not updated in 'recompute', because this functionality is only used with ROS.
+        :return: A large matrix with all forward kinematics.
+        """
+        return self.compiled_tf.fast_call(self.subs)
+
+    @memoize
+    def compute_forward_kinematics_np(self, root: Body, tip: Body) -> np.ndarray:
+        """
+        Computes the forward kinematics from the root body to the tip body, root_T_tip.
+
+        This method computes the transformation matrix representing the pose of the
+        tip body relative to the root body, expressed as a numpy ndarray.
+
+        :param root: Root body for which the kinematics are computed.
+        :param tip: Tip body to which the kinematics are computed.
+        :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
+        """
+        root = root.name
+        tip = tip.name
+        root_is_world = root == self.world.root.name
+        tip_is_world = tip == self.world.root.name
+
+        if not tip_is_world:
+            i = self.idx_start[tip]
+            map_T_tip = self.forward_kinematics_for_all_bodies[i:i + 4]
+            if root_is_world:
+                return map_T_tip
+
+        if not root_is_world:
+            i = self.idx_start[root]
+            map_T_root = self.forward_kinematics_for_all_bodies[i:i + 4]
+            root_T_map = inverse_frame(map_T_root)
+            if tip_is_world:
+                return root_T_map
+
+        if tip_is_world and root_is_world:
+            return np.eye(4)
+
+        return root_T_map @ map_T_tip
+
+
 class ResetStateContextManager:
+    """
+    A context manager for resetting the state of a given `World` instance. 
+
+    This class is designed to allow operations to be performed on a `World`
+    object, ensuring that its state can be safely returned to its previous
+    condition upon leaving the context. If no exceptions occur within the 
+    context, the original state of the `World` instance is restored, and the 
+    state change is notified.
+    """
+
     def __init__(self, world: World):
         self.world = world
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.state = self.world.state.copy()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Optional[type]) -> None:
         if exc_type is None:
             self.world.state = self.state
             self.world.notify_state_change()
@@ -54,14 +177,14 @@ class WorldModelUpdateContextManager:
         self.world = world
 
     def __enter__(self):
-        if self.world.context_manager_active:
+        if self.world.world_is_being_modified:
             self.first = False
-        self.world.context_manager_active = True
+        self.world.world_is_being_modified = True
         return self.world
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.first:
-            self.world.context_manager_active = False
+            self.world.world_is_being_modified = False
             if exc_type is None:
                 self.world._notify_model_change()
 
@@ -115,7 +238,10 @@ class World:
     Mostly triggered by updating connection values.
     """
 
-    context_manager_active: bool = False
+    world_is_being_modified: bool = False
+    """
+    Is set to True, when a function with @modifies_world is called or world.modify_world context is used.
+    """
 
     def __post_init__(self):
         self.add_body(self.root)
@@ -128,10 +254,18 @@ class World:
                                  name: PrefixedName,
                                  lower_limits: Optional[Dict[Derivatives, float]] = None,
                                  upper_limits: Optional[Dict[Derivatives, float]] = None) -> DegreeOfFreedom:
+        """
+        Create a degree of freedom in the world and return it.
+        For dependent kinematics, DoFs must be created with this method and passed to the connection's conctructor.
+        :param name: Name of the DoF.
+        :param lower_limits: If the DoF is actively controlled, it must have at least velocity limits.
+        :param upper_limits: If the DoF is actively controlled, it must have at least velocity limits.
+        :return: The already registered DoF.
+        """
         dof = DegreeOfFreedom(name=name,
                               _lower_limits=lower_limits,
                               _upper_limits=upper_limits,
-                              world=self)
+                              _world=self)
         initial_position = 0
         lower_limit = dof.get_lower_limit(derivative=Derivatives.position)
         if lower_limit is not None:
@@ -184,7 +318,7 @@ class World:
         """
         # clear_memo(self.compute_fk)
         # clear_memo(self.compute_fk_with_collision_offset_np)
-        self._recompute_fks()
+        self._recompute_forward_kinematics()
         self._state_version += 1
 
     def _notify_model_change(self) -> None:
@@ -192,10 +326,10 @@ class World:
         Call this function if you have changed the model of the world to trigger necessary events and increase
         the model version number.
         """
-        if not self.context_manager_active:
+        if not self.world_is_being_modified:
             # self._fix_tree_structure()
             self.reset_cache()
-            self.init_all_fks()
+            self.compile_forward_kinematics_expressions()
             # self._cleanup_unused_dofs()
             self.notify_state_change()
             self._model_version += 1
@@ -435,80 +569,16 @@ class World:
                 continue
             self._travel_branch(child_body, visitor)
 
-    def init_all_fks(self) -> None:
-        class FKVisitor(WorldVisitor):
-            idx_start: Dict[PrefixedName, int]
-            compiled_collision_fks: cas.CompiledFunction
-            compiled_all_fks: cas.CompiledFunction
-            str_params: List[str]
-            fks: np.ndarray
-            fks_exprs: Dict[PrefixedName, cas.TransformationMatrix]
-
-            def __init__(self, world: World):
-                self.world = world
-                self.fks_exprs = {self.world.root.name: cas.TransformationMatrix()}
-                self.tf = OrderedDict()
-
-            def connection_call(self, connection: Connection) -> bool:
-                map_T_parent = self.fks_exprs[connection.parent.name]
-                self.fks_exprs[connection.child.name] = map_T_parent.dot(connection.origin)
-                self.tf[(connection.parent.name, connection.child.name)] = connection.parent_T_child_as_pos_quaternion()
-                return False
-
-            def compile_fks(self):
-                all_fks = cas.vstack([self.fks_exprs[body.name] for body in self.world.bodies])
-                tf = cas.vstack([pose for pose in self.tf.values()])
-                collision_fks = []
-                for body in sorted(self.world.bodies_with_collisions, key=lambda body: body.name):
-                    if body == self.world.root:
-                        continue
-                    collision_fks.append(self.fks_exprs[body.name])
-                collision_fks = cas.vstack(collision_fks)
-                params = [v.get_symbol(Derivatives.position) for v in self.world.degrees_of_freedom.values()]
-                self.compiled_all_fks = all_fks.compile(parameters=params)
-                self.compiled_collision_fks = collision_fks.compile(parameters=params)
-                self.compiled_tf = tf.compile(parameters=params)
-                self.idx_start = {body.name: i * 4 for i, body in enumerate(self.world.bodies)}
-
-            def recompute(self):
-                self.compute_fk_np.memo.clear()
-                self.subs = self.world.state[Derivatives.position]
-                self.fks = self.compiled_all_fks.fast_call(self.subs)
-
-            def compute_tf(self):
-                return self.compiled_tf.fast_call(self.subs)
-
-            @memoize
-            def compute_fk_np(self, root: Body, tip: Body) -> np.ndarray:
-                root = root.name
-                tip = tip.name
-                root_is_world = root == self.world.root.name
-                tip_is_world = tip == self.world.root.name
-
-                if not tip_is_world:
-                    i = self.idx_start[tip]
-                    map_T_tip = self.fks[i:i + 4]
-                    if root_is_world:
-                        return map_T_tip
-
-                if not root_is_world:
-                    i = self.idx_start[root]
-                    map_T_root = self.fks[i:i + 4]
-                    root_T_map = inverse_frame(map_T_root)
-                    if tip_is_world:
-                        return root_T_map
-
-                if tip_is_world and root_is_world:
-                    return np.eye(4)
-
-                return root_T_map @ map_T_tip
-
-        new_fks = FKVisitor(self)
+    def compile_forward_kinematics_expressions(self) -> None:
+        """
+        Traverse the kinematic structure and compile forward kinematics expressions for fast evaluation.
+        """
+        new_fks = ForwardKinematicsVisitor(self)
         self._travel_branch(self.root, new_fks)
-        new_fks.compile_fks()
+        new_fks.compile_forward_kinematics()
         self._fk_computer = new_fks
 
-    def _recompute_fks(self) -> None:
+    def _recompute_forward_kinematics(self) -> None:
         self._fk_computer.recompute()
 
     @copy_memoize
@@ -533,9 +603,9 @@ class World:
         fk.child_frame = tip.name
         return fk
 
-    def compute_fk_np(self, root: Body, tip: Body) -> np.ndarray:
+    def compute_forward_kinematics_np(self, root: Body, tip: Body) -> np.ndarray:
         """
-        Computes the forward kinematics from the root body to the tip body.
+        Computes the forward kinematics from the root body to the tip body, root_T_tip.
 
         This method computes the transformation matrix representing the pose of the
         tip body relative to the root body, expressed as a numpy ndarray.
@@ -544,7 +614,7 @@ class World:
         :param tip: Tip body to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
         """
-        return self._fk_computer.compute_fk_np(root, tip)
+        return self._fk_computer.compute_forward_kinematics_np(root, tip)
 
     def apply_control_commands(self, commands: np.ndarray, dt: float, derivative: Derivatives) -> None:
         """

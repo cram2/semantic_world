@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
-import semantic_world.spatial_types.spatial_types as cas
+from ..spatial_types import spatial_types as cas
 from urdf_parser_py import urdf
 
 from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection

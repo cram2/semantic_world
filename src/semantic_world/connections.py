@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-import semantic_world.spatial_types.spatial_types as cas
+from . import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
@@ -24,7 +24,7 @@ class FixedConnection(Connection):
 @dataclass
 class ActiveConnection(Connection):
     """
-    Has active degrees of freedom.
+    Has one or more degrees of freedom that can be actively controlled, e.g., robot joints.
     """
     active_dofs: List[DegreeOfFreedom] = field(default_factory=list, init=False)
 
@@ -32,17 +32,38 @@ class ActiveConnection(Connection):
 @dataclass
 class PassiveConnection(Connection):
     """
-    Has passive degrees of freedom.
+    Has one or more degrees of freedom that cannot be actively controlled.
+    Useful if a transformation is only tracked, e.g., the robot's localization.
     """
     passive_dofs: List[DegreeOfFreedom] = field(default_factory=list, init=False)
 
 
 @dataclass
 class PrismaticConnection(ActiveConnection):
+    """
+    Allows the movement along an axis.
+    """
+
     axis: Tuple[float, float, float] = field(kw_only=True)
+    """
+    Connection moves along this axis, should be a unit vector.
+    The axis is defined relative to the local reference frame of the parent body.
+    """
+
     multiplier: float = 1.0
+    """
+    Movement along the axis is multiplied by this value. Useful if Connections share DoFs.
+    """
+
     offset: float = 0.0
+    """
+    Movement along the axis is offset by this value. Useful if Connections share DoFs.
+    """
+
     dof: DegreeOfFreedom = field(default=None)
+    """
+    Degree of freedom to control movement along the axis.
+    """
 
     def __post_init__(self):
         super().__post_init__()
@@ -68,10 +89,30 @@ class PrismaticConnection(ActiveConnection):
 
 @dataclass
 class RevoluteConnection(ActiveConnection):
+    """
+    Allows rotation about an axis.
+    """
+
     axis: Tuple[float, float, float] = field(kw_only=True)
+    """
+    Connection rotates about this axis, should be a unit vector.
+    The axis is defined relative to the local reference frame of the parent body.
+    """
+
     multiplier: float = 1.0
+    """
+    Rotation about the axis is multiplied by this value. Useful if Connections share DoFs.
+    """
+
     offset: float = 0.0
+    """
+    Rotation about the axis is offset by this value. Useful if Connections share DoFs.
+    """
+
     dof: DegreeOfFreedom = field(default=None)
+    """
+    Degree of freedom to control rotation about the axis.
+    """
 
     def __post_init__(self):
         super().__post_init__()
@@ -95,14 +136,31 @@ class RevoluteConnection(ActiveConnection):
 
 @dataclass
 class Connection6DoF(PassiveConnection):
+    """
+    Has full 6 degrees of freedom, that cannot be actively controlled.
+    Useful for synchronizing with transformations from external providers.
+    """
+
     x: DegreeOfFreedom = field(default=None)
+    """
+    Displacement of child body with respect to parent body along the x-axis.
+    """
     y: DegreeOfFreedom = field(default=None)
+    """
+    Displacement of child body with respect to parent body along the y-axis.
+    """
     z: DegreeOfFreedom = field(default=None)
+    """
+    Displacement of child body with respect to parent body along the z-axis.
+    """
 
     qx: DegreeOfFreedom = field(default=None)
     qy: DegreeOfFreedom = field(default=None)
     qz: DegreeOfFreedom = field(default=None)
     qw: DegreeOfFreedom = field(default=None)
+    """
+    Rotation of child body with respect to parent body represented as a quaternion.
+    """
 
     def __post_init__(self):
         self.x = self.x or self._world.create_degree_of_freedom(name=PrefixedName('x', self.name))
@@ -135,8 +193,20 @@ class Connection6DoF(PassiveConnection):
 
 
 class HasUpdateState(ABC):
+    """
+    Mixin class for connections that need state updated which are not trivial integrations.
+    Typically needed for connections that use active and passive degrees of freedom.
+    Look at OmniDrive for an example usage.
+    """
+
     @abstractmethod
     def update_state(self, dt: float) -> None:
+        """
+        Allows the connection to update the state of its dofs.
+        An integration update for active dofs will have happened before this method is called.
+        Write directly into self._world.state, but don't touch dofs that don't belong to this connection.
+        :param dt: Time passed since last update.
+        """
         pass
 
 

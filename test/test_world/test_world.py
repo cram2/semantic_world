@@ -115,7 +115,7 @@ class WorldTestCase(unittest.TestCase):
         assert result == ([], [])
 
     def test_compute_fk_connection6dof(self):
-        fk = self.world.compute_fk_np(self.world.root, self.bf)
+        fk = self.world.compute_forward_kinematics_np(self.world.root, self.bf)
         np.testing.assert_array_equal(fk, np.eye(4))
 
         self.world.state[Derivatives.position, 1] = 1.
@@ -128,12 +128,12 @@ class WorldTestCase(unittest.TestCase):
                                            [0., 0., 0., 1.]])
 
     def test_compute_fk(self):
-        fk = self.world.compute_fk_np(self.l2, self.r2)
+        fk = self.world.compute_forward_kinematics_np(self.l2, self.r2)
         np.testing.assert_array_equal(fk, np.eye(4))
 
         self.world.state[Derivatives.position, 0] = 1.
         self.world.notify_state_change()
-        fk = self.world.compute_fk_np(self.l2, self.r2)
+        fk = self.world.compute_forward_kinematics_np(self.l2, self.r2)
         np.testing.assert_array_almost_equal(fk, np.array([[0.540302, -0.841471, 0., -1.],
                                                            [0.841471, 0.540302, 0., 0.],
                                                            [0., 0., 1., 0.],
@@ -142,10 +142,10 @@ class WorldTestCase(unittest.TestCase):
     def test_compute_fk_expression(self):
         self.world.state[Derivatives.position, 0] = 1.
         self.world.notify_state_change()
-        fk = self.world.compute_fk_np(self.r2, self.l2)
+        fk = self.world.compute_forward_kinematics_np(self.r2, self.l2)
         fk_expr = self.world.compose_forward_kinematics_expression(self.r2, self.l2)
         fk_expr_compiled = fk_expr.compile()
-        fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.params))
+        fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
         np.testing.assert_array_almost_equal(fk, fk2)
 
     def test_apply_control_commands(self):
@@ -247,7 +247,7 @@ class PR2WorldTests(unittest.TestCase):
     def test_compute_fk_np(self):
         tip = self.world.get_body_by_name('r_gripper_tool_frame')
         root = self.world.get_body_by_name('l_gripper_tool_frame')
-        fk = self.world.compute_fk_np(root, tip)
+        fk = self.world.compute_forward_kinematics_np(root, tip)
         np.testing.assert_array_almost_equal(fk, np.array([[1.0, 0.0, 0.0, -0.0356],
                                                            [0, 1.0, 0.0, -0.376],
                                                            [0, 0.0, 1.0, 0.0],
@@ -259,7 +259,7 @@ class PR2WorldTests(unittest.TestCase):
 
         fk_expr = self.world.compose_forward_kinematics_expression(root, tip)
         fk_expr_compiled = fk_expr.compile()
-        fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.params))
+        fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
 
         np.testing.assert_array_almost_equal(fk2, np.array([[0.988771, 0., -0.149438, 0.4],
                                                             [0., 1., 0., 0.],

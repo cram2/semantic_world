@@ -79,7 +79,12 @@ def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'g
     return ET.tostring(root, encoding='unicode')
 
 
-def robot_name_from_urdf_string(urdf_string):
+def robot_name_from_urdf_string(urdf_string: str) -> str:
+    """
+    Returns the name defined in the robot tag, e.g., 'pr2' from <robot name="pr2"> ... </robot>.
+    :param urdf_string: URDF string
+    :return: Extracted name
+    """
     return urdf_string.split('robot name="')[1].split('"')[0]
 
 
