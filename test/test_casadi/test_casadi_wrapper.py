@@ -1,5 +1,5 @@
 import math
-import unittest
+import pytest
 from datetime import timedelta
 import semantic_world.spatial_types.math as giskard_math
 import hypothesis.strategies as st
@@ -43,7 +43,7 @@ def logic_or(a, b):
         raise ValueError(f'Invalid truth values: {a}, {b}')
 
 
-class TestUndefinedLogic(unittest.TestCase):
+class TestUndefinedLogic:
     values = [cas.TrinaryTrue, cas.TrinaryFalse, cas.TrinaryUnknown]
 
     def test_and3(self):
@@ -147,7 +147,7 @@ class TestSymbol:
         assert d[s] == 1
 
 
-class TestExpression(unittest.TestCase):
+class TestExpression:
     def test_pretty_str(self):
         e = cas.eye(4)
         e.pretty_str()
@@ -157,17 +157,17 @@ class TestExpression(unittest.TestCase):
         cas.Expression([cas.ca.SX(1), cas.ca.SX.sym('muh')])
         m = cas.Expression(np.eye(4))
         m = cas.Expression(m)
-        np.testing.assert_array_almost_equal(m.to_np(), np.eye(4))
+        assert np.allclose(m.to_np(), np.eye(4))
         m = cas.Expression(cas.ca.SX(np.eye(4)))
-        np.testing.assert_array_almost_equal(m.to_np(), np.eye(4))
+        assert np.allclose(m.to_np(), np.eye(4))
         m = cas.Expression([1, 1])
-        np.testing.assert_array_almost_equal(m.to_np(), np.array([1, 1]))
+        assert np.allclose(m.to_np(), np.array([1, 1]))
         m = cas.Expression([np.array([1, 1])])
-        np.testing.assert_array_almost_equal(m.to_np(), np.array([1, 1]))
+        assert np.allclose(m.to_np(), np.array([1, 1]))
         m = cas.Expression(1)
         assert m.to_np() == 1
         m = cas.Expression([[1, 1], [2, 2]])
-        np.testing.assert_array_almost_equal(m.to_np(), np.array([[1, 1], [2, 2]]))
+        assert np.allclose(m.to_np(), np.array([[1, 1], [2, 2]]))
         m = cas.Expression([])
         assert m.shape[0] == m.shape[1] == 0
         m = cas.Expression()
@@ -192,27 +192,27 @@ class TestExpression(unittest.TestCase):
         filter_[2] = True
         actual = e[filter_].to_np()
         expected = e_np[filter_]
-        np.testing.assert_array_almost_equal(actual, expected)
+        assert np.allclose(actual, expected)
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_add(self, f1, f2):
         expected = f1 + f2
         r1 = cas.compile_and_execute(lambda a: cas.Expression(a) + f1, [f2])
-        self.assertAlmostEqual(r1, expected)
+        assert np.isclose(r1, expected)
         r1 = cas.compile_and_execute(lambda a: f1 + cas.Expression(a), [f2])
-        self.assertAlmostEqual(r1, expected)
+        assert np.isclose(r1, expected)
         r1 = cas.compile_and_execute(lambda a, b: cas.Expression(a) + cas.Expression(b), [f1, f2])
-        self.assertAlmostEqual(r1, expected)
+        assert np.isclose(r1, expected)
 
     @given(float_no_nan_no_inf(), float_no_nan_no_inf())
     def test_sub(self, f1, f2):
         expected = f1 - f2
         r1 = cas.compile_and_execute(lambda a: cas.Expression(a) - f2, [f1])
-        self.assertAlmostEqual(r1, expected)
+        np.isclose(r1, expected)
         r1 = cas.compile_and_execute(lambda a: f1 - cas.Expression(a), [f2])
-        self.assertAlmostEqual(r1, expected)
+        np.isclose(r1, expected)
         r1 = cas.compile_and_execute(lambda a, b: cas.Expression(a) - cas.Expression(b), [f1, f2])
-        self.assertAlmostEqual(r1, expected)
+        np.isclose(r1, expected)
 
     def test_len(self):
         m = cas.Expression(np.eye(4))
@@ -313,7 +313,7 @@ class TestExpression(unittest.TestCase):
         assert cas.logic_all(gt_result == cas.Expression([0, 0, 0, 1])).to_np()
 
 
-class TestRotationMatrix(unittest.TestCase):
+class TestRotationMatrix:
     def test_transpose(self):
         # todo
         pass
@@ -331,7 +331,7 @@ class TestRotationMatrix(unittest.TestCase):
     def test_from_quaternion(self, q):
         actual = cas.RotationMatrix.from_quaternion(cas.Quaternion(q)).to_np()
         expected = giskard_math.rotation_matrix_from_quaternion(*q)
-        np.testing.assert_array_almost_equal(actual, expected)
+        assert np.allclose(actual, expected)
 
     @given(random_angle(),
            random_angle(),
@@ -339,12 +339,12 @@ class TestRotationMatrix(unittest.TestCase):
     def test_rotation_matrix_from_rpy(self, roll, pitch, yaw):
         m1 = cas.compile_and_execute(cas.RotationMatrix.from_rpy, [roll, pitch, yaw])
         m2 = giskard_math.rotation_matrix_from_rpy(roll, pitch, yaw)
-        np.testing.assert_array_almost_equal(m1, m2)
+        assert np.allclose(m1, m2)
 
     @given(unit_vector(length=3),
            random_angle())
     def test_rotation3_axis_angle(self, axis, angle):
-        np.testing.assert_array_almost_equal(cas.compile_and_execute(cas.RotationMatrix.from_axis_angle,
+        assert np.allclose(cas.compile_and_execute(cas.RotationMatrix.from_axis_angle,
                                                                      [axis, angle]),
                                              giskard_math.rotation_matrix_from_axis_angle(np.array(axis), angle))
 
@@ -373,9 +373,9 @@ class TestRotationMatrix(unittest.TestCase):
         pitch = cas.compile_and_execute(lambda m: cas.RotationMatrix(m).to_rpy()[1], [matrix])
         yaw = cas.compile_and_execute(lambda m: cas.RotationMatrix(m).to_rpy()[2], [matrix])
         roll2, pitch2, yaw2 = giskard_math.rpy_from_matrix(matrix)
-        self.assertTrue(np.isclose(roll, roll2), msg='{} != {}'.format(roll, roll2))
-        self.assertTrue(np.isclose(pitch, pitch2), msg='{} != {}'.format(pitch, pitch2))
-        self.assertTrue(np.isclose(yaw, yaw2), msg='{} != {}'.format(yaw, yaw2))
+        assert np.isclose(roll, roll2)
+        assert np.isclose(pitch, pitch2)
+        assert np.isclose(yaw, yaw2)
 
     @given(unit_vector(4))
     def test_rpy_from_matrix2(self, q):
@@ -384,26 +384,26 @@ class TestRotationMatrix(unittest.TestCase):
         pitch = cas.compile_and_execute(lambda m: cas.RotationMatrix(m).to_rpy()[1], [matrix])
         yaw = cas.compile_and_execute(lambda m: cas.RotationMatrix(m).to_rpy()[2], [matrix])
         r1 = cas.compile_and_execute(cas.RotationMatrix.from_rpy, [roll, pitch, yaw])
-        self.assertTrue(np.isclose(r1, matrix, atol=1.e-4).all(), msg='{} != {}'.format(r1, matrix))
+        assert np.allclose(r1, matrix, atol=1.e-4)
 
 
-class TestPoint3(unittest.TestCase):
+class TestPoint3:
 
     @given(vector(3))
     def test_norm(self, v):
         p = cas.Point3(v)
         actual = p.norm().to_np()
         expected = np.linalg.norm(v)
-        self.assertAlmostEqual(actual, expected)
+        np.isclose(actual, expected)
 
     @given(vector(3))
     def test_point3(self, v):
         cas.Point3()
         r1 = cas.Point3(v)
-        self.assertEqual(r1[0], v[0])
-        self.assertEqual(r1[1], v[1])
-        self.assertEqual(r1[2], v[2])
-        self.assertEqual(r1[3], 1)
+        assert r1[0] == v[0]
+        assert r1[1] == v[1]
+        assert r1[2] == v[2]
+        assert r1[3] == 1
         cas.Point3(cas.Expression(v))
         cas.Point3(cas.Point3(v))
         cas.Point3(cas.Vector3(v))
@@ -415,20 +415,20 @@ class TestPoint3(unittest.TestCase):
         p2 = cas.Point3((1, 1, 1))
         p3 = p1 - p2
         assert isinstance(p3, cas.Vector3)
-        self.assertEqual(p3[0], 0)
-        self.assertEqual(p3[1], 0)
-        self.assertEqual(p3[2], 0)
-        self.assertEqual(p3[3], 0)
+        assert p3[0] == 0
+        assert p3[1] == 0
+        assert p3[2] == 0
+        assert p3[3] == 0
 
     def test_point3_add_vector3(self):
         p1 = cas.Point3((1, 1, 1))
         v1 = cas.Vector3((1, 1, 1))
         p3 = p1 + v1
         assert isinstance(p3, cas.Point3)
-        self.assertEqual(p3[0], 2)
-        self.assertEqual(p3[1], 2)
-        self.assertEqual(p3[2], 2)
-        self.assertEqual(p3[3], 1)
+        assert p3[0] == 2
+        assert p3[1] == 2
+        assert p3[2] == 2
+        assert p3[3] == 1
 
     def test_point3_mul(self):
         p1 = cas.Point3((1, 1, 1))
@@ -438,10 +438,10 @@ class TestPoint3(unittest.TestCase):
         f = 2
         p3 = p1 / f
         assert isinstance(p3, cas.Point3)
-        self.assertEqual(p3[0], 0.5)
-        self.assertEqual(p3[1], 0.5)
-        self.assertEqual(p3[2], 0.5)
-        self.assertEqual(p3[3], 1)
+        assert p3[0] == 0.5
+        assert p3[1] == 0.5
+        assert p3[2] == 0.5
+        assert p3[3] == 1
 
     @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
     def test_dot(self, vectors):
@@ -451,22 +451,22 @@ class TestPoint3(unittest.TestCase):
         result = cas.compile_and_execute(lambda p1, p2: cas.Point3(p1).dot(cas.Point3(p2)), [u, v])
         expected = np.dot(u, v.T)
         if not np.isnan(result) and not np.isinf(result):
-            self.assertTrue(np.isclose(result, expected))
+            assert np.isclose(result, expected)
 
     @given(float_no_nan_no_inf(), vector(3), vector(3))
     def test_if_greater_zero(self, condition, if_result, else_result):
         actual = cas.compile_and_execute(cas.if_greater_zero, [condition, if_result, else_result])
         expected = if_result if condition > 0 else else_result
-        np.testing.assert_array_almost_equal(actual, expected)
+        assert np.allclose(actual, expected)
 
 
-class TestVector3(unittest.TestCase):
+class TestVector3:
     @given(vector(3))
     def test_norm(self, v):
         expected = np.linalg.norm(v)
         v = cas.Vector3(v)
         actual = v.norm().to_np()
-        self.assertAlmostEqual(actual, expected)
+        np.isclose(actual, expected)
 
     @given(vector(3), float_no_nan_no_inf(), vector(3))
     def test_save_division(self, nominator, denominator, if_nan):
@@ -479,10 +479,10 @@ class TestVector3(unittest.TestCase):
     def test_vector3(self, v):
         r1 = cas.Vector3(v)
         assert isinstance(r1, cas.Vector3)
-        self.assertEqual(r1[0], v[0])
-        self.assertEqual(r1[1], v[1])
-        self.assertEqual(r1[2], v[2])
-        self.assertEqual(r1[3], 0)
+        assert r1[0] == v[0]
+        assert r1[1] == v[1]
+        assert r1[2] == v[2]
+        assert r1[3] == 0
 
     @given(lists_of_same_length([float_no_nan_no_inf(), float_no_nan_no_inf()], min_length=3, max_length=3))
     def test_dot(self, vectors):
@@ -492,10 +492,10 @@ class TestVector3(unittest.TestCase):
         result = cas.compile_and_execute(lambda p1, p2: cas.Vector3(p1).dot(cas.Vector3(p2)), [u, v])
         expected = np.dot(u, v.T)
         if not np.isnan(result) and not np.isinf(result):
-            self.assertTrue(np.isclose(result, expected))
+            assert np.isclose(result, expected)
 
 
-class TestTransformationMatrix(unittest.TestCase):
+class TestTransformationMatrix:
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
@@ -505,7 +505,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        self.assertTrue(np.isclose(r1, r2).all(), msg=f'{r1} != {r2}')
+        assert np.allclose(r1, r2)
 
     def test_dot(self):
         s = cas.Symbol('x')
@@ -520,7 +520,7 @@ class TestTransformationMatrix(unittest.TestCase):
     @given(st.integers(min_value=1, max_value=10))
     def test_matrix(self, x_dim):
         data = list(range(x_dim))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             cas.TransformationMatrix(data)
 
     @given(st.integers(min_value=1, max_value=10),
@@ -528,14 +528,14 @@ class TestTransformationMatrix(unittest.TestCase):
     def test_matrix2(self, x_dim, y_dim):
         data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
         if x_dim != 4 or y_dim != 4:
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 m = cas.TransformationMatrix(data).to_np()
         else:
             m = cas.TransformationMatrix(data).to_np()
-            self.assertEqual(float(m[3, 0]), 0)
-            self.assertEqual(float(m[3, 1]), 0)
-            self.assertEqual(float(m[3, 2]), 0)
-            self.assertEqual(float(m[x_dim - 1, y_dim - 1]), 1)
+            assert float(m[3, 0]) == 0
+            assert float(m[3, 1]) == 0
+            assert float(m[3, 2]) == 0
+            assert float(m[x_dim - 1, y_dim - 1]) == 1
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -551,7 +551,7 @@ class TestTransformationMatrix(unittest.TestCase):
             cas.Point3((x, y, z)),
             cas.RotationMatrix.from_axis_angle(axis, angle)),
                                     [x, y, z, axis, angle])
-        np.testing.assert_array_almost_equal(r, r2)
+        assert np.allclose(r, r2)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -564,7 +564,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        np.testing.assert_array_almost_equal(cas.compile_and_execute(cas.TransformationMatrix.from_xyz_rpy,
+        assert np.allclose(cas.compile_and_execute(cas.TransformationMatrix.from_xyz_rpy,
                                                                      [x, y, z, roll, pitch, yaw]),
                                              r2)
 
@@ -579,8 +579,8 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[2, 3] = z
         r = cas.TransformationMatrix.from_point_rotation_matrix(point=cas.Point3((x, y, z)),
                                                                 rotation_matrix=cas.RotationMatrix.from_quaternion(
-                                                           cas.Quaternion(q))).to_np()
-        np.testing.assert_array_almost_equal(r, r2)
+                                                                    cas.Quaternion(q))).to_np()
+        assert np.allclose(r, r2)
 
     @given(float_no_nan_no_inf(outer_limit=1000),
            float_no_nan_no_inf(outer_limit=1000),
@@ -594,7 +594,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r = cas.compile_and_execute(lambda x: cas.TransformationMatrix(x).inverse(), [f])
 
         r2 = np.linalg.inv(f)
-        self.assertTrue(np.isclose(r, r2, atol=1.e-4, rtol=1.e-4).all())
+        assert np.allclose(r, r2, atol=1.e-4, rtol=1.e-4)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -603,10 +603,10 @@ class TestTransformationMatrix(unittest.TestCase):
     def test_pos_of(self, x, y, z, q):
         r1 = cas.TransformationMatrix.from_point_rotation_matrix(cas.Point3((x, y, z)),
                                                                  cas.RotationMatrix.from_quaternion(
-                                                            cas.Quaternion(q))).to_position()
+                                                                     cas.Quaternion(q))).to_position()
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
-            self.assertAlmostEqual(r1[i].to_np(), e)
+            np.isclose(r1[i].to_np(), e)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -615,14 +615,14 @@ class TestTransformationMatrix(unittest.TestCase):
     def test_trans_of(self, x, y, z, q):
         r1 = cas.TransformationMatrix.from_point_rotation_matrix(point=cas.Point3((x, y, z)),
                                                                  rotation_matrix=cas.RotationMatrix.from_quaternion(
-                                                            cas.Quaternion(q))).to_translation().to_np()
+                                                                     cas.Quaternion(q))).to_translation().to_np()
         r2 = np.identity(4)
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
         for i in range(r2.shape[0]):
             for j in range(r2.shape[1]):
-                self.assertAlmostEqual(float(r1[i, j]), r2[i, j])
+                np.isclose(float(r1[i, j]), r2[i, j])
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -631,9 +631,9 @@ class TestTransformationMatrix(unittest.TestCase):
     def test_rot_of(self, x, y, z, q):
         r1 = cas.TransformationMatrix.from_point_rotation_matrix(point=cas.Point3((x, y, z)),
                                                                  rotation_matrix=cas.RotationMatrix.from_quaternion(
-                                                            cas.Quaternion(q))).to_rotation().to_np()
+                                                                     cas.Quaternion(q))).to_rotation().to_np()
         r2 = giskard_math.rotation_matrix_from_quaternion(*q)
-        self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
+        assert np.allclose(r1, r2)
 
     def test_rot_of2(self):
         """
@@ -641,41 +641,40 @@ class TestTransformationMatrix(unittest.TestCase):
         """
         f = cas.TransformationMatrix.from_xyz_rpy(1, 2, 3)
         r = f.to_rotation()
-        self.assertTrue(f[0, 3], 1)
-        self.assertTrue(f[0, 3], 2)
-        self.assertTrue(f[0, 3], 3)
-        self.assertTrue(r[0, 0], 1)
-        self.assertTrue(r[1, 1], 1)
-        self.assertTrue(r[2, 2], 1)
+        assert f[0, 3] == 1
+        assert f[0, 3] == 2
+        assert f[0, 3] == 3
+        assert r[0, 0] == 1
+        assert r[1, 1] == 1
+        assert r[2, 2] == 1
 
 
-class TestQuaternion(unittest.TestCase):
+class TestQuaternion:
     @given(unit_vector(length=3),
            random_angle())
     def test_quaternion_from_axis_angle1(self, axis, angle):
         r2 = giskard_math.quaternion_from_axis_angle(axis, angle)
-        self.assertTrue(np.isclose(cas.compile_and_execute(cas.Quaternion.from_axis_angle, [axis, angle]),
-                                   r2).all())
+        assert np.allclose(cas.compile_and_execute(cas.Quaternion.from_axis_angle, [axis, angle]), r2)
 
     @given(quaternion(),
            quaternion())
     def test_quaternion_multiply(self, q, p):
         r1 = cas.compile_and_execute(cas.quaternion_multiply, [q, p])
         r2 = giskard_math.quaternion_multiply(q, p)
-        self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
+        assert np.allclose(r1, r2) or np.isclose(r1, -r2)
 
     @given(quaternion())
     def test_quaternion_conjugate(self, q):
         r1 = cas.compile_and_execute(cas.quaternion_conjugate, [q])
         r2 = giskard_math.quaternion_conjugate(q)
-        self.assertTrue(np.isclose(r1, r2).all() or np.isclose(r1, -r2).all(), msg='{} != {}'.format(r1, r2))
+        assert np.allclose(r1, r2) or np.isclose(r1, -r2)
 
     @given(quaternion(),
            quaternion())
     def test_quaternion_diff(self, q1, q2):
         q3 = giskard_math.quaternion_multiply(giskard_math.quaternion_conjugate(q1), q2)
         q4 = cas.compile_and_execute(cas.quaternion_diff, [q1, q2])
-        self.assertTrue(np.isclose(q3, q4).all() or np.isclose(q3, -q4).all(), msg='{} != {}'.format(q1, q4))
+        assert np.allclose(q3, q4) or np.isclose(q3, -q4)
 
     @given(quaternion())
     def test_axis_angle_from_quaternion(self, q):
@@ -706,7 +705,7 @@ class TestQuaternion(unittest.TestCase):
         matrix = giskard_math.rotation_matrix_from_quaternion(*q)
         q2 = giskard_math.quaternion_from_rotation_matrix(matrix)
         q1_2 = cas.Quaternion.from_rotation_matrix(cas.RotationMatrix(matrix)).to_np()
-        self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
+        assert np.allclose(q1_2, q2) or np.allclose(q1_2, -q2)
 
     @given(quaternion(), quaternion())
     def test_dot(self, q1, q2):
@@ -715,10 +714,10 @@ class TestQuaternion(unittest.TestCase):
         result = cas.compile_and_execute(lambda p1, p2: cas.Quaternion(p1).dot(cas.Quaternion(p2)), [q1, q2])
         expected = np.dot(q1.T, q2)
         if not np.isnan(result) and not np.isinf(result):
-            self.assertTrue(np.isclose(result, expected))
+            assert np.isclose(result, expected)
 
 
-class TestCASWrapper(unittest.TestCase):
+class TestCASWrapper:
     @given(st.booleans())
     def test_empty_compiled_function(self, sparse):
         if sparse:
@@ -727,8 +726,8 @@ class TestCASWrapper(unittest.TestCase):
             expected = np.array([1, 2, 3])
         e = cas.Expression(expected)
         f = e.compile(sparse=sparse)
-        np.testing.assert_array_almost_equal(f(), expected)
-        np.testing.assert_array_almost_equal(f.fast_call(np.array([])), expected)
+        assert np.allclose(f(), expected)
+        assert np.allclose(f.fast_call(np.array([])), expected)
 
     def test_add(self):
         s2 = 'muh'
@@ -749,17 +748,17 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(f + v, cas.Vector3)
         assert isinstance(p + f, cas.Point3)
         assert isinstance(f + p, cas.Point3)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + f
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             f + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + f
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             f + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + f
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             f + q
 
         # Symbol
@@ -772,21 +771,21 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(s + p, cas.Point3)
         assert isinstance(p + s, cas.Point3)
         assert (s + p)[3].to_np() == 1 == (p + s)[3].to_np()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + s
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + s
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s + q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + s
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s + s2
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s2 + s
         # Expression
         assert isinstance(e + e, cas.Expression)
@@ -796,17 +795,17 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(e + p, cas.Point3)
         assert isinstance(p + e, cas.Point3)
         assert (e + p)[3].to_np() == 1 == (p + e)[3].to_np()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             e + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + e
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             e + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + e
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             e + q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + e
         # Vector3
         assert isinstance(v + v, cas.Vector3)
@@ -814,53 +813,53 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(v + p, cas.Point3)
         assert isinstance(p + v, cas.Point3)
         assert (v + p)[3].to_np() == 1 == (p + v)[3].to_np()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + v
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + v
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v + q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + v
         # Point3
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p + p
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + p
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + p
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p + q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + p
         # TransMatrix
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t + q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + t
         # RotationMatrix
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r + q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + r
         # Quaternion
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q + q
 
     def test_sub(self):
@@ -882,17 +881,17 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(f - v, cas.Vector3)
         assert isinstance(p - f, cas.Point3)
         assert isinstance(f - p, cas.Point3)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - f
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             f - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - f
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             f - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - f
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             f - q
         # Symbol
         assert isinstance(s - s, cas.Expression)
@@ -904,17 +903,17 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(s - p, cas.Point3)
         assert isinstance(p - s, cas.Point3)
         assert (s - p)[3].to_np() == 1 == (p - s)[3].to_np()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - s
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - s
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             s - q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - s
         # Expression
         assert isinstance(e - e, cas.Expression)
@@ -924,17 +923,17 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(e - p, cas.Point3)
         assert isinstance(p - e, cas.Point3)
         assert (e - p)[3].to_np() == 1 == (p - e)[3].to_np()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             e - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - e
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             e - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - e
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             e - q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - e
         # Vector3
         assert isinstance(v - v, cas.Vector3)
@@ -942,53 +941,53 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(v - p, cas.Point3)
         assert isinstance(p - v, cas.Point3)
         assert (v - p)[3].to_np() == 1 == (p - v)[3].to_np()
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - v
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - v
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v - q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - v
         # Point3
         assert isinstance(p - p, cas.Vector3)
         assert (p - p)[3].to_np() == 0
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - p
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - p
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p - q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - p
         # TransMatrix
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - t
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t - q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - t
         # RotationMatrix
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - r
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r - q
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - r
         # Quaternion
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q - q
 
     def test_basic_operation_with_string(self):
@@ -1006,14 +1005,14 @@ class TestCASWrapper(unittest.TestCase):
             for thing in things:
                 if hasattr(str_, fn):
                     error_msg = f'string.{fn}({thing.__class__.__name__})'
-                    with self.assertRaises(TypeError, msg=error_msg) as e:
+                    with pytest.raises(TypeError) as e:
                         getattr(str_, fn)(thing)
-                    assert 'NotImplementedType' not in str(e.exception), error_msg
+                    assert 'NotImplementedType' not in str(e), error_msg
                 if hasattr(thing, fn):
                     error_msg = f'{thing.__class__.__name__}.{fn}(string)'
-                    with self.assertRaises(TypeError, msg=error_msg) as e:
+                    with pytest.raises(TypeError) as e:
                         getattr(thing, fn)(str_)
-                    assert 'NotImplementedType' not in str(e.exception), error_msg
+                    assert 'NotImplementedType' not in str(e), error_msg
 
     def test_mul_truediv_pow(self):
         f = 1.0
@@ -1033,17 +1032,17 @@ class TestCASWrapper(unittest.TestCase):
             assert isinstance(fn(v, f), cas.Vector3)
             assert isinstance(fn(f, p), cas.Point3)
             assert isinstance(fn(p, f), cas.Point3)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(f, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, f)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(f, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, f)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(f, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, f)
 
             # Symbol
@@ -1056,17 +1055,17 @@ class TestCASWrapper(unittest.TestCase):
             assert isinstance(fn(s, p), cas.Point3)
             assert isinstance(fn(p, s), cas.Point3)
             assert (fn(s, p))[3].to_np() == 1 == (fn(p, s))[3].to_np()
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(s, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, s)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(s, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, s)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(s, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, s)
             # Expression
             assert isinstance(fn(e, e), cas.Expression)
@@ -1076,72 +1075,72 @@ class TestCASWrapper(unittest.TestCase):
             assert isinstance(fn(e, p), cas.Point3)
             assert isinstance(fn(p, e), cas.Point3)
             assert (fn(e, p))[3].to_np() == 1 == (fn(p, e))[3].to_np()
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(e, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, e)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(e, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, e)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(e, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, e)
             # Vector3
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(v, v)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(v, p)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(p, v)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(v, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, v)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(v, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, v)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(v, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, v)
             # Point3
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(p, p)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(p, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, p)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(p, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, p)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(p, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, p)
             # TransMatrix
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, t)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(t, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, t)
             # RotationMatrix
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, r)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(r, q)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, r)
             # Quaternion
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 fn(q, q)
 
     def test_dot_types(self):
@@ -1154,19 +1153,19 @@ class TestCASWrapper(unittest.TestCase):
         q = cas.Quaternion()
         # Symbol
         for muh in [s, e, v, p, t, r, q]:
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 cas.dot(s, muh)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 cas.dot(muh, s)
         # Expression
         assert isinstance(cas.dot(e, e), cas.Expression)
         assert isinstance(e.dot(e), cas.Expression)
         for muh in [v, p, t, r, q]:
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 cas.dot(e, muh)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 cas.dot(muh, e)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 e.dot(muh)
         # Vector3
         assert isinstance(v.dot(v), cas.Expression)
@@ -1177,38 +1176,38 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(cas.dot(p, v), cas.Expression)
         assert isinstance(t.dot(v), cas.Vector3)
         assert isinstance(cas.dot(t, v), cas.Vector3)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v.dot(t)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(v, t)
         assert isinstance(r.dot(v), cas.Vector3)
         assert isinstance(cas.dot(r, v), cas.Vector3)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             v.dot(q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(v, q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q.dot(v)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(q, v)
         # Point3
         assert isinstance(p.dot(p), cas.Expression)
         assert isinstance(cas.dot(p, p), cas.Expression)
         assert isinstance(t.dot(p), cas.Point3)
         assert isinstance(cas.dot(t, p), cas.Point3)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p.dot(t)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(p, t)
         assert isinstance(r.dot(p), cas.Point3)
         assert isinstance(cas.dot(r, p), cas.Point3)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             p.dot(q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(p, q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q.dot(p)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(q, p)
         # TransMatrix
         assert isinstance(t.dot(t), cas.TransformationMatrix)
@@ -1217,24 +1216,24 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(cas.dot(t, r), cas.RotationMatrix)
         assert isinstance(r.dot(t), cas.TransformationMatrix)
         assert isinstance(cas.dot(r, t), cas.TransformationMatrix)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             t.dot(q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(t, q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q.dot(t)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(q, t)
         # RotationMatrix
         assert isinstance(r.dot(r), cas.RotationMatrix)
         assert isinstance(cas.dot(r, r), cas.RotationMatrix)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             r.dot(q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(r, q)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             q.dot(r)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             cas.dot(q, r)
         assert isinstance(q.dot(q), cas.Expression)
         assert isinstance(cas.dot(q, q), cas.Expression)
@@ -1421,7 +1420,7 @@ class TestCASWrapper(unittest.TestCase):
         e = cas.vstack([m1, m1])
         r1 = e.to_np()
         r2 = np.vstack([m, m])
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     def test_vstack_empty(self):
         m = np.eye(0)
@@ -1429,7 +1428,7 @@ class TestCASWrapper(unittest.TestCase):
         e = cas.vstack([m1, m1])
         r1 = e.to_np()
         r2 = np.vstack([m, m])
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     def test_hstack(self):
         m = np.eye(4)
@@ -1437,7 +1436,7 @@ class TestCASWrapper(unittest.TestCase):
         e = cas.hstack([m1, m1])
         r1 = e.to_np()
         r2 = np.hstack([m, m])
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     def test_hstack_empty(self):
         m = np.eye(0)
@@ -1445,7 +1444,7 @@ class TestCASWrapper(unittest.TestCase):
         e = cas.hstack([m1, m1])
         r1 = e.to_np()
         r2 = np.hstack([m, m])
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     def test_diag_stack(self):
         m1_np = np.eye(4)
@@ -1464,41 +1463,38 @@ class TestCASWrapper(unittest.TestCase):
             column_counter:column_counter + matrix.shape[1]] = matrix
             row_counter += matrix.shape[0]
             column_counter += matrix.shape[1]
-        np.testing.assert_array_almost_equal(r1, combined_matrix)
+        assert np.allclose(r1, combined_matrix)
 
     @given(float_no_nan_no_inf())
     def test_abs(self, f1):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.abs, [f1]), abs(f1), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.abs, [f1]), abs(f1))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_max(self, f1, f2):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.max, [f1, f2]),
-                               max(f1, f2), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.max, [f1, f2]), max(f1, f2))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_save_division(self, f1, f2):
-        self.assertTrue(np.isclose(cas.compile_and_execute(cas.save_division, [f1, f2]),
-                                   f1 / f2 if f2 != 0 else 0))
+        assert np.isclose(cas.compile_and_execute(cas.save_division, [f1, f2]),
+                          f1 / f2 if f2 != 0 else 0)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_min(self, f1, f2):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.min, [f1, f2]),
-                               min(f1, f2), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.min, [f1, f2]), min(f1, f2))
 
     @given(float_no_nan_no_inf())
     def test_sign(self, f1):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.sign, [f1]),
-                               np.sign(f1), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.sign, [f1]), np.sign(f1))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_greater_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.if_greater_zero, [condition, if_result, else_result]),
-                               float(if_result if condition > 0 else else_result), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.if_greater_zero, [condition, if_result, else_result]),
+                          float(if_result if condition > 0 else else_result))
 
     def test_if_one_arg(self):
         types = [cas.Point3, cas.Vector3, cas.Quaternion, cas.Expression, cas.TransformationMatrix, cas.RotationMatrix]
@@ -1526,39 +1522,39 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_greater_eq_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.if_greater_eq_zero, [condition, if_result, else_result]),
-                               float(if_result if condition >= 0 else else_result), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.if_greater_eq_zero, [condition, if_result, else_result]),
+                          float(if_result if condition >= 0 else else_result))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_greater_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.if_greater_eq, [a, b, if_result, else_result]),
-                               float(if_result if a >= b else else_result), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.if_greater_eq, [a, b, if_result, else_result]),
+                          float(if_result if a >= b else else_result))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_less_eq(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.if_less_eq, [a, b, if_result, else_result]),
-                               float(if_result if a <= b else else_result), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.if_less_eq, [a, b, if_result, else_result]),
+                          float(if_result if a <= b else else_result))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq_zero(self, condition, if_result, else_result):
-        self.assertAlmostEqual(cas.compile_and_execute(cas.if_eq_zero, [condition, if_result, else_result]),
-                               float(if_result if condition == 0 else else_result), places=7)
+        assert np.isclose(cas.compile_and_execute(cas.if_eq_zero, [condition, if_result, else_result]),
+                   float(if_result if condition == 0 else else_result))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_eq(self, a, b, if_result, else_result):
-        self.assertTrue(np.isclose(cas.compile_and_execute(cas.if_eq, [a, b, if_result, else_result]),
-                                   float(if_result if a == b else else_result)))
+        assert np.isclose(cas.compile_and_execute(cas.if_eq, [a, b, if_result, else_result]),
+                          float(if_result if a == b else else_result))
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases(self, a):
@@ -1577,7 +1573,7 @@ class TestCASWrapper(unittest.TestCase):
 
         actual = cas.compile_and_execute(lambda a: cas.if_eq_cases(a, b_result_cases, 0), [a])
         expected = float(reference(a, b_result_cases, 0))
-        self.assertAlmostEqual(actual, expected)
+        assert np.isclose(actual, expected)
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases_set(self, a):
@@ -1596,8 +1592,7 @@ class TestCASWrapper(unittest.TestCase):
 
         actual = cas.compile_and_execute(lambda a: cas.if_eq_cases(a, b_result_cases, 0), [a])
         expected = float(reference(a, b_result_cases, 0))
-        self.assertAlmostEqual(actual, expected)
-
+        assert np.isclose(actual, expected)
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases_grouped(self, a):
@@ -1616,7 +1611,7 @@ class TestCASWrapper(unittest.TestCase):
 
         actual = cas.compile_and_execute(lambda a: cas.if_eq_cases_grouped(a, b_result_cases, 0), [a])
         expected = float(reference(a, b_result_cases, 0))
-        self.assertAlmostEqual(actual, expected)
+        assert np.isclose(actual, expected)
 
     @given(float_no_nan_no_inf(10))
     def test_if_less_eq_cases(self, a):
@@ -1635,7 +1630,7 @@ class TestCASWrapper(unittest.TestCase):
                     return if_result
             return else_result
 
-        self.assertAlmostEqual(
+        assert np.isclose(
             cas.compile_and_execute(lambda a, default: cas.if_less_eq_cases(a, b_result_cases, default),
                                     [a, 0]),
             float(reference(a, b_result_cases, 0)))
@@ -1645,23 +1640,23 @@ class TestCASWrapper(unittest.TestCase):
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_greater(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
+        assert np.isclose(
             cas.compile_and_execute(cas.if_greater, [a, b, if_result, else_result]),
-            float(if_result if a > b else else_result), places=7)
+            float(if_result if a > b else else_result))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_if_less(self, a, b, if_result, else_result):
-        self.assertAlmostEqual(
+        assert np.isclose(
             cas.compile_and_execute(cas.if_less, [a, b, if_result, else_result]),
-            float(if_result if a < b else else_result), places=7)
+            float(if_result if a < b else else_result))
 
     @given(vector(3),
            vector(3))
     def test_cross(self, u, v):
-        np.testing.assert_array_almost_equal(
+        assert np.allclose(
             cas.compile_and_execute(cas.cross, [u, v])[:3],
             np.cross(u, v))
 
@@ -1671,14 +1666,14 @@ class TestCASWrapper(unittest.TestCase):
     def test_limit(self, x, lower_limit, upper_limit):
         r1 = cas.compile_and_execute(cas.limit, [x, lower_limit, upper_limit])
         r2 = max(lower_limit, min(upper_limit, x))
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     @given(st.lists(float_no_nan_no_inf(), min_size=1))
     def test_norm(self, v):
         actual = cas.compile_and_execute(cas.norm, [v])
         expected = np.linalg.norm(v)
         assume(not np.isinf(expected))
-        self.assertTrue(np.isclose(actual, expected, equal_nan=True))
+        assert np.isclose(actual, expected, equal_nan=True)
 
     @given(vector(3),
            float_no_nan_no_inf())
@@ -1687,7 +1682,7 @@ class TestCASWrapper(unittest.TestCase):
             r2 = [0, 0, 0]
         else:
             r2 = v / np.linalg.norm(v) * a
-        np.testing.assert_array_almost_equal(
+        assert np.allclose(
             cas.compile_and_execute(cas.scale, [v, a]),
             r2)
 
@@ -1698,7 +1693,7 @@ class TestCASWrapper(unittest.TestCase):
         v = np.array(v)
         result = cas.compile_and_execute(cas.dot, [u, v])
         if not np.isnan(result) and not np.isinf(result):
-            self.assertTrue(np.isclose(result, np.dot(u, v)))
+            assert np.isclose(result, np.dot(u, v))
 
     @given(lists_of_same_length([float_no_nan_no_inf(outer_limit=1000), float_no_nan_no_inf(outer_limit=1000)],
                                 min_length=16, max_length=16))
@@ -1709,12 +1704,12 @@ class TestCASWrapper(unittest.TestCase):
         result = cas.compile_and_execute(cas.dot, [u, v])
         expected = np.dot(u, v)
         if not np.isnan(result).any() and not np.isinf(result).any():
-            np.testing.assert_array_almost_equal(result, expected)
+            assert np.allclose(result, expected)
 
     @given(unit_vector(4))
     def test_trace(self, q):
         m = giskard_math.rotation_matrix_from_quaternion(*q)
-        np.testing.assert_array_almost_equal(cas.compile_and_execute(cas.trace, [m]), np.trace(m))
+        assert np.allclose(cas.compile_and_execute(cas.trace, [m]), np.trace(m))
 
     @given(quaternion(),
            quaternion())
@@ -1725,11 +1720,9 @@ class TestCASWrapper(unittest.TestCase):
         _, expected_angle = giskard_math.axis_angle_from_rotation_matrix(m1.T.dot(m2))
         expected_angle = expected_angle
         try:
-            self.assertAlmostEqual(giskard_math.shortest_angular_distance(actual_angle, expected_angle),
-                                   0, places=3)
+            assert np.isclose(giskard_math.shortest_angular_distance(actual_angle, expected_angle), 0)
         except AssertionError:
-            self.assertAlmostEqual(giskard_math.shortest_angular_distance(actual_angle, -expected_angle),
-                                   0, places=3)
+            assert np.isclose(giskard_math.shortest_angular_distance(actual_angle, -expected_angle), 0)
 
     @given(random_angle(),
            random_angle(),
@@ -1748,9 +1741,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_slerp(self, q1, q2, t):
         r1 = cas.compile_and_execute(cas.quaternion_slerp, [q1, q2, t])
         r2 = giskard_math.quaternion_slerp(q1, q2, t)
-        self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
-                        np.isclose(r1, -r2, atol=1e-3).all(),
-                        msg='q1={} q2={} t={}\n{} != {}'.format(q1, q2, t, r1, r2))
+        assert np.allclose(r1, r2, atol=1e-3) or np.isclose(r1, -r2, atol=1e-3)
 
     @given(quaternion(),
            quaternion())
@@ -1796,33 +1787,22 @@ class TestCASWrapper(unittest.TestCase):
         for r1, r2 in zip(r1s, r2s):
             compare_orientations(r1, r2)
 
-    # @given(unit_vector(3),
-    #        unit_vector(3),
-    #        st.floats(allow_nan=False, allow_infinity=False, min_value=0, max_value=1))
-    # def test_slerp2(self, v1, v2, t):
-    #     r1 = cas.compile_and_execute(cas.quaternion_slerp, [v1, v2, t])
-    #     r2 = quaternion_slerp(v1, v2, t)
-    #
-    #     self.assertTrue(np.isclose(r1, r2, atol=1e-3).all() or
-    #                     np.isclose(r1, -r2, atol=1e-3).all(),
-    #                     msg='q1={} q2={} t={}\n{} != {}'.format(v1, v2, t, r1, r2))
-
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
     def test_fmod(self, a, b):
         ref_r = np.fmod(a, b)
-        self.assertTrue(np.isclose(cas.compile_and_execute(cas.fmod, [a, b]), ref_r, equal_nan=True))
+        assert np.isclose(cas.compile_and_execute(cas.fmod, [a, b]), ref_r, equal_nan=True)
 
     @given(float_no_nan_no_inf())
     def test_normalize_angle_positive(self, a):
         expected = giskard_math.normalize_angle_positive(a)
         actual = cas.compile_and_execute(cas.normalize_angle_positive, [a])
-        self.assertAlmostEqual(giskard_math.shortest_angular_distance(expected, actual), 0.0, places=5)
+        assert np.isclose(giskard_math.shortest_angular_distance(expected, actual), 0.0)
 
     @given(float_no_nan_no_inf())
     def test_normalize_angle(self, a):
         ref_r = giskard_math.normalize_angle(a)
-        self.assertAlmostEqual(cas.compile_and_execute(cas.normalize_angle, [a]), ref_r, places=5)
+        assert np.isclose(cas.compile_and_execute(cas.normalize_angle, [a]), ref_r)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf())
@@ -1832,7 +1812,7 @@ class TestCASWrapper(unittest.TestCase):
         except ValueError:
             expected = np.nan
         actual = cas.compile_and_execute(cas.shortest_angular_distance, [angle1, angle2])
-        self.assertTrue(np.isclose(actual, expected, equal_nan=True))
+        assert np.isclose(actual, expected, equal_nan=True)
 
     @given(unit_vector(4),
            unit_vector(4))
@@ -1841,19 +1821,19 @@ class TestCASWrapper(unittest.TestCase):
         m2 = giskard_math.rotation_matrix_from_quaternion(*q2)
         r1 = cas.compile_and_execute(cas.entrywise_product, [m1, m2])
         r2 = m1 * m2
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     def test_kron(self):
         m1 = np.eye(4)
         r1 = cas.compile_and_execute(cas.kron, [m1, m1])
         r2 = np.kron(m1, m1)
-        np.testing.assert_array_almost_equal(r1, r2)
+        assert np.allclose(r1, r2)
 
     @given(sq_matrix())
     def test_sum(self, m):
         actual_sum = cas.compile_and_execute(cas.sum, [m])
         expected_sum = np.sum(m)
-        self.assertTrue(np.isclose(actual_sum, expected_sum, rtol=1.e-4))
+        assert np.isclose(actual_sum, expected_sum, rtol=1.e-4)
 
     @settings(deadline=timedelta(milliseconds=500))
     @given(st.integers(max_value=10000, min_value=1),
@@ -1881,21 +1861,21 @@ class TestCASWrapper(unittest.TestCase):
     @given(float_no_nan_no_inf_min_max(min_value=0))
     def test_r_gauss(self, n):
         result = cas.compile_and_execute(lambda x: cas.r_gauss(cas.gauss(x)), [n])
-        self.assertAlmostEqual(result, n)
+        np.isclose(result, n)
         result = cas.compile_and_execute(lambda x: cas.gauss(cas.r_gauss(x)), [n])
-        self.assertAlmostEqual(result, n)
+        np.isclose(result, n)
 
     @given(sq_matrix())
     def test_sum_row(self, m):
         actual_sum = cas.compile_and_execute(cas.sum_row, [m])
         expected_sum = np.sum(m, axis=0)
-        self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))
+        assert np.allclose(actual_sum, expected_sum)
 
     @given(sq_matrix())
     def test_sum_column(self, m):
         actual_sum = cas.compile_and_execute(cas.sum_column, [m])
         expected_sum = np.sum(m, axis=1)
-        self.assertTrue(np.all(np.isclose(actual_sum, expected_sum)))
+        assert np.allclose(actual_sum, expected_sum)
 
     def test_distance_point_to_line_segment1(self):
         p = np.array([0, 0, 0])
