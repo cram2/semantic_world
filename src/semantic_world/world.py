@@ -15,7 +15,7 @@ from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .utils import IDGenerator, memoize, clear_memo, copy_memoize
-from .world_entity import Body, Connection
+from .world_entity import Body, Connection, View
 
 id_generator = IDGenerator()
 
@@ -217,6 +217,11 @@ class World:
     The kinematic structure of the world.
     The kinematic structure is a tree-like directed graph where the nodes represent bodies in the world,
     and the edges represent connections between them.
+    """
+
+    views: List[View] = field(default_factory=list, repr=False)
+    """
+    All views the world is aware of.
     """
 
     degrees_of_freedom: Dict[PrefixedName, DegreeOfFreedom] = field(default_factory=dict)

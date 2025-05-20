@@ -1,12 +1,15 @@
 import os
+import sys
 import unittest
+
+from PyQt6.QtWidgets import QApplication
 
 from ripple_down_rules.datastructures.dataclasses import CaseQuery
 from ripple_down_rules.experts import Human
 from ripple_down_rules.rdr import GeneralRDR
+from ripple_down_rules.user_interface.gui import RDRCaseViewer
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
-from semantic_world.world import JointType
 
 
 class ViewTestCase(unittest.TestCase):
@@ -17,10 +20,14 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(main_dir, "test_expert_answers")
     generated_rdrs_dir = os.path.join(main_dir, "test_generated_rdrs")
     saved_rdrs_dir = os.path.join(main_dir, "saved_rdrs")
+    app: QApplication
+    viewer: RDRCaseViewer
 
     def setUp(self):
         self.kitchen_parser = URDFParser(self.kitchen)
         self.apartment_parser = URDFParser(self.apartment)
+        self.app = QApplication(sys.argv)
+        self.viewer = RDRCaseViewer()
 
     def test_id(self):
         v1 = Handle(1)
@@ -42,23 +49,26 @@ class ViewTestCase(unittest.TestCase):
         world = self.kitchen_parser.parse()
         world.validate()
 
-        use_loaded_answers = True
-        save_answers = False
-        append = False
-        expert_answers_filename = os.path.join(self.expert_answers_dir, "kitchen_expert_answers_fit")
         rdr_filename = os.path.join(self.saved_rdrs_dir, "kitchen_rdr")
-        expert = Human(use_loaded_answers=use_loaded_answers, append=append)
-        if use_loaded_answers:
-            expert.load_answers(expert_answers_filename)
-        grdr = GeneralRDR()
-        for view in [Handle, Container, Drawer, Cabinet]:
-            grdr.fit_case(CaseQuery(world, "views", (view,), False), expert=expert)
-        if save_answers:
-            expert.save_answers(expert_answers_filename)
+
+        use_current_rules = False
+        save_rules = True
+        expert = Human(viewer=self.viewer)
+
+        if use_current_rules:
+            grdr = GeneralRDR.load(rdr_filename)
+            grdr.update_from_python_file(self.generated_rdrs_dir)
+        else:
+            grdr = GeneralRDR()
+            for view in [Handle, Container, Drawer, Cabinet]:
+                grdr.fit_case(CaseQuery(world, "views", (view,), False), expert=expert)
+
         views = grdr.classify(world)
-        grdr.write_to_python_file(self.generated_rdrs_dir)
-        grdr.save(rdr_filename)
-        loaded_rdr = GeneralRDR.load(rdr_filename)
+
+        if save_rules:
+            grdr.write_to_python_file(self.generated_rdrs_dir)
+            grdr.save(rdr_filename)
+
         print("found types are: ", {type(v).__name__ for values in views.values() for v in values})
         drawer_container_names = [v.body.name for values in views.values() for v in values if type(v) is Container]
         print("\n".join(drawer_container_names))
