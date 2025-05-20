@@ -27,7 +27,7 @@ class ViewTestCase(unittest.TestCase):
         self.kitchen_parser = URDFParser(self.kitchen)
         self.apartment_parser = URDFParser(self.apartment)
         self.app = QApplication(sys.argv)
-        self.viewer = RDRCaseViewer()
+        self.viewer = RDRCaseViewer(save_file=self.saved_rdrs_dir + "/grdr_views")
 
     def test_id(self):
         v1 = Handle(1)
@@ -58,8 +58,9 @@ class ViewTestCase(unittest.TestCase):
         if use_current_rules:
             grdr = GeneralRDR.load(rdr_filename)
             grdr.update_from_python_file(self.generated_rdrs_dir)
+            grdr.set_viewer(self.viewer)
         else:
-            grdr = GeneralRDR()
+            grdr = GeneralRDR(viewer=self.viewer)
             for view in [Handle, Container, Drawer, Cabinet]:
                 grdr.fit_case(CaseQuery(world, "views", (view,), False), expert=expert)
 
