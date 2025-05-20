@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import logging
 import os
-from functools import lru_cache
-from typing import Any
+from copy import deepcopy
+from functools import lru_cache, wraps
+from typing import Any, Tuple, TypeVar, Callable
+from xml.etree import ElementTree as ET
 
 
 class IDGenerator:
@@ -62,36 +63,66 @@ class suppress_stdout_stderr(object):
             os.close(fd)
 
 
-class ClassPropertyDescriptor:
+def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'gazebo')) -> str:
+    # Parse input string
+    root = ET.fromstring(urdf)
+
+    # Iterate through each section in the blacklist
+    for section_name in blacklist:
+        # Find all sections with the given name and remove them
+        for elem in root.findall(f".//{section_name}"):
+            parent = root.find(f".//{section_name}/..")
+            if parent is not None:
+                parent.remove(elem)
+
+    # Turn back to string
+    return ET.tostring(root, encoding='unicode')
+
+
+def robot_name_from_urdf_string(urdf_string: str) -> str:
     """
-    A helper that can be used to define properties of a class like the built-in ones but does not require the class
-    to be instantiated.
+    Returns the name defined in the robot tag, e.g., 'pr2' from <robot name="pr2"> ... </robot>.
+    :param urdf_string: URDF string
+    :return: Extracted name
     """
-
-    def __init__(self, fget, fset=None):
-        self.fget = fget
-        self.fset = fset
-
-    def __get__(self, obj, klass=None):
-        if klass is None:
-            klass = type(obj)
-        return self.fget.__get__(obj, klass)()
-
-    def __set__(self, obj, value):
-        if not self.fset:
-            raise AttributeError("can't set attribute")
-        type_ = type(obj)
-        return self.fset.__get__(obj, type_)(value)
-
-    def setter(self, func):
-        if not isinstance(func, (classmethod, staticmethod)):
-            func = classmethod(func)
-        self.fset = func
-        return self
+    return urdf_string.split('robot name="')[1].split('"')[0]
 
 
-def classproperty(func):
-    if not isinstance(func, (classmethod, staticmethod)):
-        func = classmethod(func)
+T = TypeVar("T", bound=Callable)
 
-    return ClassPropertyDescriptor(func)
+
+def memoize(function: T) -> T:
+    memo = function.memo = {}
+
+    @wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        key = (args, frozenset(kwargs.items()))
+        try:
+            return memo[key]
+        except KeyError:
+            rv = function(*args, **kwargs)
+            memo[key] = rv
+            return rv
+
+    return wrapper
+
+
+def clear_memo(f):
+    if hasattr(f, 'memo'):
+        f.memo.clear()
+
+
+def copy_memoize(function: T) -> T:
+    memo = function.memo = {}
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        key = (args, frozenset(kwargs.items()))
+        try:
+            return deepcopy(memo[key])
+        except KeyError:
+            rv = function(*args, **kwargs)
+            memo[key] = rv
+            return deepcopy(rv)
+
+    return wrapper

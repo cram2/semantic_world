@@ -1,24 +1,61 @@
 import os
 from dataclasses import dataclass
-
-from typing_extensions import List, Union
+from typing import Optional, Tuple, Dict
+from ..spatial_types import spatial_types as cas
 from urdf_parser_py import urdf
 
-from .ros import get_ros_package_path
-from ..enums import JointType, Axis
-from ..geometry import Color
-from ..geometry import Shape, Box, Mesh, Cylinder
-from ..pose import Vector3, Quaternion, Pose, Header, PoseStamped
-from ..utils import suppress_stdout_stderr
+from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection
+from ..prefixed_name import PrefixedName
+from ..spatial_types.derivatives import Derivatives
+from ..utils import suppress_stdout_stderr, hacky_urdf_parser_fix
 from ..world import World, Body, Connection
 
-joint_type_map = {'unknown': JointType.UNKNOWN,
-                  'revolute': JointType.REVOLUTE,
-                  'continuous': JointType.CONTINUOUS,
-                  'prismatic': JointType.PRISMATIC,
-                  'floating': JointType.FLOATING,
-                  'planar': JointType.PLANAR,
-                  'fixed': JointType.FIXED}
+connection_type_map = {  # 'unknown': JointType.UNKNOWN,
+    'revolute': RevoluteConnection,
+    'continuous': RevoluteConnection,
+    'prismatic': PrismaticConnection,
+    # 'floating': JointType.FLOATING,
+    # 'planar': JointType.PLANAR,
+    'fixed': FixedConnection}
+
+
+def urdf_joint_to_limits(urdf_joint: urdf.Joint) -> Tuple[Dict[Derivatives, float], Dict[Derivatives, float]]:
+    lower_limits = {}
+    upper_limits = {}
+    if not urdf_joint.type == 'continuous':
+        try:
+            lower_limits[Derivatives.position] = max(urdf_joint.safety_controller.soft_lower_limit,
+                                                     urdf_joint.limit.lower)
+            upper_limits[Derivatives.position] = min(urdf_joint.safety_controller.soft_upper_limit,
+                                                     urdf_joint.limit.upper)
+        except AttributeError:
+            try:
+                lower_limits[Derivatives.position] = urdf_joint.limit.lower
+                upper_limits[Derivatives.position] = urdf_joint.limit.upper
+            except AttributeError:
+                pass
+    try:
+        lower_limits[Derivatives.velocity] = -urdf_joint.limit.velocity
+        upper_limits[Derivatives.velocity] = urdf_joint.limit.velocity
+    except AttributeError:
+        pass
+    if urdf_joint.mimic is not None:
+        if urdf_joint.mimic.multiplier is not None:
+            multiplier = urdf_joint.mimic.multiplier
+        else:
+            multiplier = 1
+        if urdf_joint.mimic.offset is not None:
+            offset = urdf_joint.mimic.offset
+        else:
+            offset = 0
+        for d2 in Derivatives.range(Derivatives.position, Derivatives.velocity):
+            lower_limits[d2] -= offset
+            upper_limits[d2] -= offset
+            if multiplier < 0:
+                upper_limits[d2], lower_limits[d2] = lower_limits[d2], upper_limits[d2]
+            upper_limits[d2] /= multiplier
+            lower_limits[d2] /= multiplier
+    return lower_limits, upper_limits
 
 
 @dataclass
@@ -32,6 +69,15 @@ class URDFParser:
     The file path of the URDF.
     """
 
+    prefix: Optional[str] = None
+    """
+    The prefix for every name used in this world.
+    """
+
+    def __post_init__(self):
+        if self.prefix is None:
+            self.prefix = os.path.basename(self.file_path).split('.')[0]
+
     def parse(self) -> World:
         # cache_dir = os.path.join(os.getcwd(), '..', '..', '../resources', 'cache')
         # file_name = os.path.basename(self.file_path)
@@ -41,109 +87,75 @@ class URDFParser:
         with open(self.file_path, 'r') as file:
             # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
             with suppress_stdout_stderr():
-                parsed = urdf.URDF.from_xml_string(file.read())
+                parsed = urdf.URDF.from_xml_string(hacky_urdf_parser_fix(file.read()))
 
         links = [self.parse_link(link) for link in parsed.links]
-        joints = []
-        for joint in parsed.joints:
-            parent = [link for link in links if link.name == joint.parent][0]
-            child = [link for link in links if link.name == joint.child][0]
-            parsed_joint = self.parse_joint(joint, parent, child)
-            joints.append(parsed_joint)
+        root = [link for link in links if link.name.name == parsed.get_root()][0]
+        world = World(root=root)
 
-        world = World(root=links[0])
-        [world.add_connection(joint) for joint in joints]
-        [world.add_body(link) for link in links]
+        with world.modify_world():
+            joints = []
+            for joint in parsed.joints:
+                parent = [link for link in links if link.name.name == joint.parent][0]
+                child = [link for link in links if link.name.name == joint.child][0]
+                parsed_joint = self.parse_joint(joint, parent, child, world)
+                joints.append(parsed_joint)
+
+            [world.add_connection(joint) for joint in joints]
+            [world.add_body(link) for link in links]
 
         return world
 
-    def parse_joint(self, joint: urdf.Joint, parent: Body, child: Body) -> Connection:
-        axis = self.parse_joint_axis(joint.axis)
-
-        lower = None
-        upper = None
-        if joint.limit:
-            lower = joint.limit.lower
-            upper = joint.limit.upper
-
-        origin = self.urdf_pose_to_pose(joint.origin)
-        origin = PoseStamped(origin, Header(frame_id=parent.name))
-
-        result = Connection(type=joint_type_map[joint.type], parent=parent, child=child,
-                            axis=axis, lower_limit=lower, upper_limit=upper, origin=origin)
-
-        child.origin = origin
-        return result
-
-    def parse_joint_axis(self, axis) -> Axis:
-        result = Axis.X
-        if axis:
-            if axis[0]:
-                result = Axis.X
-            elif axis[1]:
-                result = Axis.Y
-            elif axis[2]:
-                result = Axis.Z
-        return result
-
-    def visual_of_link(self, link: urdf.Link) -> List[Shape]:
-        if link.visuals:
-            return [self.parse_shape(visual, link) for visual in link.visuals]
+    def parse_joint(self, joint: urdf.Joint, parent: Body, child: Body, world: World) -> Connection:
+        connection_type = connection_type_map.get(joint.type, Connection)
+        if joint.origin is not None:
+            translation_offset = joint.origin.xyz
+            rotation_offset = joint.origin.rpy
         else:
-            return []
+            translation_offset = None
+            rotation_offset = None
+        if translation_offset is None:
+            translation_offset = [0, 0, 0]
+        if rotation_offset is None:
+            rotation_offset = [0, 0, 0]
+        parent_T_child = cas.TransformationMatrix.from_xyz_rpy(x=translation_offset[0],
+                                                               y=translation_offset[1],
+                                                               z=translation_offset[2],
+                                                               roll=rotation_offset[0],
+                                                               pitch=rotation_offset[1],
+                                                               yaw=rotation_offset[2])
+        if connection_type == FixedConnection:
+            return connection_type(parent=parent, child=child, origin=parent_T_child)
 
-    def collision_of_link(self, link: urdf.Link) -> List[Shape]:
-        if link.collisions:
-            return [self.parse_shape(collision, link) for collision in link.collisions]
+        lower_limits, upper_limits = urdf_joint_to_limits(joint)
+        is_mimic = joint.mimic is not None
+        multiplier = None
+        offset = None
+        if is_mimic:
+            if joint.mimic.multiplier is not None:
+                multiplier = joint.mimic.multiplier
+            else:
+                multiplier = 1
+            if joint.mimic.offset is not None:
+                offset = joint.mimic.offset
+            else:
+                offset = 0
+
+            free_variable_name = PrefixedName(joint.mimic.joint)
         else:
-            return []
+            free_variable_name = PrefixedName(joint.name)
 
-    def parse_shape(self, shape: urdf.Visual, link: urdf.Link) -> Shape:
-        geometry: urdf.GeometricType = shape.geometry
-
-        if isinstance(geometry, urdf.Box):
-            return self.parse_box(geometry, shape, link)
-        elif isinstance(geometry, urdf.Mesh):
-            return self.parse_mesh(geometry, shape, link)
-        elif isinstance(geometry, urdf.Cylinder):
-            return self.parse_cylinder(geometry, shape, link)
-
-        raise NotImplementedError(f"Parsing of {type(geometry)}: {geometry} not implemented yet.")
-
-    def get_color(self, shape: Union[urdf.Visual, urdf.Collision]) -> Color:
-        if isinstance(shape, urdf.Visual) and shape.material and shape.material.color and shape.material.color.rgba:
-            return Color(shape.material.color.rgba)
+        if free_variable_name in world.degrees_of_freedom:
+            dof = world.degrees_of_freedom[free_variable_name]
         else:
-            return Color()
+            dof = world.create_degree_of_freedom(name=PrefixedName(joint.name),
+                                                 lower_limits=lower_limits, upper_limits=upper_limits)
 
-    def parse_box(self, box: urdf.Box, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Box:
-        pose = self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link)
-        color = self.get_color(shape)
-
-        result = Box(length=box.size[0], width=box.size[1], height=box.size[2], origin=pose, color=color)
+        result = connection_type(parent=parent, child=child, origin=parent_T_child,
+                                 multiplier=multiplier, offset=offset,
+                                 axis=joint.axis,
+                                 dof=dof)
         return result
-
-    def parse_mesh(self, mesh: urdf.Mesh, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Mesh:
-
-        scale = Vector3(*mesh.scale) if mesh.scale else Vector3(1., 1., 1.)
-        filename: str = mesh.filename
-
-        if filename.startswith("package://"):
-            package_name = filename.split('//')
-            package_name = package_name[1].split('/')
-            path = get_ros_package_path(package_name[0])
-            filename = filename.replace("package://" + package_name[0], path)
-        elif filename.startswith("file://"):
-            filename = filename.replace("file://", './')
-
-        return Mesh(filename=filename, scale=scale,
-                    origin=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link))
-
-    def parse_cylinder(self, cylinder: urdf.Cylinder, shape: Union[urdf.Visual, urdf.Collision],
-                       link: urdf.Link) -> Cylinder:
-        color = self.get_color(shape)
-        return Cylinder(radius=cylinder.radius, length=cylinder.length,
-                        origin=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link), color=color)
 
     def parse_link(self, link: urdf.Link) -> Body:
         """
@@ -151,13 +163,5 @@ class URDFParser:
         :param link: The URDF link to parse.
         :return: The parsed link object.
         """
-        return Body(link.name, visual=self.visual_of_link(link), collision=self.collision_of_link(link))
-
-    def urdf_pose_to_pose(self, pose: urdf.Pose) -> Pose:
-        if pose:
-            return Pose(Vector3(*pose.xyz), Quaternion(*pose.rpy, 1.))
-        else:
-            return Pose()
-
-    def as_pose_stamped(self, pose: Pose, link: Body):
-        return PoseStamped(pose=pose, header=Header(frame_id=link.name))
+        name = PrefixedName(prefix=self.prefix, name=link.name)
+        return Body(name=name)

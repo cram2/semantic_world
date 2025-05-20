@@ -6,10 +6,10 @@ import threading
 import time
 from dataclasses import dataclass
 
-from roslaunch.core import get_ros_package_path as get_ros_package_paths
+# from roslaunch.core import get_ros_package_path as get_ros_package_paths
 
 from ..geometry import Shape, Mesh, Sphere, Cylinder, Box, Color
-from ..pose import Vector3, Quaternion, Pose, Header, PoseStamped
+from ..spatial_types import Vector3, Quaternion
 from ..utils import IDGenerator
 from ..world import World
 
@@ -32,31 +32,31 @@ def get_ros_package_path(package_name: str) -> str:
 
 id_generator = IDGenerator()
 
-
-def vector3_to_ros_message(obj: Vector3) -> ROSVector3:
-    return ROSVector3(x=obj.x, y=obj.y, z=obj.z)
-
-
-def quaternion_to_ros_message(obj: Quaternion) -> ROSQuaternion:
-    return ROSQuaternion(x=obj.x, y=obj.y, z=obj.z, w=obj.w)
-
-
-def pose_to_ros_message(obj: Pose) -> ROSPose:
-    return ROSPose(position=vector3_to_ros_message(obj.position),
-                   orientation=quaternion_to_ros_message(obj.orientation))
-
-
-def header_to_ros_message(obj: Header) -> ROSHeader:
-    stamp = ROSTime.from_sec(obj.timestamp.timestamp())
-    return ROSHeader(frame_id=obj.frame_id, stamp=stamp, seq=obj.sequence)
-
-
-def pose_stamped_to_ros_message(obj: PoseStamped) -> PoseStamped:
-    return ROSPoseStamped(pose=pose_to_ros_message(obj.pose), header=header_to_ros_message(obj.header))
-
-
-def color_to_ros_message(obj: Color):
-    return ROSColor(rgba=vector3_to_ros_message(obj.rgba), )
+#
+# def vector3_to_ros_message(obj: Vector3) -> ROSVector3:
+#     return ROSVector3(x=obj.x, y=obj.y, z=obj.z)
+#
+#
+# def quaternion_to_ros_message(obj: Quaternion) -> ROSQuaternion:
+#     return ROSQuaternion(x=obj.x, y=obj.y, z=obj.z, w=obj.w)
+#
+#
+# def pose_to_ros_message(obj: Pose) -> ROSPose:
+#     return ROSPose(position=vector3_to_ros_message(obj.position),
+#                    orientation=quaternion_to_ros_message(obj.orientation))
+#
+#
+# def header_to_ros_message(obj: Header) -> ROSHeader:
+#     stamp = ROSTime.from_sec(obj.timestamp.timestamp())
+#     return ROSHeader(frame_id=obj.frame_id, stamp=stamp, seq=obj.sequence)
+#
+#
+# def pose_stamped_to_ros_message(obj: PoseStamped) -> PoseStamped:
+#     return ROSPoseStamped(pose=pose_to_ros_message(obj.pose), header=header_to_ros_message(obj.header))
+#
+#
+# def color_to_ros_message(obj: Color):
+#     return ROSColor(rgba=vector3_to_ros_message(obj.rgba), )
 
 
 def shape_to_ros_message(obj: Shape) -> Marker:
