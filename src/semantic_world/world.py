@@ -387,6 +387,7 @@ class World:
         """
         for dof in world.degrees_of_freedom.values():
             dof.state_idx += len(self.degrees_of_freedom)
+            dof._world = self
         self.degrees_of_freedom.update(world.degrees_of_freedom)
         self.state = np.hstack((self.state, world.state))
         for connection in world.connections:

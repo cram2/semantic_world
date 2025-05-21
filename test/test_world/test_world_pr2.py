@@ -18,10 +18,14 @@ def pr2_world():
     pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
     world = World()
     with world.modify_world():
+        localization_body = Body(PrefixedName('odom_combined'))
+        localization_connection = Connection6DoF(parent=world.root, child=localization_body, _world=world)
+        world.add_connection(localization_connection)
+
         pr2_parser = URDFParser(pr2)
-        pr2_world = pr2_parser.parse()
-        world.merge_world(pr2_world)
-        c_root_bf = OmniDrive(parent=world.root, child=pr2_world.root, _world=world)
+        world_with_pr2 = pr2_parser.parse()
+        world.merge_world(world_with_pr2)
+        c_root_bf = OmniDrive(parent=localization_body, child=world_with_pr2.root, _world=world)
         world.add_connection(c_root_bf)
     return world
 
@@ -130,7 +134,7 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world):
 
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world):
-    omni_drive: OmniDrive = pr2_world.get_connection_by_name(PrefixedName(name='root_T_base_footprint',
+    omni_drive: OmniDrive = pr2_world.get_connection_by_name(PrefixedName(name='odom_combined_T_base_footprint',
                                                                           prefix='pr2_kinematic_tree'))
     cmd = np.zeros((len(pr2_world.degrees_of_freedom)), dtype=float)
     cmd[-3] = 100
