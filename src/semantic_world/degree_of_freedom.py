@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Union, TYPE_CHECKING
+from functools import lru_cache
+from typing import Dict, Optional, Union
 
-from .spatial_types import spatial_types as cas
 from .prefixed_name import PrefixedName
+from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.symbol_manager import symbol_manager
-from .utils import memoize
 from .world_entity import WorldEntity
 
 
@@ -89,7 +89,7 @@ class DegreeOfFreedom(WorldEntity):
             except:
                 pass
 
-    @memoize
+    @lru_cache(maxsize=None)
     def get_lower_limit(self, derivative: Derivatives) -> Optional[float]:
         if derivative in self._lower_limits and derivative in self._lower_limits_overwrite:
             lower_limit = cas.max(self._lower_limits[derivative], self._lower_limits_overwrite[derivative])
@@ -101,7 +101,7 @@ class DegreeOfFreedom(WorldEntity):
             return None
         return lower_limit
 
-    @memoize
+    @lru_cache(maxsize=None)
     def get_upper_limit(self, derivative: Derivatives) -> Optional[float]:
         if derivative in self._upper_limits and derivative in self._upper_limits_overwrite:
             upper_limit = cas.min(self._upper_limits[derivative], self._upper_limits_overwrite[derivative])
@@ -119,7 +119,7 @@ class DegreeOfFreedom(WorldEntity):
     def set_upper_limit(self, derivative: Derivatives, limit: float):
         self._upper_limits_overwrite[derivative] = limit
 
-    @memoize
+    @lru_cache(maxsize=None)
     def has_position_limits(self) -> bool:
         try:
             lower_limit = self.get_lower_limit(Derivatives.position)
