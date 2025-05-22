@@ -93,7 +93,7 @@ class Body(WorldEntity):
         new_link._world = body._world
         return new_link
 
-
+@dataclass
 class View(WorldEntity):
     """
     Represents a view on a set of bodies in the world.
@@ -101,12 +101,14 @@ class View(WorldEntity):
     This class can hold references to certain bodies that gain meaning in this context.
     """
 
+@dataclass
 class RootedView(View):
     """
     Represents a view that is rooted in a specific body.
     """
-    root_body: Body = field(default_factory=Body)
+    root: Body = field(default_factory=Body)
 
+@dataclass
 class EnvironmentView(View):
     """
     Represents a view of the environment.

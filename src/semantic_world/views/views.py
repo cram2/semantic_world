@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
-from ..world import View, Body
+from ..world import Body
+from ..world_entity import View
+
 
 @dataclass
 class Container(View):

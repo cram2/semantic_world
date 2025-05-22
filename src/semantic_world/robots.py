@@ -38,27 +38,6 @@ class KinematicChain(RobotView):
     manipulator: Optional[Manipulator] = None
     sensors: Optional[List[Sensor]] = None
 
-
-@dataclass
-class RobotBase(RobotView):
-    """
-    Represents the structural core of the robot. It may be connected directly to a collection of kinematic chains, one
-    of which may be a torso.
-    """
-    torso: KinematicChain = field(default_factory=KinematicChain)
-    kinematic_chains: List[KinematicChain] = field(default_factory=list)
-
-class WheelBaseType(str, enum.Enum):
-    """
-    Example collection of wheel base types.
-    """
-    OMNI = "omni"
-    DIFFERENTIAL = "differential"
-    ACKERMANN = "ackermann"
-    MECANUM = "mecanum"
-    TRACKS = "tracks"
-
-
 class Direction(int, enum.Enum):
     POSITIVE = 1
     NEGATIVE = -1
@@ -76,14 +55,6 @@ class AxisIdentifier(enum.Enum):
 class AxisDirection:
     axis: AxisIdentifier
     direction: Direction
-
-
-@dataclass
-class WheeledBase(RobotBase):
-    """
-    Represents a wheeled base of a robot.
-    """
-    type: WheelBaseType = field(default_factory=str)
 
 
 @dataclass
@@ -167,7 +138,7 @@ class AbstractRobot(RootedView):
     - an optional collection of sensor chains, each containing a sensor, such as a camera
     => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
     """
-    root: Body
+    odom: RobotBody = field(default_factory=RobotBody)
     torso: Optional[Torso] = None
     manipulators: Optional[List[Manipulator]] = None
     sensors: Optional[List[Sensor]] = None
@@ -208,11 +179,11 @@ class AbstractRobot(RootedView):
                         finger_children = []
                         for idx, finger in enumerate(chain.manipulator.fingers):
                             finger_children.append((
-                                f"[{idx}] {finger.identifier} ({finger.__class__.__name__}): {finger.root_body.name} → {finger.tip_body.name}", []
+                                f"[{idx}] {finger.identifier} ({finger.__class__.__name__}): {finger.root.name} → {finger.tip_body.name}", []
                             ))
                         if chain.manipulator.thumb:
                             finger_children.append((
-                                f"{chain.manipulator.thumb.identifier} ({chain.manipulator.thumb.__class__.__name__}): {chain.manipulator.thumb.root_body.name} → {chain.manipulator.thumb.tip_body.name}",
+                                f"{chain.manipulator.thumb.identifier} ({chain.manipulator.thumb.__class__.__name__}): {chain.manipulator.thumb.root.name} → {chain.manipulator.thumb.tip_body.name}",
                                 []
                             ))
                         manip_children.append(("Fingers:", finger_children))
@@ -235,10 +206,10 @@ class AbstractRobot(RootedView):
                 children.append((f"Pitch body: {chain.pitch_body.name}", []))
             if hasattr(chain, "yaw_body") and chain.yaw_body:
                 children.append((f"Yaw body: {chain.yaw_body.name}", []))
-            return f"{chain.identifier} ({chain.__class__.__name__}): {chain.root_body.name} → {chain.tip_body.name}", children
+            return f"{chain.identifier} ({chain.__class__.__name__}): {chain.root.name} → {chain.tip_body.name}", children
 
         def make_torso_node(torso: Torso):
-            torso_label = f"{torso.identifier} ({torso.__class__.__name__}): {torso.root_body.name} → {torso.tip_body.name}"
+            torso_label = f"{torso.identifier} ({torso.__class__.__name__}): {torso.root.name} → {torso.tip_body.name}"
             children = [make_chain_node(kc) for kc in torso.kinematic_chains]
             return torso_label, children
 
@@ -277,13 +248,14 @@ class PR2(AbstractRobot):
             """
             fingers = []
             for index, (root_name, tip_name) in enumerate(finger_body_pairs):
-                root_body_obj = world.get_body_by_name(root_name)
+                root_obj = world.get_body_by_name(root_name)
                 tip_body_obj = world.get_body_by_name(tip_name)
-                if root_body_obj and tip_body_obj:
+                if root_obj and tip_body_obj:
                     finger = Finger(
-                        root_body=RobotBody.from_body(root_body_obj),
+                        root=RobotBody.from_body(root_obj),
                         tip_body=RobotBody.from_body(tip_body_obj),
-                        identifier=f"{prefix}_finger_{index}"
+                        identifier=f"{prefix}_finger_{index}",
+                        _world=world,
                     )
                     fingers.append(finger)
             thumb = fingers[-1] if fingers else None
@@ -298,22 +270,24 @@ class PR2(AbstractRobot):
             if palm_body and tool_frame_body and thumb:
                 return Gripper(
                     identifier=f"{prefix}_gripper",
-                    root_body=RobotBody.from_body(palm_body),
+                    root=RobotBody.from_body(palm_body),
                     fingers=fingers,
                     thumb=thumb,
-                    tool_frame=RobotBody.from_body(tool_frame_body)
+                    tool_frame=RobotBody.from_body(tool_frame_body),
+                    _world=world,
                 )
             return None
 
         def create_arm(world, shoulder_body_name, gripper, prefix):
             shoulder_body = world.get_body_by_name(shoulder_body_name)
             if shoulder_body and gripper:
-                arm_tip_body = gripper.root_body.parent_body
+                arm_tip_body = gripper.root.parent_body
                 return KinematicChain(
                     identifier=f"{prefix}_arm",
-                    root_body=RobotBody.from_body(shoulder_body),
+                    root=RobotBody.from_body(shoulder_body),
                     tip_body=RobotBody.from_body(arm_tip_body),
-                    manipulator=gripper
+                    manipulator=gripper,
+                    _world=world,
                 )
             return None
 
@@ -353,22 +327,24 @@ class PR2(AbstractRobot):
             forward_facing_axis=AxisDirection(AxisIdentifier.Z, Direction.POSITIVE),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.27,
-            maximal_height=1.60
+            maximal_height=1.60,
+            _world=world,
         ) if camera_body else None
         sensors.append(camera)
 
         ################################## Create head ##################################
-        neck_root_body = world.get_body_by_name("head_pan_link")
+        neck_root = world.get_body_by_name("head_pan_link")
         neck_tip_body = world.get_body_by_name("head_tilt_link")
         head = None
-        if neck_root_body and neck_tip_body and camera:
+        if neck_root and neck_tip_body and camera:
             head = Neck(
                 identifier="neck",
-                root_body=RobotBody.from_body(neck_root_body),
+                root=RobotBody.from_body(neck_root),
                 tip_body=RobotBody.from_body(neck_tip_body),
                 sensors=[camera],
                 pitch_body=neck_tip_body,
-                yaw_body=neck_root_body
+                yaw_body=neck_root,
+                _world=world,
             )
             sensor_chains.append(head)
 
@@ -379,17 +355,18 @@ class PR2(AbstractRobot):
         if torso_root and torso_body:
             torso = Torso(
                 identifier="torso",
-                root_body=torso_root,
-                tip_body=torso_body,
-                kinematic_chains=[kc for kc in [left_arm, right_arm, head] if kc]
+                root=torso_root,
+                tip_body=torso_root,
+                kinematic_chains=[kc for kc in [left_arm, right_arm, head] if kc],
+                _world=world,
             )
 
         ################################## Create base ##################################
         base_body = world.get_body_by_name("base_footprint")
         base_root = RobotBody.from_body(base_body) if base_body else None
+        odom=world.get_body_by_name("odom_combined")
+        odom_root = RobotBody.from_body(odom) if odom else None
 
         ################################## Create robot ##################################
-
-        return cls(root=base_root, torso=torso,
-                   manipulators=manipulators ,manipulator_chains=manipulator_chains,
-                   sensors=sensors, sensor_chains=sensor_chains)
+        return cls(odom=odom_root, root=base_root, torso=torso, manipulators=manipulators,
+                    manipulator_chains=manipulator_chains, sensors=sensors, sensor_chains=sensor_chains, _world=world)
