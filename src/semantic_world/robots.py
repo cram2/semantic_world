@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, field
 from typing_extensions import Optional, List, Self
 
-from semantic_world.world_entity import Body, View
+from semantic_world.world_entity import Body, RootedView
 
 
 @dataclass
@@ -18,13 +18,12 @@ class RobotBody(Body):
         return super().__hash__()
 
 @dataclass
-class RobotView(View):
+class RobotView(RootedView):
     """
     Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
     of tip bodies.
     """
     _robot: AbstractRobot = field(default=None, init=False)
-    root_body: RobotBody = field(default_factory=RobotBody)
     identifier: str = field(default_factory=str)
 
 
@@ -158,7 +157,7 @@ class Torso(KinematicChain):
 
 
 @dataclass
-class AbstractRobot(View):
+class AbstractRobot(RootedView):
     """
     Specification of an abstract robot. A robot consists of:
     - a root body, which is the base of the robot
@@ -170,6 +169,8 @@ class AbstractRobot(View):
     """
     root: Body
     torso: Optional[Torso] = None
+    manipulators: Optional[List[Manipulator]] = None
+    sensors: Optional[List[Sensor]] = None
     manipulator_chains: Optional[List[KinematicChain]] = None
     sensor_chains: Optional[List[KinematicChain]] = None
 
@@ -317,6 +318,10 @@ class PR2(AbstractRobot):
             return None
 
         ################################# Create robot #################################
+        manipulators = []
+        manipulator_chains = []
+        sensors = []
+        sensor_chains = []
         ################################### Left Arm ###################################
         left_finger_bodys = [
             ("l_gripper_l_finger_link", "l_gripper_l_finger_tip_link"),
@@ -324,8 +329,9 @@ class PR2(AbstractRobot):
         ]
         left_gripper = create_gripper(world, "l_gripper_palm_link", "l_gripper_tool_frame",
                                       left_finger_bodys, "left")
+        manipulators.append(left_gripper)
         left_arm = create_arm(world, "l_shoulder_pan_link", left_gripper, "left")
-
+        manipulator_chains.append(left_arm)
         ################################### Right Arm ###################################
         right_finger_bodys = [
             ("r_gripper_l_finger_link", "r_gripper_l_finger_tip_link"),
@@ -333,7 +339,9 @@ class PR2(AbstractRobot):
         ]
         right_gripper = create_gripper(world, "r_gripper_palm_link", "r_gripper_tool_frame",
                                        right_finger_bodys, "right")
+        manipulators.append(right_gripper)
         right_arm = create_arm(world, "r_shoulder_pan_link", right_gripper, "right")
+        manipulator_chains.append(right_arm)
 
         ################################# Create camera #################################
         camera_body = world.get_body_by_name("wide_stereo_optical_frame")
@@ -347,6 +355,7 @@ class PR2(AbstractRobot):
             minimal_height=1.27,
             maximal_height=1.60
         ) if camera_body else None
+        sensors.append(camera)
 
         ################################## Create head ##################################
         neck_root_body = world.get_body_by_name("head_pan_link")
@@ -361,6 +370,7 @@ class PR2(AbstractRobot):
                 pitch_body=neck_tip_body,
                 yaw_body=neck_root_body
             )
+            sensor_chains.append(head)
 
         ################################## Create torso ##################################
         torso_body = world.get_body_by_name("torso_lift_link")
@@ -379,7 +389,7 @@ class PR2(AbstractRobot):
         base_root = RobotBody.from_body(base_body) if base_body else None
 
         ################################## Create robot ##################################
-        manipulator_chains = [chain for chain in [left_arm, right_arm] if chain]
-        sensor_chains = [head] if head else []
 
-        return cls(root=base_root, torso=torso, manipulator_chains=manipulator_chains, sensor_chains=sensor_chains)
+        return cls(root=base_root, torso=torso,
+                   manipulators=manipulators ,manipulator_chains=manipulator_chains,
+                   sensors=sensors, sensor_chains=sensor_chains)

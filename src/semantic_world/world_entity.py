@@ -101,6 +101,17 @@ class View(WorldEntity):
     This class can hold references to certain bodies that gain meaning in this context.
     """
 
+class RootedView(View):
+    """
+    Represents a view that is rooted in a specific body.
+    """
+    root_body: Body = field(default_factory=Body)
+
+class EnvironmentView(View):
+    """
+    Represents a view of the environment.
+    """
+
 
 @dataclass
 class Connection(WorldEntity):
