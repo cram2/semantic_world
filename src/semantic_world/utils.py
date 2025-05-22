@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from copy import deepcopy
 from functools import lru_cache, wraps
-from typing import Any, Tuple, TypeVar, Callable
+from typing import Any, Tuple
 from xml.etree import ElementTree as ET
 
 
@@ -88,41 +88,19 @@ def robot_name_from_urdf_string(urdf_string: str) -> str:
     return urdf_string.split('robot name="')[1].split('"')[0]
 
 
-T = TypeVar("T", bound=Callable)
+def copy_lru_cache(maxsize=None, typed=False):
+    def decorator(func):
+        cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
 
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            result = cached_func(*args, **kwargs)
+            return deepcopy(result)
 
-def memoize(function: T) -> T:
-    memo = function.memo = {}
+        # Preserve lru_cache methods
+        wrapper.cache_info = cached_func.cache_info
+        wrapper.cache_clear = cached_func.cache_clear
 
-    @wraps(function)
-    def wrapper(*args: Any, **kwargs: Any) -> T:
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return memo[key]
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return rv
+        return wrapper
 
-    return wrapper
-
-
-def clear_memo(f):
-    if hasattr(f, 'memo'):
-        f.memo.clear()
-
-
-def copy_memoize(function: T) -> T:
-    memo = function.memo = {}
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return deepcopy(memo[key])
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return deepcopy(rv)
-
-    return wrapper
+    return decorator

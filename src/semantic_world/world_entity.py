@@ -116,7 +116,7 @@ class Connection(WorldEntity):
     def name(self):
         return PrefixedName(f'{self.parent.name.name}_T_{self.child.name.name}', prefix=self.child.name.prefix)
 
-    # @memoize
+    # @lru_cache(maxsize=None)
     def origin_as_position_quaternion(self) -> Expression:
         position = self.origin.to_position()[:3]
         orientation = self.origin.to_quaternion()
