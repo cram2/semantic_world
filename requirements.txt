@@ -9,3 +9,4 @@ hypothesis
 pytest
 scipy
 ormatic
+ripple_down_rules
