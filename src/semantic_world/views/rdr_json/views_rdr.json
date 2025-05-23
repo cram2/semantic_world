@@ -1,0 +1,258 @@
+{
+    "_type": "ripple_down_rules.rdr.GeneralRDR",
+    "start_rules": {
+        "views": {
+            "_type": "ripple_down_rules.rdr.MultiClassRDR",
+            "start_rule": {
+                "_type": "ripple_down_rules.rules.MultiClassTopRule",
+                "conditions": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n                                return True\n    ",
+                    "conclusion_type": [
+                        "builtins.bool"
+                    ],
+                    "scope": {
+                        "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                        "Drawer": "semantic_world.views.views.Drawer",
+                        "Handle": "semantic_world.views.views.Handle",
+                        "Cabinet": "semantic_world.views.views.Cabinet",
+                        "Union": "typing.Union",
+                        "Container": "semantic_world.views.views.Container",
+                        "World": "semantic_world.world.World",
+                        "FixedConnection": "semantic_world.connections.FixedConnection"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": true
+                },
+                "conclusion": {
+                    "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                    "user_input": "def _get_value(case):\n                                def get_value_for_world_views_of_type_handle(case: World) -> Union[set, list, Handle]:\n                                    \"\"\"Get possible value(s) for World.views of types list/set of Handle\"\"\"\n                                    return [Handle(b) for b in case.bodies if \"handle\" in b.name.name.lower()]\n                            \n                                return get_value_for_world_views_of_type_handle(case)\n    ",
+                    "conclusion_type": [
+                        "semantic_world.views.views.Handle",
+                        "builtins.set",
+                        "builtins.list"
+                    ],
+                    "scope": {
+                        "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                        "Drawer": "semantic_world.views.views.Drawer",
+                        "Handle": "semantic_world.views.views.Handle",
+                        "Cabinet": "semantic_world.views.views.Cabinet",
+                        "Union": "typing.Union",
+                        "Container": "semantic_world.views.views.Container",
+                        "World": "semantic_world.world.World",
+                        "FixedConnection": "semantic_world.connections.FixedConnection"
+                    },
+                    "conclusion": {
+                        "_type": "builtins.NoneType",
+                        "value": null
+                    },
+                    "mutually_exclusive": false
+                },
+                "parent": null,
+                "corner_case": {
+                    "$id": "cbac77ef-24a3-49aa-9b9e-c3bf3a707fd1",
+                    "__dataclass__": "semantic_world.world.World",
+                    "fields": {
+                        "root": {
+                            "$id": "5a307348-62be-4141-bd35-899f8ab6e5f3",
+                            "__dataclass__": "semantic_world.world_entity.Body",
+                            "fields": {
+                                "_world": {
+                                    "$ref": "cbac77ef-24a3-49aa-9b9e-c3bf3a707fd1"
+                                },
+                                "_views": [],
+                                "name": "room_link",
+                                "visual": [],
+                                "collision": []
+                            }
+                        },
+                        "kinematic_structure": null,
+                        "views": [],
+                        "degrees_of_freedom": null,
+                        "state": null,
+                        "_model_version": null,
+                        "_state_version": null,
+                        "world_is_being_modified": null
+                    }
+                },
+                "conclusion_name": "views",
+                "weight": "next",
+                "uid": "90574698325129464513441443063592862114",
+                "refinement": null,
+                "alternative": {
+                    "_type": "ripple_down_rules.rules.MultiClassTopRule",
+                    "conditions": {
+                        "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                        "user_input": "def _get_value(case):\n                                return len([v for v in case.views if type(v) is Handle]) > 0\n    ",
+                        "conclusion_type": [
+                            "builtins.bool"
+                        ],
+                        "scope": {
+                            "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                            "Drawer": "semantic_world.views.views.Drawer",
+                            "Handle": "semantic_world.views.views.Handle",
+                            "Cabinet": "semantic_world.views.views.Cabinet",
+                            "Union": "typing.Union",
+                            "Container": "semantic_world.views.views.Container",
+                            "World": "semantic_world.world.World",
+                            "FixedConnection": "semantic_world.connections.FixedConnection"
+                        },
+                        "conclusion": {
+                            "_type": "builtins.NoneType",
+                            "value": null
+                        },
+                        "mutually_exclusive": true
+                    },
+                    "conclusion": {
+                        "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                        "user_input": "def _get_value(case):\n                                def get_value_for_world_views_of_type_container(case: World) -> Union[set, Container, list]:\n                                    \"\"\"Get possible value(s) for World.views of types list/set of Container\"\"\"\n                                    prismatic_connections = [c for c in case.connections if isinstance(c, PrismaticConnection)]\n                                    fixed_connections = [c for c in case.connections if isinstance(c, FixedConnection)]\n                                    children_of_prismatic_connections = [c.child for c in prismatic_connections]\n                                    handles = [v for v in case.views if type(v) is Handle]\n                                    fixed_connections_with_handle_child = [fc for fc in fixed_connections if fc.child in [h.body for h in handles]]\n                                    drawer_containers = set(children_of_prismatic_connections).intersection(\n                                        set([fc.parent for fc in fixed_connections_with_handle_child]))\n                                    return [Container(b) for b in drawer_containers]\n                            \n                                return get_value_for_world_views_of_type_container(case)\n    ",
+                        "conclusion_type": [
+                            "semantic_world.views.views.Container",
+                            "builtins.set",
+                            "builtins.list"
+                        ],
+                        "scope": {
+                            "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                            "Drawer": "semantic_world.views.views.Drawer",
+                            "Handle": "semantic_world.views.views.Handle",
+                            "Cabinet": "semantic_world.views.views.Cabinet",
+                            "Union": "typing.Union",
+                            "Container": "semantic_world.views.views.Container",
+                            "World": "semantic_world.world.World",
+                            "FixedConnection": "semantic_world.connections.FixedConnection"
+                        },
+                        "conclusion": {
+                            "_type": "builtins.NoneType",
+                            "value": null
+                        },
+                        "mutually_exclusive": false
+                    },
+                    "parent": null,
+                    "corner_case": null,
+                    "conclusion_name": null,
+                    "weight": "next",
+                    "uid": "14920098271685635920637692283091167284",
+                    "refinement": null,
+                    "alternative": {
+                        "_type": "ripple_down_rules.rules.MultiClassTopRule",
+                        "conditions": {
+                            "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                            "user_input": "def _get_value(case):\n                                return len([v for v in case.views if type(v) is Handle]) > 0 and len(\n                                    [v for v in case.views if type(v) is Container]) > 0\n    ",
+                            "conclusion_type": [
+                                "builtins.bool"
+                            ],
+                            "scope": {
+                                "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                                "Drawer": "semantic_world.views.views.Drawer",
+                                "Handle": "semantic_world.views.views.Handle",
+                                "Cabinet": "semantic_world.views.views.Cabinet",
+                                "Union": "typing.Union",
+                                "Container": "semantic_world.views.views.Container",
+                                "World": "semantic_world.world.World",
+                                "FixedConnection": "semantic_world.connections.FixedConnection"
+                            },
+                            "conclusion": {
+                                "_type": "builtins.NoneType",
+                                "value": null
+                            },
+                            "mutually_exclusive": true
+                        },
+                        "conclusion": {
+                            "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                            "user_input": "def _get_value(case):\n                                def get_value_for_world_views_of_type_drawer(case: World) -> Union[set, list, Drawer]:\n                                    \"\"\"Get possible value(s) for World.views of types list/set of Drawer\"\"\"\n                                    handles = [v for v in case.views if type(v) is Handle]\n                                    containers = [v for v in case.views if type(v) is Container]\n                                    fixed_connections = [c for c in case.connections if\n                                                         isinstance(c, FixedConnection) and c.parent in [cont.body for cont in\n                                                                                                         containers] and c.child in [\n                                                             h.body for h in handles]]\n                                    prismatic_connections = [c for c in case.connections if\n                                                             isinstance(c, PrismaticConnection) and c.child in [cont.body for cont in containers]]\n                                    drawer_handle_connections = [fc for fc in fixed_connections if\n                                                                 fc.parent in [pc.child for pc in prismatic_connections]]\n                                    drawers = [Drawer([cont for cont in containers if dc.parent == cont.body][0],\n                                                      [h for h in handles if dc.child == h.body][0]) for dc in drawer_handle_connections]\n                                    return drawers\n                            \n                                return get_value_for_world_views_of_type_drawer(case)\n    ",
+                            "conclusion_type": [
+                                "semantic_world.views.views.Drawer",
+                                "builtins.set",
+                                "builtins.list"
+                            ],
+                            "scope": {
+                                "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                                "Drawer": "semantic_world.views.views.Drawer",
+                                "Handle": "semantic_world.views.views.Handle",
+                                "Cabinet": "semantic_world.views.views.Cabinet",
+                                "Union": "typing.Union",
+                                "Container": "semantic_world.views.views.Container",
+                                "World": "semantic_world.world.World",
+                                "FixedConnection": "semantic_world.connections.FixedConnection"
+                            },
+                            "conclusion": {
+                                "_type": "builtins.NoneType",
+                                "value": null
+                            },
+                            "mutually_exclusive": false
+                        },
+                        "parent": null,
+                        "corner_case": null,
+                        "conclusion_name": null,
+                        "weight": "next",
+                        "uid": "331345798360792447350644865254855982739",
+                        "refinement": null,
+                        "alternative": {
+                            "_type": "ripple_down_rules.rules.MultiClassTopRule",
+                            "conditions": {
+                                "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                                "user_input": "def _get_value(case):\n                                return len([v for v in case.views if type(v) is Drawer]) > 0\n    ",
+                                "conclusion_type": [
+                                    "builtins.bool"
+                                ],
+                                "scope": {
+                                    "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                                    "Drawer": "semantic_world.views.views.Drawer",
+                                    "Handle": "semantic_world.views.views.Handle",
+                                    "Cabinet": "semantic_world.views.views.Cabinet",
+                                    "Union": "typing.Union",
+                                    "Container": "semantic_world.views.views.Container",
+                                    "World": "semantic_world.world.World",
+                                    "FixedConnection": "semantic_world.connections.FixedConnection"
+                                },
+                                "conclusion": {
+                                    "_type": "builtins.NoneType",
+                                    "value": null
+                                },
+                                "mutually_exclusive": true
+                            },
+                            "conclusion": {
+                                "_type": "ripple_down_rules.datastructures.callable_expression.CallableExpression",
+                                "user_input": "def _get_value(case):\n                                def get_value_for_world_views_of_type_cabinet(case: World) -> Union[set, Cabinet, list]:\n                                    \"\"\"Get possible value(s) for World.views of types list/set of Cabinet\"\"\"\n                                    drawers = [v for v in case.views if type(v) is Drawer]\n                                    prismatic_connections = [c for c in case.connections if\n                                                             isinstance(c, PrismaticConnection) and c.child in [drawer.container.body for drawer in\n                                                                                                                drawers]]\n                                    cabinet_container_bodies = [pc.parent for pc in prismatic_connections]\n                                    cabinets = []\n                                    for ccb in cabinet_container_bodies:\n                                        if ccb in [cabinet.container.body for cabinet in cabinets]:\n                                            continue\n                                        cc_prismatic_connections = [pc for pc in prismatic_connections if pc.parent is ccb]\n                                        cabinet_drawer_container_bodies = [pc.child for pc in cc_prismatic_connections]\n                                        cabinet_drawers = [d for d in drawers if d.container.body in cabinet_drawer_container_bodies]\n                                        cabinets.append(Cabinet(Container(ccb), cabinet_drawers))\n                            \n                                    return cabinets\n                            \n                                return get_value_for_world_views_of_type_cabinet(case)\n    ",
+                                "conclusion_type": [
+                                    "semantic_world.views.views.Cabinet",
+                                    "builtins.set",
+                                    "builtins.list"
+                                ],
+                                "scope": {
+                                    "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
+                                    "Drawer": "semantic_world.views.views.Drawer",
+                                    "Handle": "semantic_world.views.views.Handle",
+                                    "Cabinet": "semantic_world.views.views.Cabinet",
+                                    "Union": "typing.Union",
+                                    "Container": "semantic_world.views.views.Container",
+                                    "World": "semantic_world.world.World",
+                                    "FixedConnection": "semantic_world.connections.FixedConnection"
+                                },
+                                "conclusion": {
+                                    "_type": "builtins.NoneType",
+                                    "value": null
+                                },
+                                "mutually_exclusive": false
+                            },
+                            "parent": null,
+                            "corner_case": null,
+                            "conclusion_name": null,
+                            "weight": "next",
+                            "uid": "35528769484583703815352905256802298589",
+                            "refinement": null,
+                            "alternative": null
+                        }
+                    }
+                }
+            },
+            "generated_python_file_name": "world_views_mcrdr_of_grdr",
+            "name": "views"
+        }
+    },
+    "generated_python_file_name": "world_rdr",
+    "name": "views"
+}
