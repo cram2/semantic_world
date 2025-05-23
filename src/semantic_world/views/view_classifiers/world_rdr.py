@@ -2,11 +2,11 @@ from typing_extensions import Dict, Any
 from ripple_down_rules.rdr import GeneralRDR
 from ripple_down_rules.datastructures.case import Case, create_case
 from semantic_world.world import World
-from . import world_views_mcrdr_of_grdr as world_views_classifier
+from . import world_views_mcrdr_of_grdr as views_classifier
 
 
 classifiers_dict = dict()
-classifiers_dict['World.views'] = world_views_classifier
+classifiers_dict['views'] = views_classifier
 
 
 def classify(case: World) -> Dict[str, Any]:

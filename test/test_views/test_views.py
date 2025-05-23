@@ -11,6 +11,7 @@ from ripple_down_rules.rdr import GeneralRDR
 from ripple_down_rules.user_interface.gui import RDRCaseViewer
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
+from semantic_world.views.view_classifiers import world_rdr
 from semantic_world.world import World
 
 
@@ -39,6 +40,15 @@ class ViewTestCase(unittest.TestCase):
         print(hash(v1))
         v2 = Handle(2)
         self.assertTrue(v1 is not v2)
+
+    def test_generated_views(self):
+        world = self.kitchen_parser.parse()
+        world.validate()
+
+        found_views = world_rdr.classify(world)["views"]
+
+        drawer_container_names = [v.body.name.name for v in found_views if type(v) is Container]
+        self.assertTrue(len(drawer_container_names) == 14)
 
     def test_kitchen_views(self):
         world = self.kitchen_parser.parse()
@@ -80,7 +90,7 @@ class ViewTestCase(unittest.TestCase):
 
         for view in required_views:
             case_query = CaseQuery(world, "views", (view,), False)
-            if update_existing_views or case_query.name not in grdr.start_rules_dict:
+            if update_existing_views or case_query.attribute_name not in grdr.start_rules_dict:
                 grdr.fit_case(CaseQuery(world, "views", (view,), False), expert=expert)
         if save_rules:
             grdr.write_to_python_file(self.views_dir)
