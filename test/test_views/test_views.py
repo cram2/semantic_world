@@ -32,8 +32,13 @@ class ViewTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.kitchen_parser = URDFParser(cls.kitchen)
         cls.apartment_parser = URDFParser(cls.apartment)
-        cls.app = QApplication(sys.argv)
-        cls.viewer = RDRCaseViewer(save_file=cls.views_json_dir)
+        try:
+            cls.app = QApplication(sys.argv)
+            cls.viewer = RDRCaseViewer(save_file=cls.views_json_dir)
+        except Exception as e:
+            print(f"Error initializing QApplication: {e}")
+            cls.app = None
+            cls.viewer = None
 
     def test_id(self):
         v1 = Handle(1)
