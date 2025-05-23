@@ -37,7 +37,6 @@ class ViewTestCase(unittest.TestCase):
 
     def test_id(self):
         v1 = Handle(1)
-        print(hash(v1))
         v2 = Handle(2)
         self.assertTrue(v1 is not v2)
 
