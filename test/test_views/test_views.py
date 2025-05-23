@@ -47,7 +47,7 @@ class ViewTestCase(unittest.TestCase):
 
         found_views = world_rdr.classify(world)["views"]
 
-        drawer_container_names = [v.body.name.name for v in found_views if type(v) is Container]
+        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
         self.assertTrue(len(drawer_container_names) == 14)
 
     def test_kitchen_views(self):
