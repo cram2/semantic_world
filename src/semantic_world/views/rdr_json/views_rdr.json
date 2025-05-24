@@ -12,14 +12,14 @@
                         "builtins.bool"
                     ],
                     "scope": {
+                        "Drawer": "semantic_world.views.views.Drawer",
+                        "World": "semantic_world.world.World",
                         "Container": "semantic_world.views.views.Container",
+                        "Handle": "semantic_world.views.views.Handle",
                         "Cabinet": "semantic_world.views.views.Cabinet",
                         "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                        "World": "semantic_world.world.World",
-                        "Handle": "semantic_world.views.views.Handle",
-                        "FixedConnection": "semantic_world.connections.FixedConnection",
-                        "Drawer": "semantic_world.views.views.Drawer",
-                        "Union": "typing.Union"
+                        "Union": "typing.Union",
+                        "FixedConnection": "semantic_world.connections.FixedConnection"
                     },
                     "conclusion": {
                         "_type": "builtins.NoneType",
@@ -36,14 +36,14 @@
                         "builtins.list"
                     ],
                     "scope": {
+                        "Drawer": "semantic_world.views.views.Drawer",
+                        "World": "semantic_world.world.World",
                         "Container": "semantic_world.views.views.Container",
+                        "Handle": "semantic_world.views.views.Handle",
                         "Cabinet": "semantic_world.views.views.Cabinet",
                         "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                        "World": "semantic_world.world.World",
-                        "Handle": "semantic_world.views.views.Handle",
-                        "FixedConnection": "semantic_world.connections.FixedConnection",
-                        "Drawer": "semantic_world.views.views.Drawer",
-                        "Union": "typing.Union"
+                        "Union": "typing.Union",
+                        "FixedConnection": "semantic_world.connections.FixedConnection"
                     },
                     "conclusion": {
                         "_type": "builtins.NoneType",
@@ -53,15 +53,15 @@
                 },
                 "parent": null,
                 "corner_case": {
-                    "$id": "215075f7-e018-4144-9b3a-757e23b5820a",
+                    "$id": "29303e12-656a-49e6-b712-054e62fc28db",
                     "__dataclass__": "semantic_world.world.World",
                     "fields": {
                         "root": {
-                            "$id": "14734c61-9259-450c-a4c6-dbf5ded4f505",
+                            "$id": "b6693668-a7e2-4c13-9dcb-bf354712fd16",
                             "__dataclass__": "semantic_world.world_entity.Body",
                             "fields": {
                                 "_world": {
-                                    "$ref": "215075f7-e018-4144-9b3a-757e23b5820a"
+                                    "$ref": "29303e12-656a-49e6-b712-054e62fc28db"
                                 },
                                 "_views": [],
                                 "name": "room_link",
@@ -91,14 +91,14 @@
                             "builtins.bool"
                         ],
                         "scope": {
+                            "Drawer": "semantic_world.views.views.Drawer",
+                            "World": "semantic_world.world.World",
                             "Container": "semantic_world.views.views.Container",
+                            "Handle": "semantic_world.views.views.Handle",
                             "Cabinet": "semantic_world.views.views.Cabinet",
                             "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                            "World": "semantic_world.world.World",
-                            "Handle": "semantic_world.views.views.Handle",
-                            "FixedConnection": "semantic_world.connections.FixedConnection",
-                            "Drawer": "semantic_world.views.views.Drawer",
-                            "Union": "typing.Union"
+                            "Union": "typing.Union",
+                            "FixedConnection": "semantic_world.connections.FixedConnection"
                         },
                         "conclusion": {
                             "_type": "builtins.NoneType",
@@ -115,14 +115,14 @@
                             "builtins.list"
                         ],
                         "scope": {
+                            "Drawer": "semantic_world.views.views.Drawer",
+                            "World": "semantic_world.world.World",
                             "Container": "semantic_world.views.views.Container",
+                            "Handle": "semantic_world.views.views.Handle",
                             "Cabinet": "semantic_world.views.views.Cabinet",
                             "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                            "World": "semantic_world.world.World",
-                            "Handle": "semantic_world.views.views.Handle",
-                            "FixedConnection": "semantic_world.connections.FixedConnection",
-                            "Drawer": "semantic_world.views.views.Drawer",
-                            "Union": "typing.Union"
+                            "Union": "typing.Union",
+                            "FixedConnection": "semantic_world.connections.FixedConnection"
                         },
                         "conclusion": {
                             "_type": "builtins.NoneType",
@@ -145,14 +145,14 @@
                                 "builtins.bool"
                             ],
                             "scope": {
+                                "Drawer": "semantic_world.views.views.Drawer",
+                                "World": "semantic_world.world.World",
                                 "Container": "semantic_world.views.views.Container",
+                                "Handle": "semantic_world.views.views.Handle",
                                 "Cabinet": "semantic_world.views.views.Cabinet",
                                 "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                                "World": "semantic_world.world.World",
-                                "Handle": "semantic_world.views.views.Handle",
-                                "FixedConnection": "semantic_world.connections.FixedConnection",
-                                "Drawer": "semantic_world.views.views.Drawer",
-                                "Union": "typing.Union"
+                                "Union": "typing.Union",
+                                "FixedConnection": "semantic_world.connections.FixedConnection"
                             },
                             "conclusion": {
                                 "_type": "builtins.NoneType",
@@ -169,14 +169,14 @@
                                 "builtins.list"
                             ],
                             "scope": {
+                                "Drawer": "semantic_world.views.views.Drawer",
+                                "World": "semantic_world.world.World",
                                 "Container": "semantic_world.views.views.Container",
+                                "Handle": "semantic_world.views.views.Handle",
                                 "Cabinet": "semantic_world.views.views.Cabinet",
                                 "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                                "World": "semantic_world.world.World",
-                                "Handle": "semantic_world.views.views.Handle",
-                                "FixedConnection": "semantic_world.connections.FixedConnection",
-                                "Drawer": "semantic_world.views.views.Drawer",
-                                "Union": "typing.Union"
+                                "Union": "typing.Union",
+                                "FixedConnection": "semantic_world.connections.FixedConnection"
                             },
                             "conclusion": {
                                 "_type": "builtins.NoneType",
@@ -199,14 +199,14 @@
                                     "builtins.bool"
                                 ],
                                 "scope": {
+                                    "Drawer": "semantic_world.views.views.Drawer",
+                                    "World": "semantic_world.world.World",
                                     "Container": "semantic_world.views.views.Container",
+                                    "Handle": "semantic_world.views.views.Handle",
                                     "Cabinet": "semantic_world.views.views.Cabinet",
                                     "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                                    "World": "semantic_world.world.World",
-                                    "Handle": "semantic_world.views.views.Handle",
-                                    "FixedConnection": "semantic_world.connections.FixedConnection",
-                                    "Drawer": "semantic_world.views.views.Drawer",
-                                    "Union": "typing.Union"
+                                    "Union": "typing.Union",
+                                    "FixedConnection": "semantic_world.connections.FixedConnection"
                                 },
                                 "conclusion": {
                                     "_type": "builtins.NoneType",
@@ -223,14 +223,14 @@
                                     "builtins.list"
                                 ],
                                 "scope": {
+                                    "Drawer": "semantic_world.views.views.Drawer",
+                                    "World": "semantic_world.world.World",
                                     "Container": "semantic_world.views.views.Container",
+                                    "Handle": "semantic_world.views.views.Handle",
                                     "Cabinet": "semantic_world.views.views.Cabinet",
                                     "PrismaticConnection": "semantic_world.connections.PrismaticConnection",
-                                    "World": "semantic_world.world.World",
-                                    "Handle": "semantic_world.views.views.Handle",
-                                    "FixedConnection": "semantic_world.connections.FixedConnection",
-                                    "Drawer": "semantic_world.views.views.Drawer",
-                                    "Union": "typing.Union"
+                                    "Union": "typing.Union",
+                                    "FixedConnection": "semantic_world.connections.FixedConnection"
                                 },
                                 "conclusion": {
                                     "_type": "builtins.NoneType",
@@ -250,9 +250,11 @@
                 }
             },
             "generated_python_file_name": "world_views_mcrdr_of_grdr",
-            "name": "views"
+            "name": "views",
+            "case_type": "semantic_world.world.World"
         }
     },
     "generated_python_file_name": "world_rdr",
-    "name": "views"
+    "name": "views",
+    "case_type": "semantic_world.world.World"
 }
