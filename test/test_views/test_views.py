@@ -1,14 +1,21 @@
+import logging
 import os
 import sys
 import unittest
 
-from PyQt6.QtWidgets import QApplication
-from typing_extensions import List, Type
+try:
+    from ripple_down_rules.user_interface.gui import RDRCaseViewer
+    from PyQt6.QtWidgets import QApplication
+except ImportError as e:
+    logging.debug(e)
+    QApplication = None
+    RDRCaseViewer = None
+
+from typing_extensions import List, Type, Optional
 
 from ripple_down_rules.datastructures.dataclasses import CaseQuery
 from ripple_down_rules.experts import Human
 from ripple_down_rules.rdr import GeneralRDR
-from ripple_down_rules.user_interface.gui import RDRCaseViewer
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
 from semantic_world.views.view_classifiers import world_rdr
@@ -25,20 +32,16 @@ class ViewTestCase(unittest.TestCase):
     views_rdr_filename = os.path.join(views_json_dir, "views_rdr")
     test_dir = os.path.join(main_dir, 'tests')
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
-    app: QApplication
-    viewer: RDRCaseViewer
+    app: Optional[QApplication] = None
+    viewer: Optional[RDRCaseViewer] = None
 
     @classmethod
     def setUpClass(cls):
         cls.kitchen_parser = URDFParser(cls.kitchen)
         cls.apartment_parser = URDFParser(cls.apartment)
-        try:
+        if RDRCaseViewer is not None and QApplication is not None:
             cls.app = QApplication(sys.argv)
             cls.viewer = RDRCaseViewer(save_file=cls.views_json_dir)
-        except Exception as e:
-            print(f"Error initializing QApplication: {e}")
-            cls.app = None
-            cls.viewer = None
 
     def test_id(self):
         v1 = Handle(1)

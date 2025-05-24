@@ -30,7 +30,7 @@ jobs:
         pip install virtualenv
         python -m virtualenv venv
         source venv/bin/activate
-        pip install -r requirements-ci.txt
+        pip install -r requirements.txt
         pip install pytest mypy flake8 black isort
         pip install .
 

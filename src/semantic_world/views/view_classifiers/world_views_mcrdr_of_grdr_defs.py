@@ -1,11 +1,11 @@
-from semantic_world.views.views import Drawer
-from semantic_world.world import World
-from semantic_world.views.views import Container
-from semantic_world.views.views import Handle
-from semantic_world.views.views import Cabinet
-from semantic_world.connections import PrismaticConnection
 from typing import Union
+from semantic_world.views.views import Drawer
 from semantic_world.connections import FixedConnection
+from semantic_world.connections import PrismaticConnection
+from semantic_world.world import World
+from semantic_world.views.views import Cabinet
+from semantic_world.views.views import Handle
+from semantic_world.views.views import Container
 from typing_extensions import Union
 
 

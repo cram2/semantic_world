@@ -1,3 +1,13 @@
--r requirements-base.txt
-
-ripple_down_rules[gui]
+networkx~=3.4.2
+numpy~=1.26.4
+trimesh~=4.6.8
+typing_extensions
+urdf-parser-py
+matplotlib<3.8.0
+casadi~=3.7.0
+hypothesis
+pytest
+scipy
+ormatic
+sqlacodegen
+ripple_down_rules
