@@ -23,6 +23,21 @@ from semantic_world.world import World
 
 
 class ViewTestCase(unittest.TestCase):
+    """
+    **Important**:
+    ===============
+    If use_gui is set to False, use the command line interface to test the views.
+
+    e.g. from the terminal while at the root of the repository, run:
+
+    cd test/test_views && python -m pytest test_views.py
+
+    ===============
+    OR if you want to run only the kitchen views test:
+
+    cd test/test_views && python -m pytest -k "test_kitchen_views"
+
+    """
     urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
     kitchen = os.path.join(urdf_dir, "kitchen-small.urdf")
     apartment = os.path.join(urdf_dir, "apartment.urdf")
@@ -34,12 +49,13 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
+    use_gui: bool = True
 
     @classmethod
     def setUpClass(cls):
         cls.kitchen_parser = URDFParser(cls.kitchen)
         cls.apartment_parser = URDFParser(cls.apartment)
-        if RDRCaseViewer is not None and QApplication is not None:
+        if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
             cls.viewer = RDRCaseViewer(save_file=cls.views_json_dir)
 
