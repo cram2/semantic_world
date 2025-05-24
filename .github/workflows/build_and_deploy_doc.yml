@@ -28,9 +28,21 @@ jobs:
       with:
         python-version: '3.10'
         cache: pip # Implicitly uses requirements.txt for cache key
-
+    
     - name: Install dependencies
       run: pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt install graphviz graphviz-dev
+        python -m pip install --upgrade pip
+        pip install virtualenv
+        python -m virtualenv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+        pip install pytest mypy flake8 black isort
+        pip install .
 
     # (optional) Cache your executed notebooks between runs
     # if you have config:
