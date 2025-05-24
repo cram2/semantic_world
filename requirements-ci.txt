@@ -1,3 +1,2 @@
 -r requirements-base.txt
-
-ripple_down_rules[gui]
+ripple_down_rules
