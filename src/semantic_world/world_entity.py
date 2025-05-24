@@ -7,23 +7,26 @@ from .geometry import Shape
 from .prefixed_name import PrefixedName
 from .spatial_types.spatial_types import TransformationMatrix, Expression
 from .spatial_types import spatial_types as cas
+from .utils import IDGenerator
 
 if TYPE_CHECKING:
     from .world import World
 
+id_generator = IDGenerator()
 
-@dataclass
+
+@dataclass(unsafe_hash=True)
 class WorldEntity:
     """
     A class representing an entity in the world.
     """
 
-    _world: Optional[World] = field(default=None, repr=False, kw_only=True)
+    _world: Optional[World] = field(default=None, repr=False, kw_only=True, hash=False)
     """
     The backreference to the world this entity belongs to.
     """
 
-    _views: List[View] = field(default_factory=list, init=False, repr=False)
+    _views: List[View] = field(default_factory=list, init=False, repr=False, hash=False)
     """
     The views this entity is part of.
     """
@@ -53,6 +56,10 @@ class Body(WorldEntity):
     List of shapes that represent the collision geometry of the link.
     The poses of the shapes are relative to the link.
     """
+
+    def __post_init__(self):
+        if not self.name:
+            self.name = PrefixedName(f"body_{id_generator(self)}")
 
     def __hash__(self):
         return hash(self.name)

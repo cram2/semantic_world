@@ -30,3 +30,8 @@ include = ["semantic_world*"]
 [tool.setuptools.dynamic]
 version = {attr = "semantic_world.__version__"}
 dependencies = {file = "requirements.txt"}
+
+[project.optional-dependencies]
+gui = [
+    "ripple_down_rules[gui]",
+]
