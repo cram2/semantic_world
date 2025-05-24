@@ -30,7 +30,10 @@ jobs:
         cache: pip # Implicitly uses requirements.txt for cache key
 
     - name: Install dependencies
-      run: pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
+      run: |
+        sudo apt-get update
+        sudo apt install graphviz graphviz-dev
+        pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
 
     # (optional) Cache your executed notebooks between runs
     # if you have config:
