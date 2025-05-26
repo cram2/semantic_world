@@ -1,2 +1,2 @@
-from .view_classifiers import *
+from .world_rdr import *
 from .views import *

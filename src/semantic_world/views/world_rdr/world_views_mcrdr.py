@@ -1,7 +1,7 @@
 from ripple_down_rules.datastructures.case import Case, create_case
 from typing_extensions import Set, Union
 from ripple_down_rules.utils import make_set
-from .world_views_mcrdr_of_grdr_defs import *
+from .world_views_mcrdr_defs import *
 from ripple_down_rules.rdr import MultiClassRDR
 
 
