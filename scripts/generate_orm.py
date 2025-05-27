@@ -6,12 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import registry, Session
 from ormatic.ormatic import logger, ORMatic
 
-from semantic_world.connections import FixedConnection, FreeVariable, MoveableConnection, PrismaticConnection, \
-    RevoluteConnection
+from semantic_world.connections import FixedConnection, DegreeOfFreedom, ActiveConnection, PrismaticConnection, \
+    RevoluteConnection, PassiveConnection, OmniDrive, Connection6DoF
 from semantic_world.geometry import Color, Scale, Shape, Mesh, Primitive, Sphere, Cylinder, Box
 from semantic_world.orm.model import custom_types
 from semantic_world.prefixed_name import PrefixedName
-from semantic_world.world import World, WorldEntity, Body, View, Connection
+from semantic_world.world import World
+from semantic_world.world_entity import WorldEntity, View, Connection, Body
 from semantic_world.spatial_types import Vector3, Point3, RotationMatrix, TransformationMatrix, ReferenceFrameMixin
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -23,7 +24,8 @@ from semantic_world.spatial_types import Vector3, Point3, RotationMatrix, Transf
 # ----------------------------------------------------------------------------------------------------------------------
 
 classes = [Color, Scale, Shape, Mesh, Primitive, Sphere, Cylinder, Box, World, WorldEntity, Body, View, Connection,
-           PrefixedName, FixedConnection, FreeVariable, MoveableConnection, PrismaticConnection, RevoluteConnection]
+           PrefixedName, FixedConnection, DegreeOfFreedom,
+           ActiveConnection, PassiveConnection, PrismaticConnection, RevoluteConnection, OmniDrive, Connection6DoF]
 
 def generate_orm():
     """

@@ -1,30 +1,31 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from ..world import View, Body
-
-'''
-
-#Food = ["Apple", "Milk"]
+from semantic_world.world import View, Body
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
+class Handle(View):
+    body: Body
+
+
+@dataclass(unsafe_hash=True)
 class Container(View):
     body: Body
 
-@dataclass
-class Handle(View):
-    """
-    Handle is a body you can use to open doors, draws and etc.
-    """
-    body: Body
+
+@dataclass(unsafe_hash=True)
+class Drawer(View):
+    container: Container
+    handle: Handle
+
 
 @dataclass
-class Draw(View):
-    """
-    Draw is a body that can contain stuff and open towards the user
-    """
-    handle: Handle
+class Cabinet(View):
     container: Container
+    drawers: list[Drawer] = field(default_factory=list)
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self.container))
 
 
 
@@ -102,7 +103,6 @@ class Apple(View):
 class Cereal(View):
     food: Food
 
-'''
 ################################
 
 @dataclass(unsafe_hash=True)

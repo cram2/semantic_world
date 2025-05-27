@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
-from functools import lru_cache
-from typing import Any
+from copy import deepcopy
+from functools import lru_cache, wraps
+from typing import Any, Tuple
+from xml.etree import ElementTree as ET
 
 
 class IDGenerator:
@@ -59,3 +61,46 @@ class suppress_stdout_stderr(object):
         # Close all file descriptors
         for fd in self.null_fds + self.save_fds:
             os.close(fd)
+
+
+def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'gazebo')) -> str:
+    # Parse input string
+    root = ET.fromstring(urdf)
+
+    # Iterate through each section in the blacklist
+    for section_name in blacklist:
+        # Find all sections with the given name and remove them
+        for elem in root.findall(f".//{section_name}"):
+            parent = root.find(f".//{section_name}/..")
+            if parent is not None:
+                parent.remove(elem)
+
+    # Turn back to string
+    return ET.tostring(root, encoding='unicode')
+
+
+def robot_name_from_urdf_string(urdf_string: str) -> str:
+    """
+    Returns the name defined in the robot tag, e.g., 'pr2' from <robot name="pr2"> ... </robot>.
+    :param urdf_string: URDF string
+    :return: Extracted name
+    """
+    return urdf_string.split('robot name="')[1].split('"')[0]
+
+
+def copy_lru_cache(maxsize=None, typed=False):
+    def decorator(func):
+        cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            result = cached_func(*args, **kwargs)
+            return deepcopy(result)
+
+        # Preserve lru_cache methods
+        wrapper.cache_info = cached_func.cache_info
+        wrapper.cache_clear = cached_func.cache_clear
+
+        return wrapper
+
+    return decorator

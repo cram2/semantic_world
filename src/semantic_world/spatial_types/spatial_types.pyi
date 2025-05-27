@@ -35,10 +35,11 @@ class StackedCompiledFunction:
 
 
 class CompiledFunction:
-    str_params: List[str]
-    compiled_f: ca.Function
-    buf: ca.FunctionBuffer
-    f_eval: functools.partial
+    str_parameters: List[str]
+    symbol_parameters: List[Symbol]
+    compiled_casadi_function: ca.Function
+    function_buffer: ca.FunctionBuffer
+    function_evaluator: functools.partial
     out: Union[np.ndarray, sp.csc_matrix]
     sparse: bool
 
