@@ -60,6 +60,7 @@ class Body(WorldEntity):
         return self.name == other.name
 
 
+@dataclass(unsafe_hash=True)
 class View(WorldEntity):
     """
     Represents a view on a set of bodies in the world.
