@@ -1,14 +1,14 @@
-from semantic_world.world import World
-from semantic_world.connections import FixedConnection
-from semantic_world.connections import PrismaticConnection
-from semantic_world.connections import RevoluteConnection
-from semantic_world.views.views import Container
-from semantic_world.views.views import Drawer
-from semantic_world.views.views import Door
-from typing import List
-from semantic_world.views.views import Cabinet
 from semantic_world.views.views import Handle
+from semantic_world.views.views import Door
+from semantic_world.connections import PrismaticConnection
+from typing import List
 from typing import Union
+from semantic_world.views.views import Cabinet
+from semantic_world.connections import FixedConnection
+from semantic_world.views.views import Container
+from semantic_world.connections import RevoluteConnection
+from semantic_world.views.views import Drawer
+from semantic_world.world import World
 from typing_extensions import Union
 
 
@@ -108,7 +108,7 @@ def conclusion_59112619694893607910753808758642808601(case):
         handle_bodies = [h.body for h in handles]
         connections_with_handles = [c for c in case.connections if isinstance(c, FixedConnection) and
                                     c.child in handle_bodies]
-
+    
         revolute_connections = [c for c in case.connections if isinstance(c, RevoluteConnection)]
         bodies_connected_to_handles = [c.parent if c.child in handle_bodies else c.child for c in connections_with_handles]
         bodies_that_have_revolute_joints = [b for b in bodies_connected_to_handles for c in revolute_connections

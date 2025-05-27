@@ -6,11 +6,11 @@ from ripple_down_rules.rdr import MultiClassRDR
 
 
 attribute_name = 'views'
-conclusion_type = (Drawer, Container, set, list, Handle, Cabinet, Door,)
+conclusion_type = (Cabinet, set, list, Door, Drawer, Handle, Container,)
 type_ = MultiClassRDR
 
 
-def classify(case: World) -> Set[Union[Drawer, Container, Handle, Cabinet, Door]]:
+def classify(case: World) -> Set[Union[Cabinet, Door, Drawer, Handle, Container]]:
     if not isinstance(case, Case):
         case = create_case(case, max_recursion_idx=3)
     conclusions = set()
