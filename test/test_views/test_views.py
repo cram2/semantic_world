@@ -63,6 +63,27 @@ class ViewTestCase(unittest.TestCase):
         v2 = Handle(2)
         self.assertTrue(v1 is not v2)
 
+    def test_door_view(self):
+        world = self.apartment_parser.parse()
+        world.validate()
+
+        rdr = self.fit_views_and_get_rdr(world, [Door], update_existing_views=True,
+                                         ask_always=True)
+
+        found_views = rdr.classify(world)['views']
+
+        assert any(isinstance(v, Door) for v in found_views)
+
+    def test_wardrobe_view(self):
+        world = self.apartment_parser.parse()
+        world.validate()
+
+        rdr = self.fit_views_and_get_rdr(world, [Wardrobe], update_existing_views=True)
+
+        found_views = rdr.classify(world)['views']
+
+        assert any(isinstance(v, Wardrobe) for v in found_views)
+
     def test_generated_views(self):
         world = self.kitchen_parser.parse()
         world.validate()
@@ -101,11 +122,13 @@ class ViewTestCase(unittest.TestCase):
         self.assertTrue(len(drawer_container_names) == 19)
 
     def fit_views_and_get_rdr(self, world: World, required_views: List[Type[View]], save_rules: bool = True,
-                              use_current_rules: bool = True, update_existing_views: bool = False) -> GeneralRDR:
+                              use_current_rules: bool = True, update_existing_views: bool = False,
+                              ask_always: bool = True) -> GeneralRDR:
         expert = Human(viewer=self.viewer, answers_save_path=os.path.join(self.views_dir, "expert_answers"))
         if use_current_rules:
             grdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name)
             grdr.set_viewer(self.viewer)
+            grdr.ask_always = ask_always
         else:
             grdr = GeneralRDR(save_dir=self.views_dir, viewer=self.viewer)
 

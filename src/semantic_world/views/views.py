@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from typing_extensions import List
+
 from semantic_world.world import View, Body
 
 
@@ -11,21 +13,6 @@ class Handle(View):
 @dataclass(unsafe_hash=True)
 class Container(View):
     body: Body
-
-
-@dataclass(unsafe_hash=True)
-class Drawer(View):
-    container: Container
-    handle: Handle
-
-
-@dataclass
-class Cabinet(View):
-    container: Container
-    drawers: list[Drawer] = field(default_factory=list)
-
-    def __hash__(self):
-        return hash((self.__class__.__name__, self.container))
 
 
 
@@ -121,7 +108,7 @@ class Areas(View):
 
 @dataclass(unsafe_hash=True)
 class Components(View):
-    body: Body
+    ...
 
 @dataclass(unsafe_hash=True)
 class Decor(View):
@@ -129,7 +116,7 @@ class Decor(View):
 
 @dataclass(unsafe_hash=True)
 class Furniture(View):
-    body: Body
+    ...
 
 @dataclass(unsafe_hash=True)
 class Tool(View):
@@ -278,13 +265,15 @@ class DesignatedHandle(Components):
 class DesignedSpade(Components):
     ...
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Door(Components):
-    ...
+    body: Body
+    handle: Handle
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Drawer(Components):
-    ...
+    container: Container
+    handle: Handle
 
 @dataclass
 class Frame(Components):
@@ -428,13 +417,15 @@ class Table(Furniture):
     ...
 
 ############################### subclasses to Cupboard
-@dataclass
+@dataclass(unsafe_hash=True)
 class Cabinet(Cupboard):
-    ...
+    container: Container
+    drawers: list[Drawer] = field(default_factory=list, hash=False)
+
 
 @dataclass
 class Wardrobe(Cupboard):
-    ...
+    doors: List[Door] = field(default_factory=list)
 
 ############################### subclasses to Cabinet
 @dataclass
