@@ -1,10 +1,13 @@
-from semantic_world.views.views import Cabinet
-from typing import Union
-from semantic_world.connections import PrismaticConnection
+from typing import List
 from semantic_world.connections import FixedConnection
-from semantic_world.views.views import Handle
+from semantic_world.views.views import Door
 from semantic_world.views.views import Container
 from semantic_world.views.views import Drawer
+from semantic_world.connections import RevoluteConnection
+from semantic_world.views.views import Cabinet
+from typing import Union
+from semantic_world.views.views import Handle
+from semantic_world.connections import PrismaticConnection
 from semantic_world.world import World
 from typing_extensions import Union
 
@@ -89,5 +92,30 @@ def conclusion_35528769484583703815352905256802298589(case):
         return cabinets
     
     return get_value_for_world_views_of_type_cabinet(case)
+
+
+def conditions_59112619694893607910753808758642808601(case):
+    def conditions_for_world_views_of_type_door(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Door."""
+        return len([v for v in case.views if isinstance(v, Handle)]) > 0
+    return conditions_for_world_views_of_type_door(case)
+
+
+def conclusion_59112619694893607910753808758642808601(case):
+    def world_views_of_type_door(case: World) -> List[Door]:
+        """Get possible value(s) for World.views  of type Door."""
+        handles = [v for v in case.views if isinstance(v, Handle)]
+        handle_bodies = [h.body for h in handles]
+        connections_with_handles = [c for c in case.connections if isinstance(c, FixedConnection) and
+                                    c.child in handle_bodies]
+    
+        revolute_connections = [c for c in case.connections if isinstance(c, RevoluteConnection)]
+        bodies_connected_to_handles = [c.parent if c.child in handle_bodies else c.child for c in connections_with_handles]
+        bodies_that_have_revolute_joints = [b for b in bodies_connected_to_handles for c in revolute_connections
+                                            if b == c.child]
+        body_handle_connections = [c for c in connections_with_handles if c.parent in bodies_that_have_revolute_joints]
+        doors = [Door(c.parent, [h for h in handles if h.body == c.child][0]) for c in body_handle_connections]
+        return doors
+    return world_views_of_type_door(case)
 
 
