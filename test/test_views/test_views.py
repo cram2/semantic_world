@@ -111,7 +111,7 @@ class ViewTestCase(unittest.TestCase):
         Template method to test a specific view type in the given world.
         """
         rdr = self.fit_views_and_get_rdr(world, [view_type], update_existing_views=True,
-                                         ask_always=True)
+                                         ask_always=False)
 
         found_views = rdr.classify(world)['views']
 
