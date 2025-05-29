@@ -106,30 +106,27 @@ class ViewTestCase(unittest.TestCase):
 
         self.assertTrue(len(drawer_container_names) == 19)
 
-    def fit_rules_for_a_view_and_assert(self, world: World, view_type: Type[View]):
+    def fit_rules_for_a_view_and_assert(self, world: World, view_type: Type[View], update_existing_views: bool = False):
         """
         Template method to test a specific view type in the given world.
         """
-        rdr = self.fit_views_and_get_rdr(world, [view_type], update_existing_views=True,
-                                         ask_always=False)
+        rdr = self.fit_views_and_get_rdr(world, [view_type], update_existing_views=update_existing_views)
 
         found_views = rdr.classify(world)['views']
 
         assert any(isinstance(v, view_type) for v in found_views)
 
     def fit_views_and_get_rdr(self, world: World, required_views: List[Type[View]],
-                              update_existing_views: bool = False,
-                              ask_always: bool = False) -> GeneralRDR:
+                              update_existing_views: bool = False) -> GeneralRDR:
         """
         Fit rules to the specified views in the given world and return the RDR.
 
         :param world: The world to fit the views to.
         :param required_views: A list of view types that the RDR should be fitted to.
         :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
-        :param ask_always: If True, the RDR will always ask for confirmation before applying rules.
         :return: An instance of GeneralRDR fitted to the specified views.
         """
-        rdr = self.load_or_create_rdr(ask_always=ask_always)
+        rdr = self.load_or_create_rdr()
 
         self.fit_rdr_to_views(rdr, required_views, world, update_existing_views=update_existing_views)
 
@@ -137,20 +134,17 @@ class ViewTestCase(unittest.TestCase):
 
         return rdr
 
-    def load_or_create_rdr(self, ask_always: bool = False) -> GeneralRDR:
+    def load_or_create_rdr(self) -> GeneralRDR:
         """
         Load an existing RDR or create a new one if it does not exist.
 
-        :param ask_always: If True, the RDR will always ask for confirmation before applying rules.
         :return: An instance of GeneralRDR loaded from the specified directory or a new instance of GeneralRDR.
         """
         if not os.path.exists(os.path.join(self.views_dir, self.views_rdr_model_name)):
-            return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name, viewer=self.viewer,
-                              ask_always=ask_always)
+            return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name, viewer=self.viewer)
         else:
             rdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name)
             rdr.set_viewer(self.viewer)
-            rdr.ask_always = ask_always
         return rdr
 
     @staticmethod
@@ -166,5 +160,4 @@ class ViewTestCase(unittest.TestCase):
         """
         for view in required_views:
             case_query = CaseQuery(world, "views", (view,), False)
-            if update_existing_views or view not in rdr.start_rules_dict['views'].conclusion_type:
-                rdr.fit_case(case_query)
+            rdr.fit_case(case_query, update_existing_rules=update_existing_views)
