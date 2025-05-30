@@ -19,7 +19,10 @@ from ripple_down_rules.datastructures.dataclasses import CaseQuery
 from ripple_down_rules.rdr import GeneralRDR
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
-from semantic_world.views.world_rdr import world_rdr
+try:
+    from semantic_world.views.world_rdr import world_rdr
+except ImportError:
+    world_rdr = None
 from semantic_world.world import World
 
 
@@ -83,6 +86,7 @@ class ViewTestCase(unittest.TestCase):
     def test_wardrobe_view(self):
         self.fit_rules_for_a_view_in_apartment(Wardrobe, scenario=self.test_wardrobe_view)
 
+    @pytest.mark.skipif(world_rdr is None, reason="requires world_rdr")
     def test_generated_views(self):
         found_views = world_rdr.classify(self.kitchen_world)["views"]
 
@@ -193,7 +197,7 @@ class ViewTestCase(unittest.TestCase):
 
         self.fit_rdr_to_views(rdr, required_views, world, update_existing_views=update_existing_views,
                               world_factory=world_factory, scenario=scenario)
-        rdr.save(self.views_dir, self.views_rdr_model_name)
+        rdr.save(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
 
         return rdr
 
@@ -206,7 +210,7 @@ class ViewTestCase(unittest.TestCase):
         if not os.path.exists(os.path.join(self.views_dir, self.views_rdr_model_name)):
             return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name, viewer=self.viewer)
         else:
-            rdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name)
+            rdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
             rdr.set_viewer(self.viewer)
         return rdr
 
