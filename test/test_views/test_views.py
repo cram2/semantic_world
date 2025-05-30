@@ -3,6 +3,8 @@ import os
 import sys
 import unittest
 
+import pytest
+
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer
     from PyQt6.QtWidgets import QApplication
@@ -62,6 +64,18 @@ class ViewTestCase(unittest.TestCase):
         v2 = Handle(2)
         self.assertTrue(v1 is not v2)
 
+    def test_handle_view(self):
+        self.fit_rules_for_a_view_in_apartment(Handle, scenario=self.test_handle_view)
+
+    def test_container_view(self):
+        self.fit_rules_for_a_view_in_apartment(Container, scenario=self.test_container_view)
+
+    def test_drawer_view(self):
+        self.fit_rules_for_a_view_in_apartment(Drawer, scenario=self.test_drawer_view)
+
+    def test_cabinet_view(self):
+        self.fit_rules_for_a_view_in_apartment(Cabinet, scenario=self.test_cabinet_view)
+
     def test_door_view(self):
         self.fit_rules_for_a_view_in_apartment(Door, scenario=self.test_door_view)
 
@@ -75,16 +89,7 @@ class ViewTestCase(unittest.TestCase):
         drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
         self.assertTrue(len(drawer_container_names) == 14)
 
-    def test_kitchen_views(self):
-        rdr = self.fit_views_and_get_rdr(self.kitchen_world, [Handle, Container, Drawer, Cabinet],
-                                         world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
-
-        found_views = rdr.classify(self.kitchen_world)
-
-        drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
-                                  type(v) is Container]
-        self.assertTrue(len(drawer_container_names) == 14)
-
+    @pytest.mark.order("second_to_last")
     def test_apartment_views(self):
         rdr = self.fit_views_and_get_rdr(self.apartment_world, [Handle, Container, Drawer, Cabinet],
                                          world_factory=self.get_apartment_world, scenario=self.test_apartment_views)
@@ -95,6 +100,17 @@ class ViewTestCase(unittest.TestCase):
                                   type(v) is Container]
 
         self.assertTrue(len(drawer_container_names) == 19)
+
+    @pytest.mark.order("last")
+    def test_kitchen_views(self):
+        rdr = self.fit_views_and_get_rdr(self.kitchen_world, [Handle, Container, Drawer, Cabinet],
+                                         world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
+
+        found_views = rdr.classify(self.kitchen_world)
+
+        drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
+                                  type(v) is Container]
+        self.assertTrue(len(drawer_container_names) == 14)
 
     @classmethod
     def get_kitchen_world(cls) -> World:
@@ -177,7 +193,6 @@ class ViewTestCase(unittest.TestCase):
 
         self.fit_rdr_to_views(rdr, required_views, world, update_existing_views=update_existing_views,
                               world_factory=world_factory, scenario=scenario)
-
         rdr.save(self.views_dir, self.views_rdr_model_name)
 
         return rdr
