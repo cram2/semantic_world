@@ -21,7 +21,7 @@ from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
 try:
     from semantic_world.views.world_rdr import world_rdr
-except ImportError:
+except ImportError as e:
     world_rdr = None
 from semantic_world.world import World
 

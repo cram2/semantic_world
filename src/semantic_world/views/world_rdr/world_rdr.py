@@ -1,6 +1,5 @@
 from ...world import World
-from datastructures.case import create_case
-from ripple_down_rules.datastructures.case import Case
+from ripple_down_rules.datastructures.case import Case, create_case
 from ripple_down_rules.helpers import general_rdr_classify
 from typing import Any, Dict
 from . import world_views_mcrdr as views_classifier
