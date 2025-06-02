@@ -11,3 +11,4 @@ scipy
 ormatic
 sqlacodegen
 ripple_down_rules
+pytest-order

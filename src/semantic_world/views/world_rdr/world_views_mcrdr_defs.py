@@ -1,15 +1,7 @@
-from typing import Union
-from semantic_world.connections import FixedConnection
-from semantic_world.views.views import Door
-from semantic_world.views.views import Container
-from semantic_world.connections import RevoluteConnection
-from semantic_world.world import World
-from semantic_world.views.views import Handle
-from semantic_world.connections import PrismaticConnection
-from semantic_world.views.views import Drawer
-from semantic_world.views.views import Cabinet
-from typing import List
-from typing_extensions import Union
+from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
+from ...world import World
+from ..views import Cabinet, Container, Door, Drawer, Handle
+from typing import List, Union
 
 
 def conditions_90574698325129464513441443063592862114(case):
