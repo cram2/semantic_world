@@ -82,6 +82,9 @@ class ViewTestCase(unittest.TestCase):
     def test_door_view(self):
         self.fit_rules_for_a_view_in_apartment(Door, scenario=self.test_door_view)
 
+    def test_fridge_view(self):
+        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view)
+
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
         self.fit_rules_for_a_view_in_apartment(Wardrobe, scenario=self.test_wardrobe_view)
@@ -116,13 +119,8 @@ class ViewTestCase(unittest.TestCase):
                                   type(v) is Container]
         self.assertTrue(len(drawer_container_names) == 14)
 
-    def test_fridge_view(self):
-        rdr = self.fit_views_and_get_rdr(self.kitchen_world, [Fridge], update_existing_views=False)
-        found_views = rdr.classify(self.kitchen_world)["views"]
-        fridge_container_names = [v.body.name.name for v in found_views if isinstance(v, Fridge)]
-        print(fridge_container_names)
 
-        self.assertTrue(len(fridge_container_names) == 1)
+
 
     @classmethod
     def get_kitchen_world(cls) -> World:
