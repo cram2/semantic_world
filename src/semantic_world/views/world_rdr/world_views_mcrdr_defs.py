@@ -1,3 +1,4 @@
+from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
 from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
 from ...world import World
 from ..views import Cabinet, Container, Door, Drawer, Handle
@@ -109,5 +110,23 @@ def conclusion_59112619694893607910753808758642808601(case):
         doors = [Door(c.parent, [h for h in handles if h.body == c.child][0]) for c in body_handle_connections]
         return doors
     return world_views_of_type_door(case)
+
+
+def conditions_10840634078579061471470540436169882059(case):
+    def conditions_for_world_views_of_type_fridge(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Fridge."""
+        return True
+    return conditions_for_world_views_of_type_fridge(case)
+
+
+def conclusion_10840634078579061471470540436169882059(case):
+    def world_views_of_type_fridge(case: World) -> List[Fridge]:
+        """Get possible value(s) for World.views  of type Fridge."""
+        doors = [v for v in case.views if isinstance(v, Door) and "fridge" in v.body.name.name.lower()]
+        door_connections = [c for c in case.connections if isinstance(c, RevoluteConnection) and
+                                        c.child in [d.body for d in doors] and 'fridge' in c.parent.name.name.lower()]
+        fridge_bodies = [c.parent for c in door_connections]
+        return [Fridge(b, d) for b, d in zip(fridge_bodies, doors)]
+    return world_views_of_type_fridge(case)
 
 
