@@ -1,14 +1,14 @@
+from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
 from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
 from ...world import World
-from ..views import Cabinet, Container, Door, Drawer, Handle
-from typing import List, Union
+from typing_extensions import List, Set, Union
 
 
-def conditions_90574698325129464513441443063592862114(case):
+def conditions_90574698325129464513441443063592862114(case) -> bool:
     return True
 
 
-def conclusion_90574698325129464513441443063592862114(case):
+def conclusion_90574698325129464513441443063592862114(case) -> List[Handle]:
     def get_value_for_world_views_of_type_handle(case: World) -> Union[set, list, Handle]:
         """Get possible value(s) for World.views of types list/set of Handle"""
         return [Handle(b) for b in case.bodies if "handle" in b.name.name.lower()]
@@ -16,11 +16,11 @@ def conclusion_90574698325129464513441443063592862114(case):
     return get_value_for_world_views_of_type_handle(case)
 
 
-def conditions_14920098271685635920637692283091167284(case):
+def conditions_14920098271685635920637692283091167284(case) -> bool:
     return len([v for v in case.views if type(v) is Handle]) > 0
 
 
-def conclusion_14920098271685635920637692283091167284(case):
+def conclusion_14920098271685635920637692283091167284(case) -> List[Container]:
     def get_value_for_world_views_of_type_container(case: World) -> Union[set, Container, list]:
         """Get possible value(s) for World.views of types list/set of Container"""
         prismatic_connections = [c for c in case.connections if isinstance(c, PrismaticConnection)]
@@ -35,12 +35,12 @@ def conclusion_14920098271685635920637692283091167284(case):
     return get_value_for_world_views_of_type_container(case)
 
 
-def conditions_331345798360792447350644865254855982739(case):
+def conditions_331345798360792447350644865254855982739(case) -> bool:
     return len([v for v in case.views if type(v) is Handle]) > 0 and len(
         [v for v in case.views if type(v) is Container]) > 0
 
 
-def conclusion_331345798360792447350644865254855982739(case):
+def conclusion_331345798360792447350644865254855982739(case) -> List[Drawer]:
     def get_value_for_world_views_of_type_drawer(case: World) -> Union[set, list, Drawer]:
         """Get possible value(s) for World.views of types list/set of Drawer"""
         handles = [v for v in case.views if type(v) is Handle]
@@ -60,11 +60,11 @@ def conclusion_331345798360792447350644865254855982739(case):
     return get_value_for_world_views_of_type_drawer(case)
 
 
-def conditions_35528769484583703815352905256802298589(case):
+def conditions_35528769484583703815352905256802298589(case) -> bool:
     return len([v for v in case.views if type(v) is Drawer]) > 0
 
 
-def conclusion_35528769484583703815352905256802298589(case):
+def conclusion_35528769484583703815352905256802298589(case) -> List[Cabinet]:
     def get_value_for_world_views_of_type_cabinet(case: World) -> Union[set, Cabinet, list]:
         """Get possible value(s) for World.views of types list/set of Cabinet"""
         drawers = [v for v in case.views if type(v) is Drawer]
@@ -86,14 +86,14 @@ def conclusion_35528769484583703815352905256802298589(case):
     return get_value_for_world_views_of_type_cabinet(case)
 
 
-def conditions_59112619694893607910753808758642808601(case):
+def conditions_59112619694893607910753808758642808601(case) -> bool:
     def conditions_for_world_views_of_type_door(case: World) -> bool:
         """Get conditions on whether it's possible to conclude a value for World.views  of type Door."""
         return len([v for v in case.views if isinstance(v, Handle)]) > 0
     return conditions_for_world_views_of_type_door(case)
 
 
-def conclusion_59112619694893607910753808758642808601(case):
+def conclusion_59112619694893607910753808758642808601(case) -> List[Door]:
     def world_views_of_type_door(case: World) -> List[Door]:
         """Get possible value(s) for World.views  of type Door."""
         handles = [v for v in case.views if isinstance(v, Handle)]
@@ -109,5 +109,31 @@ def conclusion_59112619694893607910753808758642808601(case):
         doors = [Door(c.parent, [h for h in handles if h.body == c.child][0]) for c in body_handle_connections]
         return doors
     return world_views_of_type_door(case)
+
+
+def conditions_10840634078579061471470540436169882059(case) -> bool:
+    def conditions_for_world_views_of_type_fridge(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Fridge."""
+        return True
+    return conditions_for_world_views_of_type_fridge(case)
+
+
+def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
+    def world_views_of_type_fridge(case: World) -> List[Fridge]:
+        """Get possible value(s) for World.views  of type Fridge."""
+        # Get fridge-related doors
+        doors = [v for v in case.views if isinstance(v, Door) and "fridge" in v.body.name.name.lower()]
+        # Precompute bodies of the fridge doors
+        door_bodies = {d.body for d in doors}
+        # Filter relevant revolute connections
+        door_connections = [
+            c for c in case.connections
+            if isinstance(c, RevoluteConnection)
+               and c.child in door_bodies
+               and 'fridge' in c.parent.name.name.lower()
+        ]
+        fridge_bodies = [c.parent for c in door_connections]
+        return [Fridge(b, d) for b, d in zip(fridge_bodies, doors)]
+    return world_views_of_type_fridge(case)
 
 

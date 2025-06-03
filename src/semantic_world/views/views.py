@@ -23,6 +23,10 @@ class Door(View):  # Door has a Footprint
     handle: Handle
     body: Body
 
+@dataclass(unsafe_hash=True)
+class Fridge(View):
+    body: Body
+    door: Door
 
 ################################
 
