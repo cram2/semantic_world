@@ -122,9 +122,17 @@ def conditions_10840634078579061471470540436169882059(case):
 def conclusion_10840634078579061471470540436169882059(case):
     def world_views_of_type_fridge(case: World) -> List[Fridge]:
         """Get possible value(s) for World.views  of type Fridge."""
+        # Get fridge-related doors
         doors = [v for v in case.views if isinstance(v, Door) and "fridge" in v.body.name.name.lower()]
-        door_connections = [c for c in case.connections if isinstance(c, RevoluteConnection) and
-                                        c.child in [d.body for d in doors] and 'fridge' in c.parent.name.name.lower()]
+        # Precompute bodies of the fridge doors
+        door_bodies = {d.body for d in doors}
+        # Filter relevant revolute connections
+        door_connections = [
+            c for c in case.connections
+            if isinstance(c, RevoluteConnection)
+               and c.child in door_bodies
+               and 'fridge' in c.parent.name.name.lower()
+        ]
         fridge_bodies = [c.parent for c in door_connections]
         return [Fridge(b, d) for b, d in zip(fridge_bodies, doors)]
     return world_views_of_type_fridge(case)
