@@ -60,7 +60,7 @@ class ViewTestCase(unittest.TestCase):
         cls.apartment_world = cls.get_apartment_world()
         if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
-            cls.viewer = RDRCaseViewer(save_file=cls.views_dir)
+            cls.viewer = RDRCaseViewer(save_dir=cls.views_dir)
 
     def test_id(self):
         v1 = Handle(1)
