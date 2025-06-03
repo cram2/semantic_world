@@ -1,7 +1,7 @@
-from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
 from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
-from ...world import World
 from typing_extensions import List, Set, Union
+from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
+from ...world import World
 
 
 def conditions_90574698325129464513441443063592862114(case) -> bool:
@@ -124,7 +124,7 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
         # Get fridge-related doors
         doors = [v for v in case.views if isinstance(v, Door) and "fridge" in v.body.name.name.lower()]
         # Precompute bodies of the fridge doors
-        door_bodies = {d.body for d in doors}
+        door_bodies = [d.body for d in doors]
         # Filter relevant revolute connections
         door_connections = [
             c for c in case.connections
@@ -132,8 +132,7 @@ def conclusion_10840634078579061471470540436169882059(case) -> List[Fridge]:
                and c.child in door_bodies
                and 'fridge' in c.parent.name.name.lower()
         ]
-        fridge_bodies = [c.parent for c in door_connections]
-        return [Fridge(b, d) for b, d in zip(fridge_bodies, doors)]
+        return [Fridge(c.parent, doors[door_bodies.index(c.child)]) for c in door_connections]
     return world_views_of_type_fridge(case)
 
 
