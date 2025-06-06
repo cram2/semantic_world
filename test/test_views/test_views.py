@@ -85,6 +85,17 @@ class ViewTestCase(unittest.TestCase):
     def test_fridge_view(self):
         self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view)
 
+    def test_roots_view(self):
+        self.fit_rules_for_a_view_in_apartment(Roots, scenario=self.test_roots_view)
+
+
+    def test_table_view(self):
+        self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)  #, update_existing_views=True)        # doesn't work anymore
+
+
+    def test_windows_view(self):
+        self.fit_rules_for_a_view_in_apartment(Windows, scenario=self.test_windows_view)
+
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
         self.fit_rules_for_a_view_in_apartment(Wardrobe, scenario=self.test_wardrobe_view)

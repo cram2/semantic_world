@@ -4,6 +4,44 @@ from typing_extensions import List
 
 from semantic_world.world import View, Body
 
+#from __future__ import annotations
+
+
+
+@dataclass(unsafe_hash=True)
+class Roots(View):
+    body: Body
+
+
+@dataclass(unsafe_hash=True)
+class Table(View):
+    body: Body
+
+#######################################################
+@dataclass(unsafe_hash=True)
+class Walls(View):
+    body: Body
+
+@dataclass(unsafe_hash=True)
+class Windows(View):
+    body: Body
+
+@dataclass(unsafe_hash=True)
+class Components(View):
+    """
+    Represents structural or functional parts of furniture or appliances.
+    """
+    body: Body
+
+@dataclass
+class Leg(Components):
+    """
+    A vertical support component of furniture.
+    """
+    ...
+
+
+
 
 @dataclass(unsafe_hash=True)
 class Handle(View):
