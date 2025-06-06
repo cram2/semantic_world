@@ -27,18 +27,26 @@ class Windows(View):
     body: Body
 
 @dataclass(unsafe_hash=True)
+class Leg(View):
+    body: Body
+
+@dataclass(unsafe_hash=True)
+class Surface(View):
+    body: Body
+
+@dataclass(unsafe_hash=True)
+class DetailedTable(View):
+    surface: Surface
+    #legs: List[Leg] = field(default_factory=list)
+
+@dataclass(unsafe_hash=True)
 class Components(View):
     """
     Represents structural or functional parts of furniture or appliances.
     """
     body: Body
 
-@dataclass
-class Leg(Components):
-    """
-    A vertical support component of furniture.
-    """
-    ...
+
 
 
 

@@ -45,6 +45,7 @@ class ViewTestCase(unittest.TestCase):
     urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
     kitchen = os.path.join(urdf_dir, "kitchen-small.urdf")
     apartment = os.path.join(urdf_dir, "apartment.urdf")
+    table = os.path.join(urdf_dir, "logical-table.urdf")
     main_dir = os.path.join(os.path.dirname(__file__), '..', '..')
     views_dir = os.path.join(main_dir, "src/semantic_world/views")
     views_rdr_model_name = "world_rdr"
@@ -58,6 +59,7 @@ class ViewTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.kitchen_world = cls.get_kitchen_world()
         cls.apartment_world = cls.get_apartment_world()
+        cls.table_world = cls.get_table_world()
         if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
             cls.viewer = RDRCaseViewer(save_dir=cls.views_dir)
@@ -95,6 +97,19 @@ class ViewTestCase(unittest.TestCase):
 
     def test_windows_view(self):
         self.fit_rules_for_a_view_in_apartment(Windows, scenario=self.test_windows_view)
+
+    def test_walls_view(self):
+        self.fit_rules_for_a_view_in_apartment(Walls, scenario=self.test_walls_view)
+
+    # BRB
+    def test_table_detaled_view(self):
+        self.fit_rules_for_a_view_in_table(Table, scenario=self.test_table_view)
+
+    def test_leg_view(self):
+        self.fit_rules_for_a_view_in_table(Leg, scenario=self.test_leg_view)
+
+    def test_surface_view(self):
+        self.fit_rules_for_a_view_in_table(Surface, scenario=self.test_surface_view)        # edit Rule to have one Leg as a parent
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
@@ -153,6 +168,16 @@ class ViewTestCase(unittest.TestCase):
         world.validate()
         return world
 
+    @classmethod
+    def get_table_world(cls) -> World:
+        """
+        Return the apartment world parsed from the URDF file.
+        """
+        parser = URDFParser(cls.table)
+        world = parser.parse()
+        world.validate()
+        return world
+
     def fit_rules_for_a_view_in_kitchen(self, view_type: Type[View], update_existing_views: bool = False,
                                         scenario: Optional[Callable] = None) -> None:
         """
@@ -175,6 +200,19 @@ class ViewTestCase(unittest.TestCase):
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
         self.fit_rules_for_a_view_and_assert(self.apartment_world, view_type,
+                                             update_existing_views=update_existing_views,
+                                             world_factory=self.get_apartment_world, scenario=scenario)
+
+    def fit_rules_for_a_view_in_table(self, view_type: Type[View], update_existing_views: bool = False,
+                                          scenario: Optional[Callable] = None) -> None:
+        """
+        Template method to test a specific view type in the apartment world.
+
+        :param view_type: The type of view to fit and assert.
+        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
+        :param scenario: Optional callable that represents the test method or scenario that is being executed.
+        """
+        self.fit_rules_for_a_view_and_assert(self.table_world, view_type,
                                              update_existing_views=update_existing_views,
                                              world_factory=self.get_apartment_world, scenario=scenario)
 

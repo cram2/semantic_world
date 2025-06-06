@@ -30,3 +30,12 @@ corner_case_32110951838731034027817851716447618523 = CaseFactoryMetaData(factory
 corner_case_284429630184552508120710178948116682797 = CaseFactoryMetaData(factory_method=ViewTestCase.get_apartment_world, factory_idx=None, case_conf=None, scenario=ViewTestCase.test_windows_view)
 
 
+corner_case_248275187658510121717149881382454303958 = CaseFactoryMetaData(factory_method=ViewTestCase.get_apartment_world, factory_idx=None, case_conf=None, scenario=ViewTestCase.test_walls_view)
+
+
+corner_case_193930575337302892359597988013972475184 = CaseFactoryMetaData(factory_method=ViewTestCase.get_apartment_world, factory_idx=None, case_conf=None, scenario=ViewTestCase.test_surface_view)
+
+
+corner_case_170324961522120215684260382462355539164 = CaseFactoryMetaData(factory_method=ViewTestCase.get_apartment_world, factory_idx=None, case_conf=None, scenario=ViewTestCase.test_leg_view)
+
+

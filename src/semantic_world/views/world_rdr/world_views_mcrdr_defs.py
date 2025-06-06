@@ -1,5 +1,5 @@
 from typing_extensions import List, Set, Union
-from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle, Roots, Table, Windows
+from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle, Leg, Roots, Surface, Table, Walls, Windows
 from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
 from ...world import World
 
@@ -189,5 +189,62 @@ def conclusion_284429630184552508120710178948116682797(case) -> List[Windows]:
         ]
         return [Windows(b.child) for b in conections_with_roots if "windows" in b.child.name.name.lower()]
     return world_views_of_type_windows(case)
+
+
+def conditions_248275187658510121717149881382454303958(case) -> bool:
+    def conditions_for_world_views_of_type_walls(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Walls."""
+        return len([r for r in case.views if isinstance(r, Roots)]) > 0
+    return conditions_for_world_views_of_type_walls(case)
+
+
+def conclusion_248275187658510121717149881382454303958(case) -> List[Walls]:
+    def world_views_of_type_walls(case: World) -> Walls:
+        """Get possible value(s) for World.views  of type Walls."""
+        all_roots = [r for r in case.views if isinstance(r, Roots)]
+        root_bodies = [r.body for r in all_roots]
+        conections_with_roots = [
+            c for c in case.connections
+            if isinstance(c, FixedConnection)
+               and c.parent in root_bodies
+        ]
+        return [Walls(b.child) for b in conections_with_roots if "walls" in b.child.name.name.lower()]
+    return world_views_of_type_walls(case)
+
+
+def conditions_193930575337302892359597988013972475184(case) -> bool:
+    def conditions_for_world_views_of_type_surface(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Surface."""
+        return True
+    return conditions_for_world_views_of_type_surface(case)
+
+
+def conclusion_193930575337302892359597988013972475184(case) -> List[Surface]:
+    def world_views_of_type_surface(case: World) -> Surface:
+        """Get possible value(s) for World.views  of type Surface."""
+        return [Surface(b) for b in case.bodies if "surface" in b.name.name.lower()]
+    return world_views_of_type_surface(case)
+
+
+def conditions_170324961522120215684260382462355539164(case) -> bool:
+    def conditions_for_world_views_of_type_leg(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Leg."""
+        return len([r for r in case.views if isinstance(r, Roots)]) > 0
+    return conditions_for_world_views_of_type_leg(case)
+
+
+def conclusion_170324961522120215684260382462355539164(case) -> List[Leg]:
+    def world_views_of_type_leg(case: World) -> Leg:
+        """Get possible value(s) for World.views  of type Leg."""
+        all_roots = [r for r in case.views if isinstance(r, Roots)]
+        root_bodies = [r.body for r in all_roots]  # r.child
+        conections_with_roots = [
+            c for c in case.connections
+            if isinstance(c, FixedConnection)
+               and c.parent in root_bodies
+        ]
+    
+        return [Leg(b.child) for b in conections_with_roots if "leg" in b.child.name.name.lower()]
+    return world_views_of_type_leg(case)
 
 
