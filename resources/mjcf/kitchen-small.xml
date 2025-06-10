@@ -13,7 +13,6 @@
 	<worldbody>
 		<body name="room_link" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
 			<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
-			<freejoint/>
 			<body name="oven_area_area_footprint" pos="1.8049999475479126 2.5199999809265137 0.0" quat="-1.0341155557737347e-13 0.0 0.0 1.0">
 				<inertial mass="1.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="1.0 1.0 1.0"/>
 				<body name="oven_area_area" pos="0.28999999165534973 0.6000000238418579 0.7549999952316284" quat="1.0 0.0 0.0 0.0">
