@@ -34,7 +34,7 @@ jobs:
         pip install pytest mypy flake8 black isort
         pip install .
         git clone https://github.com/Multiverse-Framework/Multiverse-Parser.git
-        pip install ./Multiverse-Parser
+        pip install -e ./Multiverse-Parser
         echo "PATH=$PWD/ultiverse-Parser/ext/blender:$PWD/ultiverse-Parser/USD/linux/lib/python:$PWD/ultiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=$PWD/ultiverse-Parser/USD/linux/lib/python:$PWD/src" >> $GITHUB_ENV
 
