@@ -43,4 +43,4 @@ jobs:
         source venv/bin/activate
         echo "PATH is: $PATH"
         echo "PYTHONPATH is: $PYTHONPATH"
-        PYTHONPATH=$PYTHONPATH pytest -v test/
+        PATH=$PATH PYTHONPATH=$PYTHONPATH pytest -v test/
