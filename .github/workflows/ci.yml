@@ -33,6 +33,8 @@ jobs:
         pip install -r requirements.txt
         pip install pytest mypy flake8 black isort
         pip install .
+        git clone https://github.com/Multiverse-Framework/Multiverse-Parser.git
+        pip install ./Multiverse-Parser
 
     - name: Run tests
       run: |
