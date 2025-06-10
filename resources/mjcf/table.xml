@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<mujoco model="table">
+	<compiler angle="radian" autolimits="true" balanceinertia="true" boundmass="0.000001" boundinertia="0.000001"/>
+	<default>
+		<default class="table_visual">
+			<geom contype="0" conaffinity="0"/>
+		</default>
+		<default class="table_collision">
+			<geom rgba="0.9 0.9 0.9 1.0" group="3"/>
+		</default>
+	</default>
+	<asset/>
+	<worldbody>
+		<body name="table_origin" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+			<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+			<freejoint/>
+			<body name="left_front_leg" pos="-4.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+				<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				<body name="right_front_leg" pos="0.0 1.0 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="top" pos="0.5 0.5 0.6000000238418579" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="left_back_leg" pos="1.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="right_back_leg" pos="1.0 1.0 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+			</body>
+		</body>
+	</worldbody>
+	<equality/>
+</mujoco>

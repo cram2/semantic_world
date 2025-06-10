@@ -1,0 +1,397 @@
+<?xml version="1.0" ?>
+<mujoco model="apartment">
+	<compiler angle="radian" autolimits="true" balanceinertia="true" boundmass="0.000001" boundinertia="0.000001"/>
+	<default>
+		<default class="apartment_visual">
+			<geom contype="0" conaffinity="0"/>
+		</default>
+		<default class="apartment_collision">
+			<geom rgba="0.9 0.9 0.9 1.0" group="3"/>
+		</default>
+	</default>
+	<asset/>
+	<worldbody>
+		<body name="apartment_root" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+			<body name="furnitures_root" pos="8.850000381469727 1.75 0.0" quat="1.0 0.0 0.0 0.0">
+				<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				<body name="windows" pos="0.0 0.0 -0.20000000298023224" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="wall_coloksu_wall2" pos="-8.854999542236328 0.7820000052452087 1.5299999713897705" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="wall_coloksu_wall4" pos="10.069000244140625 0.7820000052452087 1.5299999713897705" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="armchair" pos="7.968800067901611 -0.3790999948978424 0.0" quat="0.5735609531402588 0.0 0.0 0.819162905216217">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="coffee_table" pos="7.803400039672852 1.0295699834823608 0.0" quat="0.7071054577827454 0.0 0.0 0.7071080803871155">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					<body name="coffee_table_drawer" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<joint name="coffee_table_drawer_joint" type="slide" pos="0.0 0.0 0.0" range="0.0 0.5" axis="-1.0 0.0 0.0"/>
+					</body>
+				</body>
+				<body name="bedside_table" pos="7.210999965667725 0.12960000336170197 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="walls" pos="0.0 0.0 -0.20000000298023224" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="wall_coloksu_wall3" pos="0.6000000238418579 3.180000066757202 1.5299999713897705" quat="0.7073882818222046 0.0 0.0 0.7068251967430115">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="sofa" pos="8.198599815368652 2.409600019454956 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="wall_coloksu_wall1" pos="0.6000000238418579 -1.6150000095367432 1.5299999713897705" quat="0.7073882818222046 0.0 0.0 -0.7068251967430115">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				</body>
+				<body name="wardrobe" pos="9.708200454711914 -0.6330999732017517 0.0" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					<body name="wardrobe_door_right" pos="-0.3246000111103058 -0.5 0.0" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<joint name="wardrobe_door_right_joint" type="hinge" pos="2.220446049250313e-16 0.0 0.0" range="0.0 1.5708000659942627" axis="0.0 0.0 1.0"/>
+						<body name="wardrobe_door_right_handle" pos="-0.0320889987051487 0.46051299571990967 0.9737030267715454" quat="1.0 0.0 0.0 0.0">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						</body>
+					</body>
+					<body name="wardrobe_door_left" pos="-0.3246000111103058 0.5 0.0" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<joint name="wardrobe_door_left_joint" type="hinge" pos="2.220446049250313e-16 0.0 0.0" range="0.0 1.5708000659942627" axis="0.0 0.0 -1.0"/>
+						<body name="wardrobe_door_left_handle" pos="-0.0320889987051487 -0.46051299571990967 0.9737030267715454" quat="1.0 0.0 0.0 0.0">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						</body>
+					</body>
+				</body>
+			</body>
+			<body name="table_area_main" pos="5.0 4.0 0.0" quat="0.7073882818222046 0.0 0.0 0.7068251967430115">
+				<inertial mass="1.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="1.0 1.0 1.0"/>
+			</body>
+			<body name="kitchen_root" pos="-0.029999999329447746 0.75 0.004999999888241291" quat="1.0 0.0 0.0 0.0">
+				<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+				<body name="side_B" pos="2.9100000858306885 3.700000047683716 0.10999999940395355" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					<body name="cabinet8" pos="0.25600001215934753 1.1019999980926514 0.006000000052154064" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet8_drawer_bottom" pos="0.11400000005960464 -4.440892098500626e-16 0.10499999672174454" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet8_drawer_bottom_joint" type="slide" pos="3.198959950439958e-16 -4.435803018674404e-16 -0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab8" pos="-0.23800000548362732 0.0 0.6499999761581421" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet8_drawer_middle" pos="0.05000000074505806 -4.440892098500626e-16 0.47999998927116394" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet8_drawer_middle_joint" type="slide" pos="2.643849232220768e-16 -4.4366871093131006e-16 -0.0" range="0.0 0.4000000059604645" axis="-1.0 0.0 0.0"/>
+						</body>
+					</body>
+					<body name="cabinet9" pos="0.3330000042915344 1.7029999494552612 0.39399999380111694" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet9_drawer_middle" pos="0.027000000700354576 0.0 0.10599999874830246" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet9_drawer_middle_joint" type="slide" pos="5.793968998224247e-16 9.22779323511853e-19 1.3877787807814457e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab9_m" pos="-0.24500000476837158 -4.440892098500626e-16 0.12999999523162842" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet9_drawer_bottom" pos="0.035999998450279236 0.0 -0.2809999883174896" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet9_drawer_bottom_joint" type="slide" pos="4.787830970344475e-16 7.625362408868554e-19 -0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab9_b" pos="-0.23999999463558197 0.0 0.24500000476837158" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet9_drawer_top" pos="0.029999999329447746 4.440892098500626e-16 0.3269999921321869" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet9_drawer_top_joint" type="slide" pos="2.4909259039234766e-16 4.444864683023249e-16 -5.551115123125783e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab9_t" pos="-0.24500000476837158 0.0 0.05000000074505806" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="cabinet10" pos="0.3330000042915344 2.2039999961853027 0.39399999380111694" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet10_drawer_middle" pos="0.03099999949336052 0.0 0.10400000214576721" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet10_drawer_middle_joint" type="slide" pos="5.828663467743783e-16 9.283049934012838e-19 1.3877787807814457e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab10_m" pos="-0.24500000476837158 -4.440892098500626e-16 0.12999999523162842" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet10_drawer_bottom" pos="0.029999999329447746 -4.440892098500626e-16 -0.27900001406669617" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet10_drawer_bottom_joint" type="slide" pos="6.945958158687329e-16 -4.4298351421654053e-16 -0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab10_b" pos="-0.24500000476837158 -4.440892098500626e-16 0.24500000476837158" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet10_drawer_top" pos="0.032999999821186066 0.0 0.32600000500679016" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet10_drawer_top_joint" type="slide" pos="-8.326662096776833e-17 -1.3261499167178508e-19 5.551115123125783e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab10_t" pos="-0.24300000071525574 4.440892098500626e-16 0.05000000074505806" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="cabinet11" pos="0.3330000042915344 2.8550000190734863 0.39399999380111694" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet11_drawer_middle" pos="0.027000000700354576 -2.220446049250313e-16 0.10599999874830246" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet11_drawer_middle_joint" type="slide" pos="5.797505360779034e-16 -2.2112153753587113e-16 1.3877787807814457e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab11_m" pos="-0.24500000476837158 2.220446049250313e-16 0.12999999523162842" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet11_drawer_bottom" pos="0.04500000178813934 -2.220446049250313e-16 -0.28600001335144043" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet11_drawer_bottom_joint" type="slide" pos="3.7505343061043617e-16 -2.2144755257633543e-16 -0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab11_b" pos="-0.2280000001192093 2.220446049250313e-16 0.24500000476837158" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet11_drawer_top" pos="0.029999999329447746 -2.220446049250313e-16 0.32600000500679016" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet11_drawer_top_joint" type="slide" pos="2.5015349915878367e-16 -2.2164647297004219e-16 5.551115123125783e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab11_t" pos="-0.24300000071525574 0.0 0.05000000074505806" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="island_countertop" pos="0.12999999523162842 1.7860000133514404 0.8069999814033508" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="sink" pos="0.1979999989271164 -0.6980000138282776 -0.03799999877810478" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<body name="tap_body" pos="-0.2280000001192093 -0.003000000026077032 0.164000004529953" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								<joint name="tap_joint" type="hinge" pos="-1.9481510294409632e-16 3.301549669335643e-16 -2.7755575615628914e-17" range="-1.5708000659942627 1.5708000659942627" axis="0.0 0.0 1.0"/>
+								<body name="tap_handle_open" pos="0.0012329999590292573 0.038488999009132385 -0.05539499968290329" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+									<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+									<joint name="tap_handle_open_joint" type="hinge" pos="4.004644057931754e-17 -2.2891999782767407e-16 -2.7755575615628914e-17" range="-1.5708000659942627 1.5708000659942627" axis="0.0 1.0 0.0"/>
+									<body name="tap_handle" pos="4.440892098500626e-16 0.0 0.0" quat="0.9689124226570129 -4.9936009045870475e-21 0.24740396440029144 -1.0348068883364443e-19">
+										<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+										<joint name="tap_handle_hot_cold_joint" type="hinge" pos="4.44088653984691e-16 7.072799555828538e-19 -0.0" range="-0.5 0.0" axis="1.0 0.0 0.0"/>
+									</body>
+								</body>
+							</body>
+						</body>
+						<body name="cooktop" pos="0.12999999523162842 1.0740000009536743 0.023000000044703484" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<body name="hotplate2" pos="0.06690199673175812 0.13800999522209167 0.005499999970197678" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+							<body name="hotplate4" pos="-0.11577799916267395 -0.16198700666427612 0.005332999862730503" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+							<body name="hotplate1" pos="0.10689999908208847 -0.1619900017976761 0.004999999888241291" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+							<body name="hotplate3" pos="-0.15577800571918488 0.13801300525665283 0.005499999970197678" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="useless_underbar_b" pos="0.5519999861717224 1.7549999952316284 -0.04500000178813934" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+					<body name="island_waterfall_right" pos="0.2849999964237213 3.315000057220459 0.3540000021457672" quat="0.5003981590270996 0.49999985098838806 0.4996018409729004 0.49999985098838806">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+					<body name="cabinet7" pos="0.20000000298023224 0.5009999871253967 0.4699999988079071" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="dishwasher_drawer_middle" pos="-0.06499999761581421 0.029999999329447746 0.07999999821186066" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="dishwasher_drawer_middle_joint" type="slide" pos="-3.882681239694485e-16 -1.9490765452847365e-16 4.163336342344337e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab7_middle" pos="-0.3149999976158142 0.0 0.06800000369548798" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet7_door_bottom_left" pos="0.3720000088214874 0.0 -0.44999998807907104" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet7_door_bottom_left_joint" type="hinge" pos="3.3306648387107333e-16 5.304599666871403e-19 -0.0" range="0.0 1.5708000659942627" axis="0.0 -1.0 0.0"/>
+							<body name="handle_cab7" pos="-0.05999999865889549 0.0 0.7400000095367432" quat="0.7073882818222046 0.7068251967430115 -1.5326007559261325e-19 -1.532765804307731e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="island_waterfall_left" pos="0.2849999964237213 0.19099999964237213 0.3540000021457672" quat="0.5003981590270996 0.49999985098838806 0.4996018409729004 0.49999985098838806">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+					<body name="island_back" pos="-0.026000000536441803 1.753999948501587 0.3529999852180481" quat="0.7073882818222046 1.1489713191772015e-19 0.7068251967430115 3.827965692696667e-20">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+				</body>
+				<body name="side_A" pos="0.49000000953674316 0.6959999799728394 0.07999999821186066" quat="1.0 0.0 0.0 0.0">
+					<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					<body name="cabinet2" pos="-0.16300000250339508 0.5099999904632568 0.9750000238418579" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet2_drawer_small" pos="-0.009999999776482582 0.0 0.17000000178813934" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet2_drawer_small_joint" type="slide" pos="8.673617379884035e-18 0.0 3.0531133177191805e-16" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+						</body>
+						<body name="cabinet2_door_out_fancy" pos="0.2770000100135803 -0.1899999976158142 -2.220446049250313e-16" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet2_door_out_joint" type="slide" pos="0.0 -5.551115123125783e-17 2.220446049250313e-16" range="0.0 0.019999999552965164" axis="-1.0 0.0 0.0"/>
+							<body name="cabinet2_door_left" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								<joint name="cabinet2_door_left_joint" type="hinge" pos="0.0 0.0 0.0" range="0.0 1.5708000659942627" axis="0.0 0.0 -1.0"/>
+								<body name="handle_cab2_door" pos="-0.03999999910593033 -0.28999999165534973 0.05000000074505806" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+									<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								</body>
+							</body>
+						</body>
+						<body name="cabinet2_drawer_big" pos="0.03999999910593033 0.0 -0.11999999731779099" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet2_drawer_big_joint" type="slide" pos="2.0816681711721685e-17 0.0 2.220446049250313e-16" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+						</body>
+					</body>
+					<body name="cabinet3" pos="-0.27300000190734863 1.0219999551773071 1.0700000524520874" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet3_door_bottom_out_fancy" pos="0.38999998569488525 -0.30000001192092896 -0.5" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet3_door_bottom_out_joint" type="slide" pos="0.0 -1.6653345369377348e-16 0.0" range="0.0 0.019999999552965164" axis="-1.0 0.0 0.0"/>
+							<body name="cabinet3_door_bottom_left" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								<joint name="cabinet3_door_bottom_left_joint" type="hinge" pos="0.0 0.0 0.0" range="0.0 1.5708000659942627" axis="0.0 0.0 -1.0"/>
+								<body name="handle_cab3_door_bottom" pos="-0.035999998450279236 -0.44999998807907104 0.10000000149011612" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+									<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								</body>
+							</body>
+						</body>
+						<body name="cabinet3_door_top_out_fancy" pos="0.38999998569488525 -0.30000001192092896 0.5" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet3_door_top_out_joint" type="hinge" pos="0.0 -1.6653345369377348e-16 0.0" range="0.0 1.5708000659942627" axis="-1.0 0.0 0.0"/>
+							<body name="cabinet3_door_top_left" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								<joint name="cabinet3_door_top_left_joint" type="hinge" pos="0.0 0.0 0.0" range="0.0 1.5708000659942627" axis="0.0 0.0 -1.0"/>
+								<body name="handle_cab3_door_top" pos="-0.035999998450279236 -0.44999998807907104 -0.6499999761581421" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+									<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								</body>
+							</body>
+						</body>
+					</body>
+					<body name="cabinet4" pos="-0.17499999701976776 1.8250000476837158 1.7200000286102295" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet4_door_top" pos="0.07000000029802322 0.0 0.41999998688697815" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet4_door_top_top_joint" type="hinge" pos="-5.551115123125783e-17 0.0 -1.6653345369377348e-16" range="0.0 2.0" axis="0.0 1.0 0.0"/>
+							<body name="cabinet4_door_bottom" pos="-5.551115123125783e-17 0.0 -0.4000000059604645" quat="1.0 0.0 0.0 -1.0842021724855044e-19">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								<joint name="cabinet4_door_bottom_bottom_joint" type="hinge" pos="-5.551108174808637e-17 -8.840999444785672e-20 -1.1102230246251565e-16" range="0.0 1.5708000659942627" axis="0.0 -1.0 0.0"/>
+								<body name="handle_cab4_door_bottom" pos="-0.054999999701976776 4.440892098500626e-16 -0.3499999940395355" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+									<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+								</body>
+							</body>
+						</body>
+					</body>
+					<body name="cabinet5" pos="-0.12099999934434891 1.625 0.4000000059604645" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet5_drawer_middle" pos="0.027000000700354576 0.0 0.10700000077486038" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet5_drawer_middle_joint" type="slide" pos="-2.42861286636753e-17 0.0 -4.163336342344337e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab5_m" pos="-0.24500000476837158 0.0 0.12999999523162842" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet5_drawer_bottom" pos="0.03700000047683716 0.0 -0.2800000011920929" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet5_drawer_bottom_joint" type="slide" pos="2.0816681711721685e-17 0.0 0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab5_b" pos="-0.23499999940395355 -4.440892098500626e-16 0.24500000476837158" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="countertop" pos="-0.027000000700354576 0.20999999344348907 0.4230000078678131" quat="1.0 0.0 0.0 0.0">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<body name="coffe_machine" pos="0.0 0.30000001192092896 0.20000000298023224" quat="1.0 0.0 0.0 0.0">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet5_drawer_top" pos="0.029999999329447746 0.0 0.3269999921321869" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet5_drawer_top_joint" type="slide" pos="-2.7755575615628914e-17 0.0 0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab5_t" pos="-0.24500000476837158 0.0 0.05000000074505806" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="cabinet6" pos="-0.12099999934434891 2.127000093460083 0.4000000059604645" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="cabinet6_drawer_middle" pos="0.029999999329447746 0.0 0.10499999672174454" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet6_drawer_middle_joint" type="slide" pos="-2.7755575615628914e-17 0.0 -4.163336342344337e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab6_m" pos="-0.24500000476837158 4.440892098500626e-16 0.12999999523162842" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet6_drawer_bottom" pos="0.04699999839067459 0.0 -0.2800000011920929" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet6_drawer_bottom_joint" type="slide" pos="1.3877787807814457e-17 0.0 0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab6_b" pos="-0.22699999809265137 4.440892098500626e-16 0.24500000476837158" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet6_drawer_top" pos="0.032999999821186066 -0.012500000186264515 0.328000009059906" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet6_drawer_top_joint" type="slide" pos="-2.7755575615628914e-17 1.7694179454963432e-16 0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab6_t" pos="-0.23800000548362732 0.0 0.05000000074505806" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+					</body>
+					<body name="useless_underbar_a" pos="0.0949999988079071 1.0199999809265137 -0.029999999329447746" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+					<body name="side_A_rt" pos="-0.2619999945163727 2.3359999656677246 1.7400000095367432" quat="0.7073882818222046 0.0 0.0 0.7068251967430115">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+					<body name="side_A_left" pos="-0.1599999964237213 -0.29600000381469727 1.0299999713897705" quat="0.7073882818222046 0.0 0.0 0.7068251967430115">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+					<body name="cabinet1" pos="0.009999999776482582 0.009999999776482582 1.0199999809265137" quat="1.0 0.0 0.0 0.0">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						<body name="oven" pos="-0.17499999701976776 0.0 -0.02500000037252903" quat="1.0 0.0 0.0 0.0">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						</body>
+						<body name="cabinet1_drawer_bottom" pos="-0.09399999678134918 0.0 -0.949999988079071" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet1_drawer_bottom_joint" type="slide" pos="-2.7755575615628914e-17 0.0 0.0" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab1_drawer_bottom" pos="-0.2370000034570694 0.0 0.3499999940395355" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet1_coloksu_level4" pos="-0.1720000058412552 0.004999999888241291 0.2809999883174896" quat="1.0 0.0 0.0 0.0">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						</body>
+						<body name="cabinet1_door_top_left" pos="0.10300000011920929 -0.30000001192092896 0.3199999928474426" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet1_door_top_left_joint" type="hinge" pos="1.3877787807814457e-17 5.551115123125783e-17 -5.551115123125783e-17" range="0.0 1.5708000659942627" axis="0.0 0.0 -1.0"/>
+							<body name="handle_cab1_top_door" pos="-0.054999999701976776 -0.5 0.0" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet1_drawer_middle" pos="-0.11699999868869781 0.0 -0.4300000071525574" quat="0.0007963267271406949 0.0 0.0 0.9999997019767761">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							<joint name="cabinet1_drawer_middle_joint" type="slide" pos="-1.3877787807814457e-17 0.0 -5.551115123125783e-17" range="0.0 0.44999998807907104" axis="-1.0 0.0 0.0"/>
+							<body name="handle_cab1_drawer_mid" pos="-0.25999999046325684 0.0 0.10999999940395355" quat="0.7073882818222046 0.7068251967430115 -1.149345489157411e-19 3.824226577833986e-20">
+								<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+							</body>
+						</body>
+						<body name="cabinet1_coloksu_level5" pos="-0.1720000058412552 0.004999999888241291 0.5600000023841858" quat="1.0 0.0 0.0 0.0">
+							<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+						</body>
+					</body>
+					<body name="side_A_rb" pos="-0.1589999943971634 2.3380000591278076 0.3610000014305115" quat="0.5003981590270996 0.49999985098838806 0.4996018409729004 0.49999985098838806">
+						<inertial mass="0.0" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" diaginertia="0.0 0.0 0.0"/>
+					</body>
+				</body>
+			</body>
+		</body>
+	</worldbody>
+	<equality>
+		<joint name="cabinet3_door_bottom_out_joint_cabinet3_door_bottom_left_joint" joint1="cabinet3_door_bottom_out_joint" joint2="cabinet3_door_bottom_left_joint" polycoef="0.0 0.009999999776482582 0.0 0.0 0.0"/>
+		<joint name="cabinet2_door_out_joint_cabinet2_door_left_joint" joint1="cabinet2_door_out_joint" joint2="cabinet2_door_left_joint" polycoef="0.0 0.009999999776482582 0.0 0.0 0.0"/>
+		<joint name="cabinet3_door_top_out_joint_cabinet3_door_top_left_joint" joint1="cabinet3_door_top_out_joint" joint2="cabinet3_door_top_left_joint" polycoef="0.0 0.009999999776482582 0.0 0.0 0.0"/>
+		<joint name="cabinet4_door_bottom_bottom_joint_cabinet4_door_top_top_joint" joint1="cabinet4_door_bottom_bottom_joint" joint2="cabinet4_door_top_top_joint" polycoef="0.0 1.2000000476837158 0.0 0.0 0.0"/>
+	</equality>
+</mujoco>
