@@ -6,7 +6,7 @@ import hypothesis.strategies as st
 import numpy as np
 from hypothesis import given, assume, settings
 import semantic_world.spatial_types.spatial_types as cas
-from test_casadi.utils_for_tests import float_no_nan_no_inf, quaternion, random_angle, unit_vector, compare_axis_angle, \
+from .utils_for_tests import float_no_nan_no_inf, quaternion, random_angle, unit_vector, compare_axis_angle, \
     angle_positive, vector, lists_of_same_length, compare_orientations, sq_matrix, float_no_nan_no_inf_min_max
 
 

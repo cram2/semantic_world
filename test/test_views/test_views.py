@@ -60,7 +60,7 @@ class ViewTestCase(unittest.TestCase):
         cls.apartment_world = cls.get_apartment_world()
         if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
-            cls.viewer = RDRCaseViewer(save_file=cls.views_dir)
+            cls.viewer = RDRCaseViewer(save_dir=cls.views_dir)
 
     def test_id(self):
         v1 = Handle(1)
@@ -81,6 +81,9 @@ class ViewTestCase(unittest.TestCase):
 
     def test_door_view(self):
         self.fit_rules_for_a_view_in_apartment(Door, scenario=self.test_door_view)
+
+    def test_fridge_view(self):
+        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view)
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
@@ -115,6 +118,9 @@ class ViewTestCase(unittest.TestCase):
         drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
                                   type(v) is Container]
         self.assertTrue(len(drawer_container_names) == 14)
+
+
+
 
     @classmethod
     def get_kitchen_world(cls) -> World:
