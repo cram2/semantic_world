@@ -622,6 +622,13 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
         return cls.from_point_rotation_matrix(p, r, reference_frame=reference_frame, child_frame=child_frame)
 
+    @classmethod
+    def from_xyz_quat(cls, pos_x=None, pos_y=None, pos_z=None, quat_w=None, quat_x=None, quat_y=None, quat_z=None,
+                      reference_frame=None, child_frame=None):
+        p = Point3.from_xyz(pos_x, pos_y, pos_z)
+        r = RotationMatrix.from_quaternion(q=Quaternion.from_xyzw(w=quat_w, x=quat_x, y=quat_y, z=quat_z))
+        return cls.from_point_rotation_matrix(p, r, reference_frame=reference_frame, child_frame=child_frame)
+
     def to_position(self):
         result = Point3(self[:4, 3:], reference_frame=self.reference_frame)
         return result

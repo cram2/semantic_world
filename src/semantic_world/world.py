@@ -15,7 +15,7 @@ from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .utils import IDGenerator, copy_lru_cache
-from .world_entity import Body, Connection
+from .world_entity import Body, Connection, View
 
 id_generator = IDGenerator()
 
@@ -149,12 +149,12 @@ class ForwardKinematicsVisitor(WorldVisitor):
 
 class ResetStateContextManager:
     """
-    A context manager for resetting the state of a given `World` instance. 
+    A context manager for resetting the state of a given `World` instance.
 
     This class is designed to allow operations to be performed on a `World`
     object, ensuring that its state can be safely returned to its previous
-    condition upon leaving the context. If no exceptions occur within the 
-    context, the original state of the `World` instance is restored, and the 
+    condition upon leaving the context. If no exceptions occur within the
+    context, the original state of the `World` instance is restored, and the
     state change is notified.
     """
 
@@ -217,6 +217,11 @@ class World:
     The kinematic structure of the world.
     The kinematic structure is a tree-like directed graph where the nodes represent bodies in the world,
     and the edges represent connections between them.
+    """
+
+    views: List[View] = field(default_factory=list, repr=False)
+    """
+    All views the world is aware of.
     """
 
     degrees_of_freedom: Dict[PrefixedName, DegreeOfFreedom] = field(default_factory=dict)
@@ -382,7 +387,7 @@ class World:
         """
         Merge a world into the existing one by merging degrees of freedom, states, connections, and bodies.
 
-        :param world: The world to be added. 
+        :param world: The world to be added.
         :return: None
         """
         for dof in world.degrees_of_freedom.values():
@@ -398,7 +403,7 @@ class World:
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """
-        Retrieves a body from the list of bodies based on its name. 
+        Retrieves a body from the list of bodies based on its name.
         If the input is of type `PrefixedName`, it checks whether the prefix is specified and looks for an
         exact match. Otherwise, it matches based on the name's string representation.
         If more than one body with the same name is found, an assertion error is raised.
@@ -424,19 +429,19 @@ class World:
     def get_connection_by_name(self, name: Union[str, PrefixedName]) -> Connection:
         """
         Retrieve a connection by its name.
-        This method accepts either a string or a `PrefixedName` instance. 
-        It searches through the list of connections and returns the one 
-        that matches the given name. If the `PrefixedName` contains a prefix, 
-        the method ensures the name, including the prefix, matches an existing 
-        connection. Otherwise, it only considers the unprefixed name. If more than 
-        one connection matches the specified name, or if no connection is found, 
+        This method accepts either a string or a `PrefixedName` instance.
+        It searches through the list of connections and returns the one
+        that matches the given name. If the `PrefixedName` contains a prefix,
+        the method ensures the name, including the prefix, matches an existing
+        connection. Otherwise, it only considers the unprefixed name. If more than
+        one connection matches the specified name, or if no connection is found,
         an exception is raised.
 
-        :param name: The name of the connection to retrieve. Can be a string or 
-            a `PrefixedName` instance. If a prefix is included in `PrefixedName`, 
+        :param name: The name of the connection to retrieve. Can be a string or
+            a `PrefixedName` instance. If a prefix is included in `PrefixedName`,
             it will be used for matching.
         :return: The connection that matches the specified name.
-        :raises ValueError: If multiple connections with the given name are found 
+        :raises ValueError: If multiple connections with the given name are found
             or if no connection with the given name exists.
         """
         if isinstance(name, PrefixedName):
@@ -525,7 +530,7 @@ class World:
 
         :param root: The starting `Body` object for the chain of connections.
         :param tip: The ending `Body` object for the chain of connections.
-        :return: A tuple of two lists: the first list contains `Connection` objects from the `root` to 
+        :return: A tuple of two lists: the first list contains `Connection` objects from the `root` to
             the common ancestor, and the second list contains `Connection` objects from the `tip` to the
             common ancestor.
         """
