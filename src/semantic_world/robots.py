@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, field
 from typing_extensions import Optional, List, Self
 
-from semantic_world.world_entity import Body, RootedView
+from .world_entity import Body, RootedView
 
 
 @dataclass
@@ -139,11 +139,34 @@ class AbstractRobot(RootedView):
     => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
     """
     odom: RobotBody = field(default_factory=RobotBody)
+    """
+    The odometry body of the robot, which is usually the base footprint.
+    """
+
     torso: Optional[Torso] = None
-    manipulators: Optional[List[Manipulator]] = None
-    sensors: Optional[List[Sensor]] = None
-    manipulator_chains: Optional[List[KinematicChain]] = None
-    sensor_chains: Optional[List[KinematicChain]] = None
+    """
+    The torso of the robot, which is a kinematic chain connecting the base with a collection of other kinematic chains.
+    """
+
+    manipulators: List[Manipulator] = field(default_factory=list)
+    """
+    A collection of manipulators in the robot, such as grippers.
+    """
+
+    sensors: List[Sensor] = field(default_factory=list)
+    """
+    A collection of sensors in the robot, such as cameras.
+    """
+
+    manipulator_chains: List[KinematicChain] = field(default_factory=list)
+    """
+    A collection of all kinematic chains containing a manipulator, such as a gripper.
+    """
+
+    sensor_chains: List[KinematicChain] = field(default_factory=list)
+    """
+    A collection of all kinematic chains containing a sensor, such as a camera.
+    """
 
     def __repr__(self):
         manipulator_identifiers = [chain.identifier for chain in self.manipulator_chains] if self.manipulator_chains else []
@@ -241,10 +264,26 @@ class PR2(AbstractRobot):
 
     @classmethod
     def get_view(cls, world) -> Self:
+        """
+        Creates a PR2 robot view from the given world.
+        This method constructs the robot view by identifying and organizing the various components of the PR2 robot,
+        including arms, grippers, fingers, sensors, and the torso.
+
+        :param world: The world from which to create the robot view.
+
+        :return: A PR2 robot view.
+        """
 
         def create_fingers(world, finger_body_pairs, prefix):
             """
-            Note: Current assumes the last finger in the list is the thumb, in reality not always the case
+            Creates a list of Finger objects from the given finger body pairs.
+            Current assumes the last finger in the list is the thumb, in reality not always the case
+
+            :param world: The world from which to get the body objects.
+            :param finger_body_pairs: A list of tuples containing the root and tip body names for each finger.
+            :param prefix: A prefix to use for the identifiers of the fingers.
+
+            :return: A tuple containing a list of Finger objects and the thumb Finger object.
             """
             fingers = []
             for index, (root_name, tip_name) in enumerate(finger_body_pairs):
@@ -264,6 +303,15 @@ class PR2(AbstractRobot):
             return fingers, thumb
 
         def create_gripper(world, palm_body_name, tool_frame_name, finger_bodys, prefix):
+            """
+            Creates a Gripper object from the given palm body name, tool frame name, and finger body pairs.
+            :param world: The world from which to get the body objects.
+            :param palm_body_name: The name of the palm body in the world.
+            :param tool_frame_name: The name of the tool frame body in the world.
+            :param finger_bodys: A list of tuples containing the root and tip body names for each finger.
+            :param prefix: A prefix to use for the identifier of the gripper.
+            :return: A Gripper object if the palm and tool frame bodies are found, otherwise None.
+            """
             fingers, thumb = create_fingers(world, finger_bodys, prefix)
             palm_body = world.get_body_by_name(palm_body_name)
             tool_frame_body = world.get_body_by_name(tool_frame_name)
@@ -279,6 +327,14 @@ class PR2(AbstractRobot):
             return None
 
         def create_arm(world, shoulder_body_name, gripper, prefix):
+            """
+            Creates a KinematicChain object representing an arm, starting from the shoulder body and ending at the gripper.
+            :param world: The world from which to get the body objects.
+            :param shoulder_body_name: The name of the shoulder body in the world.
+            :param gripper: The Gripper object representing the gripper of the arm.
+            :param prefix: A prefix to use for the identifier of the arm.
+            :return: A KinematicChain object if the shoulder body and gripper are found, otherwise None.
+            """
             shoulder_body = world.get_body_by_name(shoulder_body_name)
             if shoulder_body and gripper:
                 arm_tip_body = gripper.root.parent_body
