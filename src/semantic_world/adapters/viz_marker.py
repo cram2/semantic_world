@@ -64,7 +64,7 @@ class VizMarkerPublisher:
                 msg.ns = body.name.name
                 msg.id = i
                 msg.action = Marker.ADD
-                msg.pose = self.transform_to_pose(self.world.compute_forward_kinematics_np(self.world.root, body))
+                msg.pose = self.transform_to_pose(self.world.compute_forward_kinematics_np(self.world.root, body) @ collision.origin.to_np())
                 msg.color = body.color if isinstance(body, Primitive) else ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
                 msg.lifetime = Duration(sec=1)
 
