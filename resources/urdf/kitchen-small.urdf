@@ -6,6 +6,7 @@
 <robot name="iai_oven_area" xmlns:xacro="http://ros.org/wiki/xacro">
   <material name="KitchenDarkGray">
     <color rgba="0.3 0.3 0.3 1"/>
+    </material>
   <material name="oven">
     <color rgba="0.3 0.3 0.3 1"/>
   </material>
