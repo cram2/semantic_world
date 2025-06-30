@@ -7,7 +7,10 @@ from typing import Dict, Tuple, OrderedDict, Union, Optional
 
 import numpy as np
 import rustworkx as rx
+import rustworkx.visualization
 import rustworkx.visit
+import matplotlib.pyplot as plt
+
 from typing_extensions import List
 
 from .connections import HasUpdateState
@@ -18,6 +21,8 @@ from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection, View
+import logging
+logger = logging.getLogger(__name__)
 
 id_generator = IDGenerator()
 
@@ -195,7 +200,7 @@ def modifies_world(func):
     """
     @wraps(func)
     def wrapper(self: World, *args, **kwargs):
-        with self.modify_world():
+        with self.modify_world() as context_manager:
             result = func(self, *args, **kwargs)
             return result
 
@@ -264,7 +269,8 @@ class World:
 
         The world must be a tree.
         """
-        ...
+        assert len(self.bodies) == (len(self.connections) + 1)
+        assert rx.is_weakly_connected(self.kinematic_structure)
 
     @modifies_world
     def create_degree_of_freedom(self, name: PrefixedName, lower_limits: Optional[Dict[Derivatives, float]] = None,
@@ -389,20 +395,39 @@ class World:
         self.kinematic_structure.add_edge(connection.parent.index, connection.child.index, connection)
 
     @modifies_world
-    def merge_world(self, world: World) -> None:
+    def remove_body(self, body: Body) -> None:
+        if body._world is self and body.index is not None:
+            self.kinematic_structure.remove_node(body.index)
+            body._world = None
+            body.index = None
+        else:
+            logger.debug("Trying to remove a body that is not part of this world.")
+
+    @modifies_world
+    def merge_world(self, other: World) -> None:
         """
         Merge a world into the existing one by merging degrees of freedom, states, connections, and bodies.
+        This removes all bodies and connections from `other`.
 
-        :param world: The world to be added.
+        :param other: The world to be added.
         :return: None
         """
-        for dof in world.degrees_of_freedom.values():
+        for dof in other.degrees_of_freedom.values():
             dof.state_idx += len(self.degrees_of_freedom)
             dof._world = self
-        self.degrees_of_freedom.update(world.degrees_of_freedom)
-        self.state = np.hstack((self.state, world.state))
-        for connection in world.connections:
+        self.degrees_of_freedom.update(other.degrees_of_freedom)
+        self.state = np.hstack((self.state, other.state))
+
+        # do not trigger computations in other
+        other.world_is_being_modified = True
+        for connection in other.connections:
+            other.remove_body(connection.parent)
+            other.remove_body(connection.child)
             self.add_connection(connection)
+        other.world_is_being_modified = False
+
+    def __str__(self):
+        return f"{self.__class__.__name__} with {len(self.bodies)} bodies."
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
@@ -467,7 +492,11 @@ class World:
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
         if root == tip:
             return [root]
-        shortest_paths = rx.all_shortest_paths(self.kinematic_structure, root.index, tip.index, as_undirected=True)
+        shortest_paths = rx.all_shortest_paths(self.kinematic_structure, root.index, tip.index, as_undirected=False)
+
+        if len(shortest_paths) == 0:
+            raise rx.NoPathFound(f'No path found from {root} to {tip}')
+
         return [self.kinematic_structure[index] for index in shortest_paths[0]]
 
     @lru_cache(maxsize=None)
@@ -573,16 +602,13 @@ class World:
         Plots the kinematic structure of the world.
         The plot shows bodies as nodes and connections as edges in a directed graph.
         """
-        import matplotlib.pyplot as plt
-        import rustworkx.visualization
-
         # Create a new figure
         plt.figure(figsize=(12, 8))
 
         pos = self.bfs_layout(scale=scale, align=align)
 
 
-        rustworkx.visualization.mpl_draw(self.kinematic_structure, pos=pos, labels=str, with_labels=True,
+        rustworkx.visualization.mpl_draw(self.kinematic_structure, pos=pos, labels=lambda body: str(body.name), with_labels=True,
                                          edge_labels=lambda edge: edge.__class__.__name__)
 
         plt.title("World Kinematic Structure")

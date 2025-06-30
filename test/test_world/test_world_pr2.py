@@ -2,6 +2,7 @@ import os
 import pytest
 import numpy as np
 from networkx.exception import NetworkXNoPath
+from rustworkx import NoPathFound
 
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, OmniDrive, \
@@ -24,6 +25,7 @@ def pr2_world():
 
         pr2_parser = URDFParser(pr2)
         world_with_pr2 = pr2_parser.parse()
+        # world_with_pr2.plot_kinematic_structure()
         world.merge_world(world_with_pr2)
         c_root_bf = OmniDrive(parent=localization_body, child=world_with_pr2.root, _world=world)
         world.add_connection(c_root_bf)
@@ -74,14 +76,14 @@ def test_compute_chain_of_connections_pr2(pr2_world):
 def test_compute_chain_of_bodies_error_pr2(pr2_world):
     root = pr2_world.get_body_by_name('r_gripper_tool_frame')
     tip = pr2_world.get_body_by_name('base_footprint')
-    with pytest.raises(NetworkXNoPath):
+    with pytest.raises(NoPathFound):
         pr2_world.compute_chain_of_bodies(root, tip)
 
 
 def test_compute_chain_of_connections_error_pr2(pr2_world):
     root = pr2_world.get_body_by_name('r_gripper_tool_frame')
     tip = pr2_world.get_body_by_name('base_footprint')
-    with pytest.raises(NetworkXNoPath):
+    with pytest.raises(NoPathFound):
         pr2_world.compute_chain_of_connections(root, tip)
 
 
