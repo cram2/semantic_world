@@ -1,24 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 from functools import wraps, lru_cache
 from typing import Dict, Tuple, OrderedDict, Union, Optional
 
+import numpy as np
 import rustworkx as rx
 import rustworkx.visit
-import numpy as np
 from typing_extensions import List
 
-from .spatial_types import spatial_types as cas
 from .connections import HasUpdateState
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
+from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection, View
 
 id_generator = IDGenerator()
+
+
+class PlotAlignment(IntEnum):
+    HORIZONTAL = 0
+    VERTICAL = 1
 
 
 class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
@@ -160,6 +166,11 @@ class ResetStateContextManager:
 
 
 class WorldModelUpdateContextManager:
+    """
+    Context manager for updating the state of a given `World` instance.
+    This class manages that updates to the world within the context of this class only trigger recomputations after all
+    desired updates have been performed.
+    """
     first: bool = True
 
     def __init__(self, world: World):
@@ -179,6 +190,9 @@ class WorldModelUpdateContextManager:
 
 
 def modifies_world(func):
+    """
+    Decorator that marks a method as a modification to the state or model of a world.
+    """
     @wraps(func)
     def wrapper(self: World, *args, **kwargs):
         with self.modify_world():
@@ -196,13 +210,13 @@ class World:
     The nodes represent bodies in the world, and the edges represent joins between them.
     """
 
-    root: Body = field(default=Body(name=PrefixedName(prefix="world", name="root")), kw_only=True)
+    root: Body = field(default_factory= lambda : Body(name=PrefixedName(prefix="world", name="root")), kw_only=True)
     """
     The root body of the world.
     """
 
-    kinematic_structure: rx.PyDAG[Body] = field(default_factory=lambda: rx.PyDAG(multigraph=False),
-                                                    kw_only=True, repr=False)
+    kinematic_structure: rx.PyDAG[Body] = field(default_factory=lambda: rx.PyDAG(multigraph=False), kw_only=True,
+                                                repr=False)
     """
     The kinematic structure of the world.
     The kinematic structure is a tree shaped directed graph where the nodes represent bodies in the world,
@@ -253,9 +267,7 @@ class World:
         ...
 
     @modifies_world
-    def create_degree_of_freedom(self,
-                                 name: PrefixedName,
-                                 lower_limits: Optional[Dict[Derivatives, float]] = None,
+    def create_degree_of_freedom(self, name: PrefixedName, lower_limits: Optional[Dict[Derivatives, float]] = None,
                                  upper_limits: Optional[Dict[Derivatives, float]] = None) -> DegreeOfFreedom:
         """
         Create a degree of freedom in the world and return it.
@@ -265,10 +277,7 @@ class World:
         :param upper_limits: If the DoF is actively controlled, it must have at least velocity limits.
         :return: The already registered DoF.
         """
-        dof = DegreeOfFreedom(name=name,
-                              _lower_limits=lower_limits,
-                              _upper_limits=upper_limits,
-                              _world=self)
+        dof = DegreeOfFreedom(name=name, _lower_limits=lower_limits, _upper_limits=upper_limits, _world=self)
         initial_position = 0
         lower_limit = dof.get_lower_limit(derivative=Derivatives.position)
         if lower_limit is not None:
@@ -456,7 +465,10 @@ class World:
 
     @lru_cache(maxsize=None)
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
-        return nx.shortest_path(self.kinematic_structure, root, tip)
+        if root == tip:
+            return [root]
+        shortest_paths = rx.all_shortest_paths(self.kinematic_structure, root.index, tip.index, as_undirected=True)
+        return [self.kinematic_structure[index] for index in shortest_paths[0]]
 
     @lru_cache(maxsize=None)
     def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
@@ -492,8 +504,7 @@ class World:
         return root_chain, [common_ancestor], tip_chain
 
     @lru_cache(maxsize=None)
-    def compute_split_chain_of_connections(self, root: Body, tip: Body) \
-            -> Tuple[List[Connection], List[Connection]]:
+    def compute_split_chain_of_connections(self, root: Body, tip: Body) -> Tuple[List[Connection], List[Connection]]:
         """
         Computes split chains of connections between 'root' and 'tip' bodies. Returns tuple of two Connection lists:
         (root->common ancestor, tip->common ancestor). Returns empty lists if root==tip.
@@ -517,39 +528,62 @@ class World:
             tip_connections.append(self.get_connection(tip_chain[i], tip_chain[i + 1]))
         return root_connections, tip_connections
 
-    def plot_kinematic_structure(self) -> None:
+    @property
+    def layers(self) -> List[List[Body]]:
+        return rx.layers(self.kinematic_structure, [self.root.index], index_output=False)
+
+    def bfs_layout(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> Dict[int, np.array]:
+        """
+        Generate a bfs layout for this circuit.
+
+        :return: A dict mapping the node indices to 2d coordinates.
+        """
+        layers = self.layers
+
+        pos = None
+        nodes = []
+        width = len(layers)
+        for i, layer in enumerate(layers):
+            height = len(layer)
+            xs = np.repeat(i, height)
+            ys = np.arange(0, height, dtype=float)
+            offset = ((width - 1) / 2, (height - 1) / 2)
+            layer_pos = np.column_stack([xs, ys]) - offset
+            if pos is None:
+                pos = layer_pos
+            else:
+                pos = np.concatenate([pos, layer_pos])
+            nodes.extend(layer)
+
+        # Find max length over all dimensions
+        pos -= pos.mean(axis=0)
+        lim = np.abs(pos).max()  # max coordinate for all axes
+        # rescale to (-scale, scale) in all directions, preserves aspect
+        if lim > 0:
+            pos *= scale / lim
+
+        if align == PlotAlignment.HORIZONTAL:
+            pos = pos[:, ::-1]  # swap x and y coords
+
+        pos = dict(zip([node.index for node in nodes], pos))
+        return pos
+
+    def plot_kinematic_structure(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> None:
         """
         Plots the kinematic structure of the world.
         The plot shows bodies as nodes and connections as edges in a directed graph.
         """
         import matplotlib.pyplot as plt
+        import rustworkx.visualization
 
         # Create a new figure
         plt.figure(figsize=(12, 8))
 
-        # Use spring layout for node positioning
-        pos = nx.drawing.bfs_layout(self.kinematic_structure, start=self.root)
+        pos = self.bfs_layout(scale=scale, align=align)
 
-        # Draw nodes (bodies)
-        nx.draw_networkx_nodes(self.kinematic_structure, pos,
-                               node_color='lightblue',
-                               node_size=2000)
 
-        # Draw edges (connections)
-        edges = self.kinematic_structure.edges(data=True)
-        nx.draw_networkx_edges(self.kinematic_structure, pos,
-                               edge_color='gray',
-                               arrows=True,
-                               arrowsize=50)
-
-        # Add link names as labels
-        labels = {node: node.name.name for node in self.kinematic_structure.nodes()}
-        nx.draw_networkx_labels(self.kinematic_structure, pos, labels)
-
-        # Add joint types as edge labels
-        edge_labels = {(edge[0], edge[1]): edge[2][Connection.__name__].__class__.__name__
-                       for edge in self.kinematic_structure.edges(data=True)}
-        nx.draw_networkx_edge_labels(self.kinematic_structure, pos, edge_labels)
+        rustworkx.visualization.mpl_draw(self.kinematic_structure, pos=pos, labels=str, with_labels=True,
+                                         edge_labels=lambda edge: edge.__class__.__name__)
 
         plt.title("World Kinematic Structure")
         plt.axis('off')  # Hide axes

@@ -1,15 +1,15 @@
-from ripple_down_rules.datastructures.case import Case, create_case
 from ripple_down_rules.utils import make_set
 from typing_extensions import Optional, Set
+from ripple_down_rules.datastructures.case import Case, create_case
 from .world_views_mcrdr_defs import *
 
 
 attribute_name = 'views'
-conclusion_type = (set, list, Cabinet, Fridge, Handle, Drawer, Container, Door,)
+conclusion_type = (Container, Handle, Door, set, list, Cabinet, Drawer, Fridge,)
 mutually_exclusive = False
 
 
-def classify(case: World, **kwargs) -> Set[Union[Cabinet, Fridge, Handle, Drawer, Container, Door]]:
+def classify(case: World, **kwargs) -> Set[Union[Container, Handle, Door, Cabinet, Drawer, Fridge]]:
     if not isinstance(case, Case):
         case = create_case(case, max_recursion_idx=3)
     conclusions = set()
