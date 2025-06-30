@@ -17,6 +17,7 @@ from semantic_world.orm.model import custom_types
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.orm.model import *
 from semantic_world.world import *
+import semantic_world.views.views
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the semantic_world package.
@@ -33,6 +34,7 @@ classes |= set(classes_of_module(semantic_world.world))
 classes |= set(classes_of_module(semantic_world.prefixed_name))
 classes |= set(classes_of_module(semantic_world.world_entity))
 classes |= set(classes_of_module(semantic_world.connections))
+classes |= set(classes_of_module(semantic_world.views.views))
 # classes |= set(classes_of_module(semantic_world.degree_of_freedom))
 
 # remove classes that should not be mapped

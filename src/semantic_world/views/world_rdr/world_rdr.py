@@ -1,7 +1,7 @@
-from typing_extensions import Any, Dict
-from ripple_down_rules.datastructures.case import Case, create_case
-from ripple_down_rules.helpers import general_rdr_classify
 from ...world import World
+from typing_extensions import Any, Dict
+from ripple_down_rules.helpers import general_rdr_classify
+from ripple_down_rules.datastructures.case import Case, create_case
 from . import world_views_mcrdr as views_classifier
 
 classifiers_dict = dict()
