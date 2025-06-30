@@ -93,7 +93,8 @@ class URDFParser:
 
         links = [self.parse_link(link, PrefixedName(link.name, self.parsed.name)) for link in self.parsed.links]
         root = [link for link in links if link.name.name == self.parsed.get_root()][0]
-        world = World(root=root)
+        world = World()
+        world.add_body(root)
 
         with world.modify_world():
             joints = []

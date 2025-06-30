@@ -1,16 +1,15 @@
 import os
-import pytest
+
 import numpy as np
-from networkx.exception import NetworkXNoPath
+import pytest
 from rustworkx import NoPathFound
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, OmniDrive, \
-    FixedConnection
+from semantic_world.connections import Connection6DoF, OmniDrive
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world import World, Body, Connection
+from semantic_world.world import World, Body
 
 
 @pytest.fixture
@@ -115,10 +114,8 @@ def test_compute_fk_np_pr2(pr2_world):
     tip = pr2_world.get_body_by_name('r_gripper_tool_frame')
     root = pr2_world.get_body_by_name('l_gripper_tool_frame')
     fk = pr2_world.compute_forward_kinematics_np(root, tip)
-    np.testing.assert_array_almost_equal(fk, np.array([[1.0, 0.0, 0.0, -0.0356],
-                                                       [0, 1.0, 0.0, -0.376],
-                                                       [0, 0.0, 1.0, 0.0],
-                                                       [0.0, 0.0, 0.0, 1.0]]))
+    np.testing.assert_array_almost_equal(fk, np.array(
+        [[1.0, 0.0, 0.0, -0.0356], [0, 1.0, 0.0, -0.376], [0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]))
 
 
 def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world):
@@ -129,15 +126,13 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world):
     fk_expr_compiled = fk_expr.compile()
     fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
 
-    np.testing.assert_array_almost_equal(fk2, np.array([[0.988771, 0., -0.149438, 0.4],
-                                                        [0., 1., 0., 0.],
-                                                        [0.149438, 0., 0.988771, 0.],
-                                                        [0., 0., 0., 1.]]))
+    np.testing.assert_array_almost_equal(fk2, np.array(
+        [[0.988771, 0., -0.149438, 0.4], [0., 1., 0., 0.], [0.149438, 0., 0.988771, 0.], [0., 0., 0., 1.]]))
 
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world):
-    omni_drive: OmniDrive = pr2_world.get_connection_by_name(PrefixedName(name='odom_combined_T_base_footprint',
-                                                                          prefix='pr2_kinematic_tree'))
+    omni_drive: OmniDrive = pr2_world.get_connection_by_name(
+        PrefixedName(name='odom_combined_T_base_footprint', prefix='pr2_kinematic_tree'))
     cmd = np.zeros((len(pr2_world.degrees_of_freedom)), dtype=float)
     cmd[-3] = 100
     cmd[-2] = 100

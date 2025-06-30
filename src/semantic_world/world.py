@@ -215,11 +215,6 @@ class World:
     The nodes represent bodies in the world, and the edges represent joins between them.
     """
 
-    root: Body = field(default_factory= lambda : Body(name=PrefixedName(prefix="world", name="root")), kw_only=True)
-    """
-    The root body of the world.
-    """
-
     kinematic_structure: rx.PyDAG[Body] = field(default_factory=lambda: rx.PyDAG(multigraph=False), kw_only=True,
                                                 repr=False)
     """
@@ -257,8 +252,21 @@ class World:
     Is set to True, when a function with @modifies_world is called or world.modify_world context is used.
     """
 
-    def __post_init__(self):
-        self.add_body(self.root)
+    @property
+    def root(self) -> Body:
+        """
+        The root of the world is the unique node with in-degree 0.
+
+        :return: The root of the world.
+        """
+        possible_roots = [node for node in self.bodies if self.kinematic_structure.in_degree(node.index) == 0]
+        if len(possible_roots) == 1:
+            return possible_roots[0]
+        elif len(possible_roots) > 1:
+            raise ValueError(f"More than one root found. Possible roots are {possible_roots}")
+        else:
+            raise ValueError(f"No root found.")
+
 
     def __hash__(self):
         return hash(id(self))

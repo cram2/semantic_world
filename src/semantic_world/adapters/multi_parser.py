@@ -82,7 +82,8 @@ class MultiParser:
 
         factory.import_model()
         bodies = [self.parse_body(body_builder) for body_builder in factory.world_builder.body_builders]
-        world = World(root=bodies[0])
+        world = World()
+        world.add_body(bodies[0])
 
         with world.modify_world():
             for body in bodies:
