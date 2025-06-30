@@ -1,14 +1,16 @@
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, Union, List
 from ..spatial_types import spatial_types as cas
 from urdf_parser_py import urdf
 
 from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection
 from ..prefixed_name import PrefixedName
 from ..spatial_types.derivatives import Derivatives
+from ..spatial_types.spatial_types import TransformationMatrix
 from ..utils import suppress_stdout_stderr, hacky_urdf_parser_fix
 from ..world import World, Body, Connection
+from ..geometry import Box, Sphere, Cylinder, Mesh, Scale, Shape, Color
 
 connection_type_map = {  # 'unknown': JointType.UNKNOWN,
     'revolute': RevoluteConnection,
@@ -87,15 +89,15 @@ class URDFParser:
         with open(self.file_path, 'r') as file:
             # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
             with suppress_stdout_stderr():
-                parsed = urdf.URDF.from_xml_string(hacky_urdf_parser_fix(file.read()))
+                self.parsed = urdf.URDF.from_xml_string(hacky_urdf_parser_fix(file.read()))
 
-        links = [self.parse_link(link) for link in parsed.links]
-        root = [link for link in links if link.name.name == parsed.get_root()][0]
+        links = [self.parse_link(link, PrefixedName(link.name, self.parsed.name)) for link in self.parsed.links]
+        root = [link for link in links if link.name.name == self.parsed.get_root()][0]
         world = World(root=root)
 
         with world.modify_world():
             joints = []
-            for joint in parsed.joints:
+            for joint in self.parsed.joints:
                 parent = [link for link in links if link.name.name == joint.parent][0]
                 child = [link for link in links if link.name.name == joint.child][0]
                 parsed_joint = self.parse_joint(joint, parent, child, world)
@@ -157,11 +159,65 @@ class URDFParser:
                                  dof=dof)
         return result
 
-    def parse_link(self, link: urdf.Link) -> Body:
+    def parse_link(self, link: urdf.Link, parent_frame: PrefixedName) -> Body:
         """
         Parses a URDF link to a link object.
         :param link: The URDF link to parse.
+        :param parent_frame: The parent frame of the link, used for transformations of collisions and visuals.
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
-        return Body(name=name)
+        visuals = self.parse_geometry(link.visuals, parent_frame)
+        collisions = self.parse_geometry(link.collisions, parent_frame)
+        return Body(name=name, visual=visuals, collision=collisions)
+
+    def parse_geometry(self, geometry: Union[List[urdf.Collision], List[urdf.Visual]], parent_frame: PrefixedName) -> \
+            List[Shape]:
+        """
+        Parses a URDF geometry to the corresponding shapes.
+        :param geometry: The URDF geometry to parse either the collisions of visuals.'
+        :param parent_frame: The parent frame of the geometry, used for transformations.
+        :return: A List of shapes corresponding to the URDF geometry.
+        """
+        res = []
+        material_dict = dict(zip([material.name for material in self.parsed.materials],
+                                 [material.color.rgba if material.color else None for material in
+                                  self.parsed.materials]))
+        for i, geom in enumerate(geometry):
+            params = (*(geom.origin.xyz + geom.origin.rpy), parent_frame,
+                      PrefixedName(geom.__class__.__name__ + str(i), parent_frame.prefix)) if geom.origin else (0, 0, 0,
+                                                                                                                0, 0, 0,
+                                                                                                                parent_frame,
+                                                                                                                PrefixedName(
+                                                                                                                    geom.__class__.__name__ + str(
+                                                                                                                        i),
+                                                                                                                    parent_frame.prefix))
+            origin_transform = TransformationMatrix.from_xyz_rpy(*params)
+            if isinstance(geom.geometry, urdf.Box):
+                color = Color(*material_dict[geom.material.name]) if hasattr(geom,
+                                                                             "material") and geom.material else Color(1,
+                                                                                                                      1,
+                                                                                                                      1,
+                                                                                                                      1)
+                res.append(Box(origin=origin_transform, scale=Scale(*geom.geometry.size), color=color))
+            elif isinstance(geom.geometry, urdf.Sphere):
+                color = Color(*material_dict[geom.material.name]) if hasattr(geom,
+                                                                             "material") and geom.material else Color(1,
+                                                                                                                      1,
+                                                                                                                      1,
+                                                                                                                      1)
+                res.append(Sphere(origin=origin_transform, radius=geom.geometry.radius, color=color))
+            elif isinstance(geom.geometry, urdf.Cylinder):
+                color = Color(*material_dict[geom.material.name]) if hasattr(geom,
+                                                                             "material") and geom.material else Color(1,
+                                                                                                                      1,
+                                                                                                                      1,
+                                                                                                                      1)
+                res.append(Cylinder(origin=origin_transform, width=geom.geometry.radius, height=geom.geometry.length,
+                                    color=color))
+            elif isinstance(geom.geometry, urdf.Mesh):
+                if geom.geometry.filename is None:
+                    raise ValueError("Mesh geometry must have a filename.")
+                res.append(Mesh(origin=origin_transform, filename=geom.geometry.filename,
+                                scale=Scale(*(geom.geometry.scale or (1, 1, 1)))))
+        return res

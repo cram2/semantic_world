@@ -81,7 +81,7 @@ class ForwardKinematicsVisitor(WorldVisitor):
         all_fks = cas.vstack([self.child_body_to_fk_expr[body.name] for body in self.world.bodies])
         tf = cas.vstack([pose for pose in self.tf.values()])
         collision_fks = []
-        for body in sorted(self.world.bodies_with_collisions, key=lambda body: body.name):
+        for body in self.world.bodies_with_collisions:
             if body == self.world.root:
                 continue
             collision_fks.append(self.child_body_to_fk_expr[body.name])
