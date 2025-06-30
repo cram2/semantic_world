@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from functools import wraps, lru_cache
 from typing import Dict, Tuple, OrderedDict, Union, Optional
 
-import networkx as nx
+import rustworkx as rx
+import rustworkx.visit
 import numpy as np
 from typing_extensions import List
 
@@ -20,21 +21,7 @@ from .world_entity import Body, Connection, View
 id_generator = IDGenerator()
 
 
-class WorldVisitor:
-    def body_call(self, body: Body) -> bool:
-        """
-        :return: return True to stop climbing up the branch
-        """
-        return False
-
-    def connection_call(self, connection: Connection) -> bool:
-        """
-        :return: return True to stop climbing up the branch
-        """
-        return False
-
-
-class ForwardKinematicsVisitor(WorldVisitor):
+class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
     """
     Visitor class for collection various forward kinematics expressions in a world model.
 
@@ -65,14 +52,16 @@ class ForwardKinematicsVisitor(WorldVisitor):
             self.world.root.name: cas.TransformationMatrix()}
         self.tf: Dict[Tuple[PrefixedName, PrefixedName], cas.Expression] = OrderedDict()
 
-    def connection_call(self, connection: Connection) -> bool:
+    def connection_call(self, edge: Tuple[int, int, Connection]):
         """
         Gathers forward kinematics expressions for a connection.
         """
+        connection = edge[2]
         map_T_parent = self.child_body_to_fk_expr[connection.parent.name]
         self.child_body_to_fk_expr[connection.child.name] = map_T_parent.dot(connection.origin)
         self.tf[(connection.parent.name, connection.child.name)] = connection.origin_as_position_quaternion()
-        return False
+
+    tree_edge = connection_call
 
     def compile_forward_kinematics(self) -> None:
         """
@@ -212,10 +201,11 @@ class World:
     The root body of the world.
     """
 
-    kinematic_structure: nx.DiGraph = field(default_factory=nx.DiGraph, kw_only=True, repr=False)
+    kinematic_structure: rx.PyDAG[Body] = field(default_factory=lambda: rx.PyDAG(multigraph=False),
+                                                    kw_only=True, repr=False)
     """
     The kinematic structure of the world.
-    The kinematic structure is a tree-like directed graph where the nodes represent bodies in the world,
+    The kinematic structure is a tree shaped directed graph where the nodes represent bodies in the world,
     and the edges represent connections between them.
     """
 
@@ -254,6 +244,14 @@ class World:
     def __hash__(self):
         return hash(id(self))
 
+    def validate(self) -> None:
+        """
+        Validate the world.
+
+        The world must be a tree.
+        """
+        ...
+
     @modifies_world
     def create_degree_of_freedom(self,
                                  name: PrefixedName,
@@ -282,15 +280,6 @@ class World:
         self.state = np.hstack((self.state, full_initial_state))
         self.degrees_of_freedom[name] = dof
         return dof
-
-    def validate(self) -> None:
-        """
-        Validate the world.
-
-        The world must be a tree.
-        """
-        if not nx.is_tree(self.kinematic_structure):
-            raise ValueError("The world is not a tree.")
 
     def modify_world(self) -> WorldModelUpdateContextManager:
         return WorldModelUpdateContextManager(self)
@@ -356,8 +345,10 @@ class World:
 
     @property
     def connections(self) -> List[Connection]:
-        return [self.kinematic_structure.get_edge_data(*edge)[Connection.__name__]
-                for edge in self.kinematic_structure.edges()]
+        """
+        :return: A list of all connections in the world.
+        """
+        return list(self.kinematic_structure.edges())
 
     @modifies_world
     def add_body(self, body: Body) -> None:
@@ -366,21 +357,27 @@ class World:
 
         :param body: The body to add.
         """
-        self.kinematic_structure.add_node(body)
+        if body._world is self and body.index is not None:
+            return
+        elif body._world is not None and body._world is not self:
+            raise NotImplementedError("Cannot add a body that already belongs to another world.")
+
+        body.index = self.kinematic_structure.add_node(body)
+
+        # write self as the bodys world
         body._world = self
 
     @modifies_world
     def add_connection(self, connection: Connection) -> None:
         """
-        Add a connection AND the bodies it connects to the world.
+        Add a connection and the bodies it connects to the world.
 
         :param connection: The connection to add.
         """
         self.add_body(connection.parent)
         self.add_body(connection.child)
-        kwargs = {Connection.__name__: connection}
         connection._world = self
-        self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
+        self.kinematic_structure.add_edge(connection.parent.index, connection.child.index, connection)
 
     @modifies_world
     def merge_world(self, world: World) -> None:
@@ -399,7 +396,7 @@ class World:
             self.add_connection(connection)
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
-        return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
+        return self.kinematic_structure.get_edge_data(parent.index, child.index)
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """
@@ -558,22 +555,14 @@ class World:
         plt.axis('off')  # Hide axes
         plt.show()
 
-    def _travel_branch(self, body: Body, visitor: WorldVisitor) -> None:
+    def _travel_branch(self, body: Body, visitor: rustworkx.visit.DFSVisitor) -> None:
         """
-        Do a depth first search on a branch starting at body.
-        Use visitor to do whatever you want. It body_call and connection_call are called on every body/connection it sees.
-        The traversion is stopped once they return False.
-        :param body: starting point of the search
-        :param visitor: payload. Implement your own WorldVisitor for your purpose.
-        """
-        if visitor.body_call(body):
-            return
+        Apply a DFS Visitor to a subtree of the kinematic structure.
 
-        for _, child_body, edge_data in self.kinematic_structure.edges(body, data=True):
-            connection = edge_data[Connection.__name__]
-            if visitor.connection_call(connection):
-                continue
-            self._travel_branch(child_body, visitor)
+        :param body: Starting point of the search
+        :param visitor: This visitor to apply.
+        """
+        rx.dfs_search(self.kinematic_structure, [body.index], visitor)
 
     def compile_forward_kinematics_expressions(self) -> None:
         """

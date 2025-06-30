@@ -167,9 +167,9 @@ class URDFParser:
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
-        visuals = self.parse_geometry(link.visuals, parent_frame)
-        collisions = self.parse_geometry(link.collisions, parent_frame)
-        return Body(name=name, visual=visuals, collision=collisions)
+        # visuals = self.parse_geometry(link.visuals, parent_frame)
+        # collisions = self.parse_geometry(link.collisions, parent_frame)
+        return Body(name=name) #, visual=visuals, collision=collisions)
 
     def parse_geometry(self, geometry: Union[List[urdf.Collision], List[urdf.Visual]], parent_frame: PrefixedName) -> \
             List[Shape]:

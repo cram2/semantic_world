@@ -1,9 +1,9 @@
-networkx~=3.4.2
-numpy~=1.26.4
-trimesh~=4.6.8
+networkx
+numpy
+trimesh
 typing_extensions
 urdf-parser-py
-matplotlib<3.8.0
+matplotlib
 casadi~=3.7.0
 hypothesis
 pytest
