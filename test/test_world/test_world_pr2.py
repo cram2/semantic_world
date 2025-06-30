@@ -19,14 +19,14 @@ def pr2_world():
     world = World()
     with world.modify_world():
         localization_body = Body(PrefixedName('odom_combined'))
-        localization_connection = Connection6DoF(parent=world.root, child=localization_body, _world=world)
-        world.add_connection(localization_connection)
+        world.add_body(localization_body)
 
         pr2_parser = URDFParser(pr2)
         world_with_pr2 = pr2_parser.parse()
         # world_with_pr2.plot_kinematic_structure()
+        pr2_root = world_with_pr2.root
         world.merge_world(world_with_pr2)
-        c_root_bf = OmniDrive(parent=localization_body, child=world_with_pr2.root, _world=world)
+        c_root_bf = OmniDrive(parent=localization_body, child=pr2_root, _world=world)
         world.add_connection(c_root_bf)
     return world
 
