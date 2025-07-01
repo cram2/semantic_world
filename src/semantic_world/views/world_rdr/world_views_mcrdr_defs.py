@@ -1,7 +1,7 @@
 from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
-from ...world import World
-from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
 from typing_extensions import List, Set, Union
+from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
+from ...world import World
 
 
 def conditions_90574698325129464513441443063592862114(case) -> bool:

@@ -12,7 +12,7 @@ class RobotBody(Body):
     """
     Represents a body in a robot.
     """
-    _robot: Optional[AbstractRobot] = field(default=None, init=False)
+    _robot: AbstractRobot = field(default=None, init=False)
 
     def __hash__(self):
         return super().__hash__()

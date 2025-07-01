@@ -67,7 +67,7 @@ class Body(WorldEntity):
             self.name = PrefixedName(f"body_{id_generator(self)}")
 
         if self._world is not None:
-            self._world.kinematic_structure.add_body(self)
+            self.index = self._world.kinematic_structure.add_node(self)
 
     def __hash__(self):
         return hash(self.name)
@@ -106,6 +106,7 @@ class Body(WorldEntity):
         """
         new_link = cls(body.name, body.visual, body.collision)
         new_link._world = body._world
+        new_link.index = body.index
         return new_link
 
 @dataclass

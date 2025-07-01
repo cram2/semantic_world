@@ -512,7 +512,7 @@ class World:
         :param body: The body for which to compute the parent body.
         :return: The parent body of the given body.
         """
-        return next(self.kinematic_structure.predecessors(body))
+        return next(iter(self.kinematic_structure.predecessors(body.index)))
 
     @lru_cache(maxsize=None)
     def compute_parent_connection(self, body: Body) -> Connection:
@@ -521,7 +521,7 @@ class World:
         :param body: The body for which to compute the parent connection.
         :return: The parent connection of the given body.
         """
-        return self.kinematic_structure.get_edge_data(self.compute_parent_body(body), body)[Connection.__name__]
+        return self.kinematic_structure.get_edge_data(self.compute_parent_body(body).index, body.index)
 
     @lru_cache(maxsize=None)
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
