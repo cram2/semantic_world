@@ -15,6 +15,7 @@ from semantic_world.world import World, Body, Connection
 @pytest.fixture
 def world_setup():
     world = World()
+    root = Body(PrefixedName(name='root', prefix='world'))
     l1 = Body(PrefixedName('l1'))
     l2 = Body(PrefixedName('l2'))
     bf = Body(PrefixedName('bf'))
@@ -22,7 +23,7 @@ def world_setup():
     r2 = Body(PrefixedName('r2'))
 
     with world.modify_world():
-        [world.add_body(b) for b in [l1, l2, bf, r1, r2]]
+        [world.add_body(b) for b in [root, l1, l2, bf, r1, r2]]
         dof = world.create_degree_of_freedom(name=PrefixedName('dof'),
                                              lower_limits={Derivatives.velocity: -1},
                                              upper_limits={Derivatives.velocity: 1})
@@ -35,7 +36,8 @@ def world_setup():
         world.add_connection(c_r1_r2)
         world.add_connection(bf_root_l1)
         world.add_connection(bf_root_r1)
-
+        c_root_bf = Connection6DoF(parent=root, child=bf, _world=world)
+        world.add_connection(c_root_bf)
 
     return world, l1, l2, bf, r1, r2
 
@@ -43,8 +45,8 @@ def world_setup():
 def test_construction(world_setup):
     world, _, _, _, _, _ = world_setup
     world.validate()
-    assert len(world.connections) == 4
-    assert len(world.bodies) == 5
+    assert len(world.connections) == 5
+    assert len(world.bodies) == 6
     assert world.state[Derivatives.position, 0] == 0
 
 
@@ -52,7 +54,8 @@ def test_chain_of_bodies(world_setup):
     world, _, l2, _, _, _ = world_setup
     result = world.compute_chain_of_bodies(root=world.root, tip=l2)
     result = [x.name for x in result]
-    assert result == [PrefixedName(name='bf', prefix=None),
+    assert result == [PrefixedName(name='root', prefix='world'),
+                      PrefixedName(name='bf', prefix=None),
                       PrefixedName(name='l1', prefix=None),
                       PrefixedName(name='l2', prefix=None)]
 
@@ -61,7 +64,8 @@ def test_chain_of_connections(world_setup):
     world, _, l2, _, _, _ = world_setup
     result = world.compute_chain_of_connections(root=world.root, tip=l2)
     result = [x.name for x in result]
-    assert result == [PrefixedName(name='bf_T_l1', prefix=None),
+    assert result == [PrefixedName(name='root_T_bf', prefix=None),
+                      PrefixedName(name='bf_T_l1', prefix=None),
                       PrefixedName(name='l1_T_l2', prefix=None)]
 
 
@@ -139,13 +143,14 @@ def test_compute_fk_connection6dof(world_setup):
     fk = world.compute_forward_kinematics_np(world.root, bf)
     np.testing.assert_array_equal(fk, np.eye(4))
 
-    world.state[Derivatives.position, 0] = 1.
+    world.state[Derivatives.position, 1] = 1.
     world.state[Derivatives.position, -1] = 0
+    world.state[Derivatives.position, -2] = 1
     world.notify_state_change()
-    np.testing.assert_array_equal(fk, [[1., 0., 0., 0.],
-              [0., 1., 0., 0.],
-              [0., 0., 1., 0.],
-              [0., 0., 0., 1.]])
+    np.testing.assert_array_equal(fk, [[-1., 0., 0., 1.],
+                                       [0., -1., 0., 0.],
+                                       [0., 0., 1., 0.],
+                                       [0., 0., 0., 1.]])
 
 
 def test_compute_fk(world_setup):
@@ -173,7 +178,6 @@ def test_compute_fk_expression(world_setup):
     np.testing.assert_array_almost_equal(fk, fk2)
 
 
-@pytest.mark.skip("Simon has to fixx this with the new world structure")
 def test_apply_control_commands(world_setup):
     world, _, _, _, _, _ = world_setup
     cmd = np.array([100., 0, 0, 0, 0, 0, 0, 0])
