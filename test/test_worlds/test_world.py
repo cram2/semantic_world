@@ -15,6 +15,7 @@ from semantic_world.world import World, Body, Connection
 @pytest.fixture
 def world_setup():
     world = World()
+    root = Body(PrefixedName(name='root', prefix='world'))
     l1 = Body(PrefixedName('l1'))
     l2 = Body(PrefixedName('l2'))
     bf = Body(PrefixedName('bf'))
@@ -22,6 +23,7 @@ def world_setup():
     r2 = Body(PrefixedName('r2'))
 
     with world.modify_world():
+        [world.add_body(b) for b in [root, l1, l2, bf, r1, r2]]
         dof = world.create_degree_of_freedom(name=PrefixedName('dof'),
                                              lower_limits={Derivatives.velocity: -1},
                                              upper_limits={Derivatives.velocity: 1})
@@ -30,12 +32,12 @@ def world_setup():
         c_r1_r2 = RevoluteConnection(r1, r2, dof=dof, axis=(0, 0, 1))
         bf_root_l1 = FixedConnection(bf, l1)
         bf_root_r1 = FixedConnection(bf, r1)
-        c_root_bf = Connection6DoF(parent=world.root, child=bf, _world=world)
-        world.add_connection(c_root_bf)
         world.add_connection(c_l1_l2)
         world.add_connection(c_r1_r2)
         world.add_connection(bf_root_l1)
         world.add_connection(bf_root_r1)
+        c_root_bf = Connection6DoF(parent=root, child=bf, _world=world)
+        world.add_connection(c_root_bf)
 
     return world, l1, l2, bf, r1, r2
 

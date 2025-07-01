@@ -1,18 +1,16 @@
 import os
-import unittest
 
-import pytest
 import numpy as np
-from networkx.exception import NetworkXNoPath
+import pytest
+from rustworkx import NoPathFound
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, OmniDrive, \
-    FixedConnection
+from semantic_world.connections import Connection6DoF, OmniDrive
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.robots import PR2
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world import World, Body, Connection
+from semantic_world.world import World, Body
 
 
 @pytest.fixture
@@ -22,13 +20,14 @@ def pr2_world():
     world = World()
     with world.modify_world():
         localization_body = Body(PrefixedName('odom_combined'))
-        localization_connection = Connection6DoF(parent=world.root, child=localization_body, _world=world)
-        world.add_connection(localization_connection)
+        world.add_body(localization_body)
 
         pr2_parser = URDFParser(pr2)
         world_with_pr2 = pr2_parser.parse()
+        # world_with_pr2.plot_kinematic_structure()
+        pr2_root = world_with_pr2.root
         world.merge_world(world_with_pr2)
-        c_root_bf = OmniDrive(parent=localization_body, child=world_with_pr2.root, _world=world)
+        c_root_bf = OmniDrive(parent=localization_body, child=pr2_root, _world=world)
         world.add_connection(c_root_bf)
     return world
 
@@ -77,14 +76,14 @@ def test_compute_chain_of_connections_pr2(pr2_world):
 def test_compute_chain_of_bodies_error_pr2(pr2_world):
     root = pr2_world.get_body_by_name('r_gripper_tool_frame')
     tip = pr2_world.get_body_by_name('base_footprint')
-    with pytest.raises(NetworkXNoPath):
+    with pytest.raises(NoPathFound):
         pr2_world.compute_chain_of_bodies(root, tip)
 
 
 def test_compute_chain_of_connections_error_pr2(pr2_world):
     root = pr2_world.get_body_by_name('r_gripper_tool_frame')
     tip = pr2_world.get_body_by_name('base_footprint')
-    with pytest.raises(NetworkXNoPath):
+    with pytest.raises(NoPathFound):
         pr2_world.compute_chain_of_connections(root, tip)
 
 
@@ -116,10 +115,8 @@ def test_compute_fk_np_pr2(pr2_world):
     tip = pr2_world.get_body_by_name('r_gripper_tool_frame')
     root = pr2_world.get_body_by_name('l_gripper_tool_frame')
     fk = pr2_world.compute_forward_kinematics_np(root, tip)
-    np.testing.assert_array_almost_equal(fk, np.array([[1.0, 0.0, 0.0, -0.0356],
-                                                       [0, 1.0, 0.0, -0.376],
-                                                       [0, 0.0, 1.0, 0.0],
-                                                       [0.0, 0.0, 0.0, 1.0]]))
+    np.testing.assert_array_almost_equal(fk, np.array(
+        [[1.0, 0.0, 0.0, -0.0356], [0, 1.0, 0.0, -0.376], [0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]))
 
 
 def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world):
@@ -130,15 +127,13 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world):
     fk_expr_compiled = fk_expr.compile()
     fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
 
-    np.testing.assert_array_almost_equal(fk2, np.array([[0.988771, 0., -0.149438, 0.4],
-                                                        [0., 1., 0., 0.],
-                                                        [0.149438, 0., 0.988771, 0.],
-                                                        [0., 0., 0., 1.]]))
+    np.testing.assert_array_almost_equal(fk2, np.array(
+        [[0.988771, 0., -0.149438, 0.4], [0., 1., 0., 0.], [0.149438, 0., 0.988771, 0.], [0., 0., 0., 1.]]))
 
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world):
-    omni_drive: OmniDrive = pr2_world.get_connection_by_name(PrefixedName(name='odom_combined_T_base_footprint',
-                                                                          prefix='pr2_kinematic_tree'))
+    omni_drive: OmniDrive = pr2_world.get_connection_by_name(
+        PrefixedName(name='odom_combined_T_base_footprint', prefix='pr2_kinematic_tree'))
     cmd = np.zeros((len(pr2_world.degrees_of_freedom)), dtype=float)
     cmd[-3] = 100
     cmd[-2] = 100

@@ -57,9 +57,17 @@ class Body(WorldEntity):
     The poses of the shapes are relative to the link.
     """
 
+    index: Optional[int] = field(default=None, init=False)
+    """
+    The index of the entity in `_world.kinematic_structure`.
+    """
+
     def __post_init__(self):
         if not self.name:
             self.name = PrefixedName(f"body_{id_generator(self)}")
+
+        if self._world is not None:
+            self._world.kinematic_structure.add_body(self)
 
     def __hash__(self):
         return hash(self.name)
