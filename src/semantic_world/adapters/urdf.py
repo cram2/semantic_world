@@ -93,7 +93,8 @@ class URDFParser:
 
         links = [self.parse_link(link, PrefixedName(link.name, self.parsed.name)) for link in self.parsed.links]
         root = [link for link in links if link.name.name == self.parsed.get_root()][0]
-        world = World(root=root)
+        world = World()
+        world.add_body(root)
 
         with world.modify_world():
             joints = []
@@ -167,9 +168,9 @@ class URDFParser:
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
-        visuals = self.parse_geometry(link.visuals, parent_frame)
-        collisions = self.parse_geometry(link.collisions, parent_frame)
-        return Body(name=name, visual=visuals, collision=collisions)
+        # visuals = self.parse_geometry(link.visuals, parent_frame)
+        # collisions = self.parse_geometry(link.collisions, parent_frame)
+        return Body(name=name) #, visual=visuals, collision=collisions)
 
     def parse_geometry(self, geometry: Union[List[urdf.Collision], List[urdf.Visual]], parent_frame: PrefixedName) -> \
             List[Shape]:

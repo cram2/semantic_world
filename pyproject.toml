@@ -2,6 +2,10 @@
 requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
+
 [project]
 name = "semantic_world"
 authors = [
