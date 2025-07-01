@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
+from typing import Tuple
+
 from typing_extensions import Optional, List, Self
 
+from .spatial_types.spatial_types import Vector3
+from .world import World
 from .world_entity import Body, RootedView
 
 
@@ -36,26 +40,7 @@ class KinematicChain(RobotView):
     """
     tip_body: RobotBody = field(default_factory=RobotBody)
     manipulator: Optional[Manipulator] = None
-    sensors: Optional[List[Sensor]] = None
-
-class Direction(int, enum.Enum):
-    POSITIVE = 1
-    NEGATIVE = -1
-
-class AxisIdentifier(enum.Enum):
-    """
-    Enum for translating the axis name to a vector along that axis.
-    """
-    X = (1, 0, 0)
-    Y = (0, 1, 0)
-    Z = (0, 0, 1)
-
-
-@dataclass
-class AxisDirection:
-    axis: AxisIdentifier
-    direction: Direction
-
+    sensors: List[Sensor] = field(default_factory=list)
 
 @dataclass
 class Manipulator(RobotView):
@@ -102,7 +87,7 @@ class Camera(Sensor):
     """
     Represents a camera sensor in a robot.
     """
-    forward_facing_axis: AxisDirection = field(default_factory=AxisDirection)
+    forward_facing_axis: Vector3 = field(default_factory=Vector3)
     field_of_view: FieldOfView = field(default_factory=FieldOfView)
     minimal_height: float = 0.0
     maximal_height: float = 1.0
@@ -125,6 +110,9 @@ class Torso(KinematicChain):
     A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
     """
     kinematic_chains: List[KinematicChain] = field(default_factory=list)
+    """
+    A collection of kinematic chains, such as sensor chains or manipulation chains, that are connected to the torso.
+    """
 
 
 @dataclass
@@ -216,7 +204,7 @@ class AbstractRobot(RootedView):
                 for sensor in chain.sensors:
                     if isinstance(sensor, Camera):
                         sensor_children.append((
-                            f"{sensor.identifier} ({sensor.__class__.__name__}): [Camera, Axis={sensor.forward_facing_axis.axis.name}, Direction={sensor.forward_facing_axis.direction.name}, "
+                            f"{sensor.identifier} ({sensor.__class__.__name__}): [Camera, Forward Vector {sensor.forward_facing_axis}, "
                             f"FOV=({sensor.field_of_view.horizontal_angle:.2f}, {sensor.field_of_view.vertical_angle:.2f})]",
                             []
                         ))
@@ -263,7 +251,7 @@ class AbstractRobot(RootedView):
 class PR2(AbstractRobot):
 
     @classmethod
-    def get_view(cls, world) -> Self:
+    def get_view(cls, world: World) -> Self:
         """
         Creates a PR2 robot view from the given world.
         This method constructs the robot view by identifying and organizing the various components of the PR2 robot,
@@ -274,7 +262,7 @@ class PR2(AbstractRobot):
         :return: A PR2 robot view.
         """
 
-        def create_fingers(world, finger_body_pairs, prefix):
+        def create_fingers(world: World, finger_body_pairs: List[Tuple[str, str]], prefix: str):
             """
             Creates a list of Finger objects from the given finger body pairs.
             Current assumes the last finger in the list is the thumb, in reality not always the case
@@ -302,7 +290,7 @@ class PR2(AbstractRobot):
                 thumb.identifier = f"{prefix}_thumb"
             return fingers, thumb
 
-        def create_gripper(world, palm_body_name, tool_frame_name, finger_bodys, prefix):
+        def create_gripper(world: World, palm_body_name: str, tool_frame_name: str, finger_bodys: List[Tuple[str, str]], prefix):
             """
             Creates a Gripper object from the given palm body name, tool frame name, and finger body pairs.
             :param world: The world from which to get the body objects.
@@ -326,7 +314,7 @@ class PR2(AbstractRobot):
                 )
             return None
 
-        def create_arm(world, shoulder_body_name, gripper, prefix):
+        def create_arm(world: World, shoulder_body_name: str, gripper: Manipulator, prefix: str):
             """
             Creates a KinematicChain object representing an arm, starting from the shoulder body and ending at the gripper.
             :param world: The world from which to get the body objects.
@@ -380,7 +368,7 @@ class PR2(AbstractRobot):
             camera_body.visual,
             camera_body.collision,
             identifier="kinect_camera",
-            forward_facing_axis=AxisDirection(AxisIdentifier.Z, Direction.POSITIVE),
+            forward_facing_axis=Vector3.from_xyz(0, 0, 1),
             field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
             minimal_height=1.27,
             maximal_height=1.60,
@@ -391,31 +379,26 @@ class PR2(AbstractRobot):
         ################################## Create head ##################################
         neck_root = world.get_body_by_name("head_pan_link")
         neck_tip_body = world.get_body_by_name("head_tilt_link")
-        head = None
-        if neck_root and neck_tip_body and camera:
-            head = Neck(
-                identifier="neck",
-                root=RobotBody.from_body(neck_root),
-                tip_body=RobotBody.from_body(neck_tip_body),
-                sensors=[camera],
-                pitch_body=neck_tip_body,
-                yaw_body=neck_root,
-                _world=world,
-            )
-            sensor_chains.append(head)
+        head = Neck(
+            identifier="neck",
+            root=RobotBody.from_body(neck_root),
+            tip_body=RobotBody.from_body(neck_tip_body),
+            sensors=[camera],
+            pitch_body=RobotBody.from_body(neck_tip_body),
+            yaw_body=RobotBody.from_body(neck_root),
+            _world=world,
+        )
+        sensor_chains.append(head)
 
         ################################## Create torso ##################################
         torso_body = world.get_body_by_name("torso_lift_link")
-        torso_root = RobotBody.from_body(torso_body) if torso_body else None
-        torso = None
-        if torso_root and torso_body:
-            torso = Torso(
-                identifier="torso",
-                root=torso_root,
-                tip_body=torso_root,
-                kinematic_chains=[kc for kc in [left_arm, right_arm, head] if kc],
-                _world=world,
-            )
+        torso = Torso(
+            identifier="torso",
+            root=RobotBody.from_body(torso_body),
+            tip_body=RobotBody.from_body(torso_body),
+            kinematic_chains=[kc for kc in [left_arm, right_arm, head] if kc],
+            _world=world,
+        )
 
         ################################## Create base ##################################
         base_body = world.get_body_by_name("base_footprint")
