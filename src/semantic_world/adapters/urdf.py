@@ -168,9 +168,9 @@ class URDFParser:
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
-        # visuals = self.parse_geometry(link.visuals, parent_frame)
-        # collisions = self.parse_geometry(link.collisions, parent_frame)
-        return Body(name=name) #, visual=visuals, collision=collisions)
+        visuals = self.parse_geometry(link.visuals, parent_frame)
+        collisions = self.parse_geometry(link.collisions, parent_frame)
+        return Body(name=name, visual=visuals, collision=collisions)
 
     def parse_geometry(self, geometry: Union[List[urdf.Collision], List[urdf.Visual]], parent_frame: PrefixedName) -> \
             List[Shape]:
@@ -195,25 +195,31 @@ class URDFParser:
                                                                                                                     parent_frame.prefix))
             origin_transform = TransformationMatrix.from_xyz_rpy(*params)
             if isinstance(geom.geometry, urdf.Box):
-                color = Color(*material_dict[geom.material.name]) if hasattr(geom,
-                                                                             "material") and geom.material else Color(1,
-                                                                                                                      1,
-                                                                                                                      1,
-                                                                                                                      1)
+                color = Color(*material_dict.get(geom.material.name,
+                                                 (1, 1, 1, 1))) if hasattr(geom,
+                                                                           "material") and geom.material else Color(
+                    1,
+                    1,
+                    1,
+                    1)
                 res.append(Box(origin=origin_transform, scale=Scale(*geom.geometry.size), color=color))
             elif isinstance(geom.geometry, urdf.Sphere):
-                color = Color(*material_dict[geom.material.name]) if hasattr(geom,
-                                                                             "material") and geom.material else Color(1,
-                                                                                                                      1,
-                                                                                                                      1,
-                                                                                                                      1)
+                color = Color(*material_dict.get(geom.material.name,
+                                                 (1, 1, 1, 1))) if hasattr(geom,
+                                                                           "material") and geom.material else Color(
+                    1,
+                    1,
+                    1,
+                    1)
                 res.append(Sphere(origin=origin_transform, radius=geom.geometry.radius, color=color))
             elif isinstance(geom.geometry, urdf.Cylinder):
-                color = Color(*material_dict[geom.material.name]) if hasattr(geom,
-                                                                             "material") and geom.material else Color(1,
-                                                                                                                      1,
-                                                                                                                      1,
-                                                                                                                      1)
+                color = Color(*material_dict.get(geom.material.name,
+                                                 (1, 1, 1, 1))) if hasattr(geom,
+                                                                           "material") and geom.material else Color(
+                    1,
+                    1,
+                    1,
+                    1)
                 res.append(Cylinder(origin=origin_transform, width=geom.geometry.radius, height=geom.geometry.length,
                                     color=color))
             elif isinstance(geom.geometry, urdf.Mesh):
