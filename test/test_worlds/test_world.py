@@ -56,11 +56,14 @@ def test_set_state(world_setup):
     c3: Connection6DoF = world.get_connection(world.root, bf)
     transform = rotation_matrix_from_rpy(1,0,0)
     transform[0, 3] = 69
-    c3.set_state(transform)
+    c3.origin = transform
     assert np.allclose(world.compute_forward_kinematics_np(world.root, bf), transform)
 
     world.set_positions_1DOF_connection({c1: 2})
     assert c1.position == 2.0
+
+    transform[0, 3] += c1.position
+    assert np.allclose(l2.global_pose, transform)
 
 
 

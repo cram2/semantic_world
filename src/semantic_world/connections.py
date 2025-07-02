@@ -5,14 +5,12 @@ from dataclasses import dataclass, field
 from typing import List, Tuple
 
 import numpy as np
-from semantic_world.spatial_types.math import rotation_matrix_from_quaternion
 
 from . import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import quaternion_from_rotation_matrix
-from .spatial_types.math import rpy_from_quaternion
 from .world_entity import Connection
 
 
@@ -173,7 +171,7 @@ class PrismaticConnection(ActiveConnection, Has1DOFState):
         parent_T_child = cas.TransformationMatrix.from_xyz_rpy(x=translation_axis[0],
                                                                y=translation_axis[1],
                                                                z=translation_axis[2])
-        self.origin = self.origin.dot(parent_T_child)
+        self.origin_expression = self.origin_expression.dot(parent_T_child)
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -223,7 +221,7 @@ class RevoluteConnection(ActiveConnection, Has1DOFState):
         motor_expression = self.dof.get_symbol(Derivatives.position) * self.multiplier + self.offset
         rotation_axis = cas.Vector3(self.axis)
         parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, motor_expression)
-        self.origin = self.origin.dot(cas.TransformationMatrix(parent_R_child))
+        self.origin_expression = self.origin_expression.dot(cas.TransformationMatrix(parent_R_child))
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -275,12 +273,17 @@ class Connection6DoF(PassiveConnection):
                                          self.qy.get_symbol(Derivatives.position),
                                          self.qz.get_symbol(Derivatives.position),
                                          self.qw.get_symbol(Derivatives.position))).to_rotation_matrix()
-        self.origin = cas.TransformationMatrix.from_point_rotation_matrix(point=parent_P_child,
+        self.origin_expression = cas.TransformationMatrix.from_point_rotation_matrix(point=parent_P_child,
                                                                           rotation_matrix=parent_R_child,
                                                                           reference_frame=self.parent.name,
                                                                           child_frame=self.child.name)
 
-    def set_state(self, transformation: np.ndarray) -> None:
+    @property
+    def origin(self) -> np.ndarray:
+        return super().origin
+
+    @origin.setter
+    def origin(self, transformation: np.ndarray) -> None:
         orientation = quaternion_from_rotation_matrix(transformation)
         self._world.state[Derivatives.position][self.x.state_idx] = transformation[0, 3]
         self._world.state[Derivatives.position][self.y.state_idx] = transformation[1, 3]
@@ -358,16 +361,7 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
                                                             roll=self.roll.get_symbol(Derivatives.position),
                                                             pitch=self.pitch.get_symbol(Derivatives.position),
                                                             yaw=0)
-        self.origin = odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
-
-    def update_transform(self, position: np.ndarray, orientation: np.ndarray) -> None:
-        roll, pitch, yaw = rpy_from_quaternion(*orientation)
-        self._world.state[Derivatives.position, self.x.state_idx] = position[0]
-        self._world.state[Derivatives.position, self.y.state_idx] = position[1]
-        self._world.state[Derivatives.position, self.z.state_idx] = position[2]
-        self._world.state[Derivatives.position, self.roll.state_idx] = roll
-        self._world.state[Derivatives.position, self.pitch.state_idx] = pitch
-        self._world.state[Derivatives.position, self.yaw.state_idx] = yaw
+        self.origin_expression = odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
 
     def update_state(self, dt: float) -> None:
         state = self._world.state

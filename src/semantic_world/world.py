@@ -1,20 +1,19 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import wraps, lru_cache
 from typing import Dict, Tuple, OrderedDict, Union, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import rustworkx as rx
-import rustworkx.visualization
 import rustworkx.visit
-import matplotlib.pyplot as plt
-from semantic_world.connections import Has1DOFState
-
+import rustworkx.visualization
 from typing_extensions import List
 
-from .connections import HasUpdateState
+from .connections import HasUpdateState, Has1DOFState
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types import spatial_types as cas
@@ -22,7 +21,7 @@ from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection, View
-import logging
+
 logger = logging.getLogger(__name__)
 
 id_generator = IDGenerator()
@@ -70,7 +69,7 @@ class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
         """
         connection = edge[2]
         map_T_parent = self.child_body_to_fk_expr[connection.parent.name]
-        self.child_body_to_fk_expr[connection.child.name] = map_T_parent.dot(connection.origin)
+        self.child_body_to_fk_expr[connection.child.name] = map_T_parent.dot(connection.origin_expression)
         self.tf[(connection.parent.name, connection.child.name)] = connection.origin_as_position_quaternion()
 
     tree_edge = connection_call
@@ -659,10 +658,10 @@ class World:
         root_chain, tip_chain = self.compute_split_chain_of_connections(root, tip)
         connection: Connection
         for connection in root_chain:
-            tip_T_root = connection.origin.inverse()
+            tip_T_root = connection.origin_expression.inverse()
             fk = fk.dot(tip_T_root)
         for connection in tip_chain:
-            fk = fk.dot(connection.origin)
+            fk = fk.dot(connection.origin_expression)
         fk.reference_frame = root.name
         fk.child_frame = tip.name
         return fk

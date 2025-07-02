@@ -7,7 +7,7 @@ import numpy as np
 import casadi as ca  # type: ignore
 
 from scipy import sparse as sp
-from semantic_world.connections import UnitVector
+from ..connections import UnitVector
 
 from ..prefixed_name import PrefixedName
 
