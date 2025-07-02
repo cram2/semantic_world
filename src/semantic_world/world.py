@@ -10,6 +10,7 @@ import rustworkx as rx
 import rustworkx.visualization
 import rustworkx.visit
 import matplotlib.pyplot as plt
+from semantic_world.connections import Has1DOFState
 
 from typing_extensions import List
 
@@ -703,4 +704,9 @@ class World:
         for connection in self.connections:
             if isinstance(connection, HasUpdateState):
                 connection.update_state(dt)
+        self.notify_state_change()
+
+    def set_positions_1DOF_connection(self, new_state: Dict[Has1DOFState, float]) -> None:
+        for connection, value in new_state.items():
+            connection.position = value
         self.notify_state_change()
