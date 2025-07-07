@@ -83,7 +83,7 @@ class ViewTestCase(unittest.TestCase):
         self.fit_rules_for_a_view_in_apartment(Door, scenario=self.test_door_view)
 
     def test_fridge_view(self):
-        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view, update_existing_views=True)
+        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view, update_existing_views=False)
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
