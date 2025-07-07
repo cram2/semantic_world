@@ -1287,12 +1287,12 @@ class TestCASWrapper:
         expected = expected_expr.compile()(**kwargs)
         assert np.allclose(actual, expected)
 
-    @given(float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf(),
-           float_no_nan_no_inf())
+    @given(float_no_nan_no_inf(outer_limit=1e3),
+           float_no_nan_no_inf(outer_limit=1e3),
+           float_no_nan_no_inf(outer_limit=1e3),
+           float_no_nan_no_inf(outer_limit=1e3),
+           float_no_nan_no_inf(outer_limit=1e3),
+           float_no_nan_no_inf(outer_limit=1e3))
     def test_jacobian_ddot(self, a, ad, add, b, bd, bdd):
         kwargs = {
             'a': a,

@@ -37,6 +37,53 @@ class PassiveConnection(Connection):
     """
     passive_dofs: List[DegreeOfFreedom] = field(default_factory=list, init=False)
 
+@dataclass
+class UnitVector:
+    """
+    Represents a unit vector which is always of size 1.
+    """
+
+    x: float
+    y: float
+    z: float
+
+    def __post_init__(self):
+        self.normalize()
+
+    def normalize(self):
+        length = self.length
+        self.x /= length
+        self.y /= length
+        self.z /= length
+
+    @property
+    def length(self):
+        return np.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
+
+    def __getitem__(self, item: int) -> float:
+        if item == 0:
+            return self.x
+        if item == 1:
+            return self.y
+        if item == 2:
+            return self.z
+        raise IndexError
+
+    def as_tuple(self) -> Tuple[float, float, float]:
+        return self.x, self.y, self.z
+
+    @classmethod
+    def X(cls):
+        return cls(1, 0, 0)
+
+    @classmethod
+    def Y(cls):
+        return cls(0, 1, 0)
+
+    @classmethod
+    def Z(cls):
+        return cls(0, 0, 1)
+
 
 @dataclass
 class PrismaticConnection(ActiveConnection):
@@ -44,7 +91,7 @@ class PrismaticConnection(ActiveConnection):
     Allows the movement along an axis.
     """
 
-    axis: Tuple[float, float, float] = field(kw_only=True)
+    axis: UnitVector = field(kw_only=True)
     """
     Connection moves along this axis, should be a unit vector.
     The axis is defined relative to the local reference frame of the parent body.
@@ -93,7 +140,7 @@ class RevoluteConnection(ActiveConnection):
     Allows rotation about an axis.
     """
 
-    axis: Tuple[float, float, float] = field(kw_only=True)
+    axis: UnitVector = field(kw_only=True)
     """
     Connection rotates about this axis, should be a unit vector.
     The axis is defined relative to the local reference frame of the parent body.

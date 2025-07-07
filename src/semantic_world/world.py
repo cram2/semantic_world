@@ -1,40 +1,38 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 from functools import wraps, lru_cache
 from typing import Dict, Tuple, OrderedDict, Union, Optional
 
-import networkx as nx
 import numpy as np
+import rustworkx as rx
+import rustworkx.visualization
+import rustworkx.visit
+import matplotlib.pyplot as plt
+
 from typing_extensions import List
 
-from .spatial_types import spatial_types as cas
 from .connections import HasUpdateState
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
+from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection, View
+import logging
+logger = logging.getLogger(__name__)
 
 id_generator = IDGenerator()
 
 
-class WorldVisitor:
-    def body_call(self, body: Body) -> bool:
-        """
-        :return: return True to stop climbing up the branch
-        """
-        return False
-
-    def connection_call(self, connection: Connection) -> bool:
-        """
-        :return: return True to stop climbing up the branch
-        """
-        return False
+class PlotAlignment(IntEnum):
+    HORIZONTAL = 0
+    VERTICAL = 1
 
 
-class ForwardKinematicsVisitor(WorldVisitor):
+class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
     """
     Visitor class for collection various forward kinematics expressions in a world model.
 
@@ -65,14 +63,16 @@ class ForwardKinematicsVisitor(WorldVisitor):
             self.world.root.name: cas.TransformationMatrix()}
         self.tf: Dict[Tuple[PrefixedName, PrefixedName], cas.Expression] = OrderedDict()
 
-    def connection_call(self, connection: Connection) -> bool:
+    def connection_call(self, edge: Tuple[int, int, Connection]):
         """
         Gathers forward kinematics expressions for a connection.
         """
+        connection = edge[2]
         map_T_parent = self.child_body_to_fk_expr[connection.parent.name]
         self.child_body_to_fk_expr[connection.child.name] = map_T_parent.dot(connection.origin)
         self.tf[(connection.parent.name, connection.child.name)] = connection.origin_as_position_quaternion()
-        return False
+
+    tree_edge = connection_call
 
     def compile_forward_kinematics(self) -> None:
         """
@@ -81,7 +81,7 @@ class ForwardKinematicsVisitor(WorldVisitor):
         all_fks = cas.vstack([self.child_body_to_fk_expr[body.name] for body in self.world.bodies])
         tf = cas.vstack([pose for pose in self.tf.values()])
         collision_fks = []
-        for body in sorted(self.world.bodies_with_collisions, key=lambda body: body.name):
+        for body in self.world.bodies_with_collisions:
             if body == self.world.root:
                 continue
             collision_fks.append(self.child_body_to_fk_expr[body.name])
@@ -171,6 +171,11 @@ class ResetStateContextManager:
 
 
 class WorldModelUpdateContextManager:
+    """
+    Context manager for updating the state of a given `World` instance.
+    This class manages that updates to the world within the context of this class only trigger recomputations after all
+    desired updates have been performed.
+    """
     first: bool = True
 
     def __init__(self, world: World):
@@ -190,9 +195,12 @@ class WorldModelUpdateContextManager:
 
 
 def modifies_world(func):
+    """
+    Decorator that marks a method as a modification to the state or model of a world.
+    """
     @wraps(func)
     def wrapper(self: World, *args, **kwargs):
-        with self.modify_world():
+        with self.modify_world() as context_manager:
             result = func(self, *args, **kwargs)
             return result
 
@@ -207,15 +215,11 @@ class World:
     The nodes represent bodies in the world, and the edges represent joins between them.
     """
 
-    root: Body = field(default=Body(name=PrefixedName(prefix="world", name="root")), kw_only=True)
-    """
-    The root body of the world.
-    """
-
-    kinematic_structure: nx.DiGraph = field(default_factory=nx.DiGraph, kw_only=True, repr=False)
+    kinematic_structure: rx.PyDAG[Body] = field(default_factory=lambda: rx.PyDAG(multigraph=False), kw_only=True,
+                                                repr=False)
     """
     The kinematic structure of the world.
-    The kinematic structure is a tree-like directed graph where the nodes represent bodies in the world,
+    The kinematic structure is a tree shaped directed graph where the nodes represent bodies in the world,
     and the edges represent connections between them.
     """
 
@@ -248,16 +252,36 @@ class World:
     Is set to True, when a function with @modifies_world is called or world.modify_world context is used.
     """
 
-    def __post_init__(self):
-        self.add_body(self.root)
+    @property
+    def root(self) -> Body:
+        """
+        The root of the world is the unique node with in-degree 0.
+
+        :return: The root of the world.
+        """
+        possible_roots = [node for node in self.bodies if self.kinematic_structure.in_degree(node.index) == 0]
+        if len(possible_roots) == 1:
+            return possible_roots[0]
+        elif len(possible_roots) > 1:
+            raise ValueError(f"More than one root found. Possible roots are {possible_roots}")
+        else:
+            raise ValueError(f"No root found.")
+
 
     def __hash__(self):
         return hash(id(self))
 
+    def validate(self) -> None:
+        """
+        Validate the world.
+
+        The world must be a tree.
+        """
+        assert len(self.bodies) == (len(self.connections) + 1)
+        assert rx.is_weakly_connected(self.kinematic_structure)
+
     @modifies_world
-    def create_degree_of_freedom(self,
-                                 name: PrefixedName,
-                                 lower_limits: Optional[Dict[Derivatives, float]] = None,
+    def create_degree_of_freedom(self, name: PrefixedName, lower_limits: Optional[Dict[Derivatives, float]] = None,
                                  upper_limits: Optional[Dict[Derivatives, float]] = None) -> DegreeOfFreedom:
         """
         Create a degree of freedom in the world and return it.
@@ -267,10 +291,7 @@ class World:
         :param upper_limits: If the DoF is actively controlled, it must have at least velocity limits.
         :return: The already registered DoF.
         """
-        dof = DegreeOfFreedom(name=name,
-                              _lower_limits=lower_limits,
-                              _upper_limits=upper_limits,
-                              _world=self)
+        dof = DegreeOfFreedom(name=name, _lower_limits=lower_limits, _upper_limits=upper_limits, _world=self)
         initial_position = 0
         lower_limit = dof.get_lower_limit(derivative=Derivatives.position)
         if lower_limit is not None:
@@ -282,15 +303,6 @@ class World:
         self.state = np.hstack((self.state, full_initial_state))
         self.degrees_of_freedom[name] = dof
         return dof
-
-    def validate(self) -> None:
-        """
-        Validate the world.
-
-        The world must be a tree.
-        """
-        if not nx.is_tree(self.kinematic_structure):
-            raise ValueError("The world is not a tree.")
 
     def modify_world(self) -> WorldModelUpdateContextManager:
         return WorldModelUpdateContextManager(self)
@@ -356,8 +368,10 @@ class World:
 
     @property
     def connections(self) -> List[Connection]:
-        return [self.kinematic_structure.get_edge_data(*edge)[Connection.__name__]
-                for edge in self.kinematic_structure.edges()]
+        """
+        :return: A list of all connections in the world.
+        """
+        return list(self.kinematic_structure.edges())
 
     @modifies_world
     def add_body(self, body: Body) -> None:
@@ -366,40 +380,65 @@ class World:
 
         :param body: The body to add.
         """
-        self.kinematic_structure.add_node(body)
+        if body._world is self and body.index is not None:
+            return
+        elif body._world is not None and body._world is not self:
+            raise NotImplementedError("Cannot add a body that already belongs to another world.")
+
+        body.index = self.kinematic_structure.add_node(body)
+
+        # write self as the bodys world
         body._world = self
 
     @modifies_world
     def add_connection(self, connection: Connection) -> None:
         """
-        Add a connection AND the bodies it connects to the world.
+        Add a connection and the bodies it connects to the world.
 
         :param connection: The connection to add.
         """
         self.add_body(connection.parent)
         self.add_body(connection.child)
-        kwargs = {Connection.__name__: connection}
         connection._world = self
-        self.kinematic_structure.add_edge(connection.parent, connection.child, **kwargs)
+        self.kinematic_structure.add_edge(connection.parent.index, connection.child.index, connection)
 
     @modifies_world
-    def merge_world(self, world: World) -> None:
+    def remove_body(self, body: Body) -> None:
+        if body._world is self and body.index is not None:
+            self.kinematic_structure.remove_node(body.index)
+            body._world = None
+            body.index = None
+        else:
+            logger.debug("Trying to remove a body that is not part of this world.")
+
+    @modifies_world
+    def merge_world(self, other: World) -> None:
         """
         Merge a world into the existing one by merging degrees of freedom, states, connections, and bodies.
+        This removes all bodies and connections from `other`.
 
-        :param world: The world to be added.
+        :param other: The world to be added.
         :return: None
         """
-        for dof in world.degrees_of_freedom.values():
+        for dof in other.degrees_of_freedom.values():
             dof.state_idx += len(self.degrees_of_freedom)
             dof._world = self
-        self.degrees_of_freedom.update(world.degrees_of_freedom)
-        self.state = np.hstack((self.state, world.state))
-        for connection in world.connections:
+        self.degrees_of_freedom.update(other.degrees_of_freedom)
+        self.state = np.hstack((self.state, other.state))
+
+        # do not trigger computations in other
+        other.world_is_being_modified = True
+        for connection in other.connections:
+            other.remove_body(connection.parent)
+            other.remove_body(connection.child)
             self.add_connection(connection)
+        other.world_is_being_modified = False
+
+    def __str__(self):
+        return f"{self.__class__.__name__} with {len(self.bodies)} bodies."
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
-        return self.kinematic_structure.get_edge_data(parent, child)[Connection.__name__]
+        return self.kinematic_structure.get_edge_data(parent.index, child.index)
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """
@@ -459,7 +498,14 @@ class World:
 
     @lru_cache(maxsize=None)
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
-        return nx.shortest_path(self.kinematic_structure, root, tip)
+        if root == tip:
+            return [root]
+        shortest_paths = rx.all_shortest_paths(self.kinematic_structure, root.index, tip.index, as_undirected=False)
+
+        if len(shortest_paths) == 0:
+            raise rx.NoPathFound(f'No path found from {root} to {tip}')
+
+        return [self.kinematic_structure[index] for index in shortest_paths[0]]
 
     @lru_cache(maxsize=None)
     def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
@@ -495,8 +541,7 @@ class World:
         return root_chain, [common_ancestor], tip_chain
 
     @lru_cache(maxsize=None)
-    def compute_split_chain_of_connections(self, root: Body, tip: Body) \
-            -> Tuple[List[Connection], List[Connection]]:
+    def compute_split_chain_of_connections(self, root: Body, tip: Body) -> Tuple[List[Connection], List[Connection]]:
         """
         Computes split chains of connections between 'root' and 'tip' bodies. Returns tuple of two Connection lists:
         (root->common ancestor, tip->common ancestor). Returns empty lists if root==tip.
@@ -520,60 +565,72 @@ class World:
             tip_connections.append(self.get_connection(tip_chain[i], tip_chain[i + 1]))
         return root_connections, tip_connections
 
-    def plot_kinematic_structure(self) -> None:
+    @property
+    def layers(self) -> List[List[Body]]:
+        return rx.layers(self.kinematic_structure, [self.root.index], index_output=False)
+
+    def bfs_layout(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> Dict[int, np.array]:
+        """
+        Generate a bfs layout for this circuit.
+
+        :return: A dict mapping the node indices to 2d coordinates.
+        """
+        layers = self.layers
+
+        pos = None
+        nodes = []
+        width = len(layers)
+        for i, layer in enumerate(layers):
+            height = len(layer)
+            xs = np.repeat(i, height)
+            ys = np.arange(0, height, dtype=float)
+            offset = ((width - 1) / 2, (height - 1) / 2)
+            layer_pos = np.column_stack([xs, ys]) - offset
+            if pos is None:
+                pos = layer_pos
+            else:
+                pos = np.concatenate([pos, layer_pos])
+            nodes.extend(layer)
+
+        # Find max length over all dimensions
+        pos -= pos.mean(axis=0)
+        lim = np.abs(pos).max()  # max coordinate for all axes
+        # rescale to (-scale, scale) in all directions, preserves aspect
+        if lim > 0:
+            pos *= scale / lim
+
+        if align == PlotAlignment.HORIZONTAL:
+            pos = pos[:, ::-1]  # swap x and y coords
+
+        pos = dict(zip([node.index for node in nodes], pos))
+        return pos
+
+    def plot_kinematic_structure(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> None:
         """
         Plots the kinematic structure of the world.
         The plot shows bodies as nodes and connections as edges in a directed graph.
         """
-        import matplotlib.pyplot as plt
-
         # Create a new figure
         plt.figure(figsize=(12, 8))
 
-        # Use spring layout for node positioning
-        pos = nx.drawing.bfs_layout(self.kinematic_structure, start=self.root)
+        pos = self.bfs_layout(scale=scale, align=align)
 
-        # Draw nodes (bodies)
-        nx.draw_networkx_nodes(self.kinematic_structure, pos,
-                               node_color='lightblue',
-                               node_size=2000)
 
-        # Draw edges (connections)
-        edges = self.kinematic_structure.edges(data=True)
-        nx.draw_networkx_edges(self.kinematic_structure, pos,
-                               edge_color='gray',
-                               arrows=True,
-                               arrowsize=50)
-
-        # Add link names as labels
-        labels = {node: node.name.name for node in self.kinematic_structure.nodes()}
-        nx.draw_networkx_labels(self.kinematic_structure, pos, labels)
-
-        # Add joint types as edge labels
-        edge_labels = {(edge[0], edge[1]): edge[2][Connection.__name__].__class__.__name__
-                       for edge in self.kinematic_structure.edges(data=True)}
-        nx.draw_networkx_edge_labels(self.kinematic_structure, pos, edge_labels)
+        rustworkx.visualization.mpl_draw(self.kinematic_structure, pos=pos, labels=lambda body: str(body.name), with_labels=True,
+                                         edge_labels=lambda edge: edge.__class__.__name__)
 
         plt.title("World Kinematic Structure")
         plt.axis('off')  # Hide axes
         plt.show()
 
-    def _travel_branch(self, body: Body, visitor: WorldVisitor) -> None:
+    def _travel_branch(self, body: Body, visitor: rustworkx.visit.DFSVisitor) -> None:
         """
-        Do a depth first search on a branch starting at body.
-        Use visitor to do whatever you want. It body_call and connection_call are called on every body/connection it sees.
-        The traversion is stopped once they return False.
-        :param body: starting point of the search
-        :param visitor: payload. Implement your own WorldVisitor for your purpose.
-        """
-        if visitor.body_call(body):
-            return
+        Apply a DFS Visitor to a subtree of the kinematic structure.
 
-        for _, child_body, edge_data in self.kinematic_structure.edges(body, data=True):
-            connection = edge_data[Connection.__name__]
-            if visitor.connection_call(connection):
-                continue
-            self._travel_branch(child_body, visitor)
+        :param body: Starting point of the search
+        :param visitor: This visitor to apply.
+        """
+        rx.dfs_search(self.kinematic_structure, [body.index], visitor)
 
     def compile_forward_kinematics_expressions(self) -> None:
         """
