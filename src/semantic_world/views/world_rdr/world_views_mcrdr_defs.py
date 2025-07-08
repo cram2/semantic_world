@@ -1,6 +1,6 @@
-from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
-from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
 from typing_extensions import List, Set, Union
+from ...connections import FixedConnection, PrismaticConnection, RevoluteConnection
+from ..views import Cabinet, Container, Door, Drawer, Fridge, Handle
 from ...world import World
 
 
