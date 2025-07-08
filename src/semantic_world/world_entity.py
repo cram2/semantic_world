@@ -69,27 +69,72 @@ class Body(WorldEntity):
             self.name = PrefixedName(f"body_{id_generator(self)}")
 
         if self._world is not None:
-            self._world.kinematic_structure.add_body(self)
+            self.index = self._world.kinematic_structure.add_node(self)
 
     def __hash__(self):
         return hash(self.name)
 
     def __eq__(self, other):
-        return self.name == other.name
+        return self.name == other.name and self._world is other._world
 
     def has_collision(self) -> bool:
         return len(self.collision) > 0
+
+    @property
+    def child_bodies(self) -> List[Body]:
+        """
+        Returns the child bodies of this body.
+        """
+        return self._world.compute_child_bodies(self)
+
+    @property
+    def parent_body(self) -> Body:
+        """
+        Returns the parent body of this body.
+        """
+        return self._world.compute_parent_body(self)
 
     @property
     def global_pose(self) -> np.ndarray:
         return self._world.compute_forward_kinematics_np(self._world.root, self)
 
 
+    @property
+    def parent_connection(self) -> Connection:
+        """
+        Returns the parent connection of this body.
+        """
+        return self._world.compute_parent_connection(self)
+
+    @classmethod
+    def from_body(cls, body: Body):
+        """
+        Creates a new link from an existing link.
+        """
+        new_link = cls(body.name, body.visual, body.collision)
+        new_link._world = body._world
+        new_link.index = body.index
+        return new_link
+
+@dataclass
 class View(WorldEntity):
     """
     Represents a view on a set of bodies in the world.
 
     This class can hold references to certain bodies that gain meaning in this context.
+    """
+
+@dataclass
+class RootedView(View):
+    """
+    Represents a view that is rooted in a specific body.
+    """
+    root: Body = field(default_factory=Body)
+
+@dataclass
+class EnvironmentView(View):
+    """
+    Represents a view of the environment.
     """
 
 
