@@ -1,4 +1,6 @@
 import os
+from typing import Tuple
+
 import pytest
 import numpy as np
 from networkx.exception import NetworkXNoPath
@@ -8,12 +10,13 @@ from semantic_world.connections import PrismaticConnection, RevoluteConnection, 
     FixedConnection
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
+from semantic_world.spatial_types.math import rotation_matrix_from_rpy
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.world import World, Body, Connection
 
 
 @pytest.fixture
-def world_setup():
+def world_setup() -> Tuple[World, Body, Body, Body, Body, Body]:
     world = World()
     root = Body(PrefixedName(name='root', prefix='world'))
     l1 = Body(PrefixedName('l1'))
@@ -42,12 +45,36 @@ def world_setup():
     return world, l1, l2, bf, r1, r2
 
 
+def test_set_state(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    c1: PrismaticConnection = world.get_connection(l1, l2)
+    c1.position = 1.0
+    assert c1.position == 1.0
+    c2: RevoluteConnection = world.get_connection(r1, r2)
+    c2.position = 1337
+    assert c2.position == 1337
+    c3: Connection6DoF = world.get_connection(world.root, bf)
+    transform = rotation_matrix_from_rpy(1,0,0)
+    transform[0, 3] = 69
+    c3.origin = transform
+    assert np.allclose(world.compute_forward_kinematics_np(world.root, bf), transform)
+
+    world.set_positions_1DOF_connection({c1: 2})
+    assert c1.position == 2.0
+
+    transform[0, 3] += c1.position
+    assert np.allclose(l2.global_pose, transform)
+
+
+
+
 def test_construction(world_setup):
-    world, _, _, _, _, _ = world_setup
+    world, l1, l2, bf, r1, r2 = world_setup
     world.validate()
     assert len(world.connections) == 5
     assert len(world.bodies) == 6
     assert world.state[Derivatives.position, 0] == 0
+    assert world.get_connection(l1, l2).dof.state_idx == world.get_connection(r1, r2).dof.state_idx
 
 
 def test_chain_of_bodies(world_setup):

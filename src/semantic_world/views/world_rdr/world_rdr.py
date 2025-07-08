@@ -2,6 +2,7 @@ from ripple_down_rules.datastructures.case import Case, create_case
 from typing_extensions import Any, Dict
 from ...world import World
 from ripple_down_rules.helpers import general_rdr_classify
+from ...world import World
 from . import world_views_mcrdr as views_classifier
 
 classifiers_dict = dict()

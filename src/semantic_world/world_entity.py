@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, TYPE_CHECKING
 
+import numpy as np
+
 from .geometry import Shape
 from .prefixed_name import PrefixedName
 from .spatial_types.spatial_types import TransformationMatrix, Expression
@@ -93,6 +95,11 @@ class Body(WorldEntity):
         return self._world.compute_parent_body(self)
 
     @property
+    def global_pose(self) -> np.ndarray:
+        return self._world.compute_forward_kinematics_np(self._world.root, self)
+
+
+    @property
     def parent_connection(self) -> Connection:
         """
         Returns the parent connection of this body.
@@ -147,16 +154,16 @@ class Connection(WorldEntity):
     The child body of the connection.
     """
 
-    origin: TransformationMatrix = None
+    origin_expression: TransformationMatrix = None
     """
-    The origin of the connection.
+    A symbolic expression describing the origin of the connection.
     """
 
     def __post_init__(self):
-        if self.origin is None:
-            self.origin = TransformationMatrix()
-        self.origin.reference_frame = self.parent.name
-        self.origin.child_frame = self.child.name
+        if self.origin_expression is None:
+            self.origin_expression = TransformationMatrix()
+        self.origin_expression.reference_frame = self.parent.name
+        self.origin_expression.child_frame = self.child.name
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -168,8 +175,15 @@ class Connection(WorldEntity):
     def name(self):
         return PrefixedName(f'{self.parent.name.name}_T_{self.child.name.name}', prefix=self.child.name.prefix)
 
+    @property
+    def origin(self) -> np.ndarray:
+        """
+        :return: The relative transform between the parent and child frame.
+        """
+        return self._world.compute_forward_kinematics_np(self.parent, self.child)
+
     # @lru_cache(maxsize=None)
     def origin_as_position_quaternion(self) -> Expression:
-        position = self.origin.to_position()[:3]
-        orientation = self.origin.to_quaternion()
+        position = self.origin_expression.to_position()[:3]
+        orientation = self.origin_expression.to_quaternion()
         return cas.vstack([position, orientation]).T
