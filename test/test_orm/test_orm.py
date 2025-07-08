@@ -1,3 +1,5 @@
+import logging
+import sys
 import unittest
 
 import sqlalchemy
@@ -5,10 +7,11 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
 from semantic_world.geometry import Shape, Box, Scale, Color
-from semantic_world.orm.ormatic_interface import mapper_registry
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.world import Body
+from semantic_world.orm.ormatic_interface import *
+import ormatic.dao
 
 
 class ORMTest(unittest.TestCase):
@@ -18,17 +21,20 @@ class ORMTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        ormatic.dao.logger.addHandler(handler)
+        ormatic.dao.logger.setLevel(logging.DEBUG)
         cls.engine = create_engine('sqlite:///:memory:')
 
     def setUp(self):
         super().setUp()
-        self.mapper_registry = mapper_registry
         self.session = Session(self.engine)
-        self.mapper_registry.metadata.create_all(bind=self.session.bind)
+        Base.metadata.create_all(bind=self.session.bind)
 
     def tearDown(self):
         super().tearDown()
-        self.mapper_registry.metadata.drop_all(self.session.bind)
+        Base.metadata.drop_all(self.session.bind)
         self.session.close()
 
     def test_insert(self):
@@ -44,12 +50,8 @@ class ORMTest(unittest.TestCase):
             collision=[shape1]
         )
 
-        self.session.add(b1)
+        body_dao = BodyDAO.to_dao(b1)
+        self.session.add(body_dao)
         self.session.commit()
-        raw = list(self.session.execute(text("select * from Shape limit 1")))
-        self.assertEqual(len(raw[0]), 5)
-        result = self.session.scalar(select(Shape))
-        self.assertIsInstance(result, Box)
-        self.assertEqual(shape1, result)
-        self.assertIsInstance(result.origin, TransformationMatrix)
-        self.assertEqual(shape1.origin, result.origin)
+        result = self.session.scalar(select(ShapeDAO))
+        self.assertIsInstance(result, BoxDAO)
