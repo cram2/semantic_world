@@ -122,7 +122,7 @@ class MultiParser:
                                                             quat_x=quat.GetImaginary()[0],
                                                             quat_y=quat.GetImaginary()[1],
                                                             quat_z=quat.GetImaginary()[2])
-            connection = FixedConnection(parent=parent_body, child=child_body, origin=origin)
+            connection = FixedConnection(parent=parent_body, child=child_body, origin_expression=origin)
             connections.append(connection)
 
         return connections
@@ -151,7 +151,7 @@ class MultiParser:
         if joint_builder.type == JointType.FREE:
             raise NotImplementedError("Free joints are not supported yet.")
         elif joint_builder.type == JointType.FIXED:
-            return FixedConnection(parent=parent_body, child=child_body, origin=origin)
+            return FixedConnection(parent=parent_body, child=child_body, origin_expression=origin)
         elif joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS, JointType.PRISMATIC]:
             axis = (float(joint_builder.axis.to_array()[0]),
                     float(joint_builder.axis.to_array()[1]),
@@ -166,11 +166,11 @@ class MultiParser:
                 else:
                     dof = world.create_degree_of_freedom(name=PrefixedName(joint_name))
             if joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS]:
-                connection = RevoluteConnection(parent=parent_body, child=child_body, origin=origin,
+                connection = RevoluteConnection(parent=parent_body, child=child_body, origin_expression=origin,
                                                 multiplier=multiplier, offset=offset,
                                                 axis=axis, dof=dof)
             else:
-                connection = PrismaticConnection(parent=parent_body, child=child_body, origin=origin,
+                connection = PrismaticConnection(parent=parent_body, child=child_body, origin_expression=origin,
                                                  multiplier=multiplier, offset=offset,
                                                  axis=axis, dof=dof)
             return connection

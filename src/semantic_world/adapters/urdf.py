@@ -128,7 +128,7 @@ class URDFParser:
                                                                pitch=rotation_offset[1],
                                                                yaw=rotation_offset[2])
         if connection_type == FixedConnection:
-            return connection_type(parent=parent, child=child, origin=parent_T_child)
+            return connection_type(parent=parent, child=child, origin_expression=parent_T_child)
 
         lower_limits, upper_limits = urdf_joint_to_limits(joint)
         is_mimic = joint.mimic is not None
@@ -154,7 +154,7 @@ class URDFParser:
             dof = world.create_degree_of_freedom(name=PrefixedName(joint.name),
                                                  lower_limits=lower_limits, upper_limits=upper_limits)
 
-        result = connection_type(parent=parent, child=child, origin=parent_T_child,
+        result = connection_type(parent=parent, child=child, origin_expression=parent_T_child,
                                  multiplier=multiplier, offset=offset,
                                  axis=joint.axis,
                                  dof=dof)
