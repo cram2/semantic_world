@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, TYPE_CHECKING
 
+import numpy as np
+
 from .geometry import Shape
 from .prefixed_name import PrefixedName
 from .spatial_types.spatial_types import TransformationMatrix, Expression
@@ -67,23 +69,72 @@ class Body(WorldEntity):
             self.name = PrefixedName(f"body_{id_generator(self)}")
 
         if self._world is not None:
-            self._world.kinematic_structure.add_body(self)
+            self.index = self._world.kinematic_structure.add_node(self)
 
     def __hash__(self):
         return hash(self.name)
 
     def __eq__(self, other):
-        return self.name == other.name
+        return self.name == other.name and self._world is other._world
 
     def has_collision(self) -> bool:
         return len(self.collision) > 0
 
+    @property
+    def child_bodies(self) -> List[Body]:
+        """
+        Returns the child bodies of this body.
+        """
+        return self._world.compute_child_bodies(self)
 
+    @property
+    def parent_body(self) -> Body:
+        """
+        Returns the parent body of this body.
+        """
+        return self._world.compute_parent_body(self)
+
+    @property
+    def global_pose(self) -> np.ndarray:
+        return self._world.compute_forward_kinematics_np(self._world.root, self)
+
+
+    @property
+    def parent_connection(self) -> Connection:
+        """
+        Returns the parent connection of this body.
+        """
+        return self._world.compute_parent_connection(self)
+
+    @classmethod
+    def from_body(cls, body: Body):
+        """
+        Creates a new link from an existing link.
+        """
+        new_link = cls(body.name, body.visual, body.collision)
+        new_link._world = body._world
+        new_link.index = body.index
+        return new_link
+
+@dataclass
 class View(WorldEntity):
     """
     Represents a view on a set of bodies in the world.
 
     This class can hold references to certain bodies that gain meaning in this context.
+    """
+
+@dataclass
+class RootedView(View):
+    """
+    Represents a view that is rooted in a specific body.
+    """
+    root: Body = field(default_factory=Body)
+
+@dataclass
+class EnvironmentView(View):
+    """
+    Represents a view of the environment.
     """
 
 
@@ -103,16 +154,16 @@ class Connection(WorldEntity):
     The child body of the connection.
     """
 
-    origin: TransformationMatrix = None
+    origin_expression: TransformationMatrix = None
     """
-    The origin of the connection.
+    A symbolic expression describing the origin of the connection.
     """
 
     def __post_init__(self):
-        if self.origin is None:
-            self.origin = TransformationMatrix()
-        self.origin.reference_frame = self.parent.name
-        self.origin.child_frame = self.child.name
+        if self.origin_expression is None:
+            self.origin_expression = TransformationMatrix()
+        self.origin_expression.reference_frame = self.parent.name
+        self.origin_expression.child_frame = self.child.name
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -124,8 +175,15 @@ class Connection(WorldEntity):
     def name(self):
         return PrefixedName(f'{self.parent.name.name}_T_{self.child.name.name}', prefix=self.child.name.prefix)
 
+    @property
+    def origin(self) -> np.ndarray:
+        """
+        :return: The relative transform between the parent and child frame.
+        """
+        return self._world.compute_forward_kinematics_np(self.parent, self.child)
+
     # @lru_cache(maxsize=None)
     def origin_as_position_quaternion(self) -> Expression:
-        position = self.origin.to_position()[:3]
-        orientation = self.origin.to_quaternion()
+        position = self.origin_expression.to_position()[:3]
+        orientation = self.origin_expression.to_quaternion()
         return cas.vstack([position, orientation]).T

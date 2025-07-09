@@ -52,7 +52,7 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
-    use_gui: bool = True
+    use_gui: bool = False
 
     @classmethod
     def setUpClass(cls):
@@ -60,7 +60,7 @@ class ViewTestCase(unittest.TestCase):
         cls.apartment_world = cls.get_apartment_world()
         if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
-            cls.viewer = RDRCaseViewer(save_dir=cls.views_dir)
+            cls.viewer = RDRCaseViewer()
 
     def test_id(self):
         v1 = Handle(1)
@@ -83,7 +83,7 @@ class ViewTestCase(unittest.TestCase):
         self.fit_rules_for_a_view_in_apartment(Door, scenario=self.test_door_view)
 
     def test_fridge_view(self):
-        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view)
+        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view, update_existing_views=False)
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
@@ -214,10 +214,9 @@ class ViewTestCase(unittest.TestCase):
         :return: An instance of GeneralRDR loaded from the specified directory or a new instance of GeneralRDR.
         """
         if not os.path.exists(os.path.join(self.views_dir, self.views_rdr_model_name)):
-            return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name, viewer=self.viewer)
+            return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name)
         else:
             rdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
-            rdr.set_viewer(self.viewer)
         return rdr
 
     @staticmethod
