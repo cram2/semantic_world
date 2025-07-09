@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import unittest
 
@@ -6,26 +7,28 @@ import sqlalchemy
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
+from semantic_world.adapters.urdf import URDFParser
 from semantic_world.geometry import Shape, Box, Scale, Color
+from semantic_world.orm.model import WorldMapping
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.world import Body
 from semantic_world.orm.ormatic_interface import *
-import ormatic.dao
+from ormatic.dao import to_dao
 
 
 class ORMTest(unittest.TestCase):
     engine: sqlalchemy.engine
     session: Session
 
+    urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
+    table = os.path.join(urdf_dir, "table.urdf")
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        ormatic.dao.logger.addHandler(handler)
-        ormatic.dao.logger.setLevel(logging.DEBUG)
         cls.engine = create_engine('sqlite:///:memory:')
+        cls.table_world = URDFParser(cls.table).parse()
 
     def setUp(self):
         super().setUp()
@@ -36,6 +39,22 @@ class ORMTest(unittest.TestCase):
         super().tearDown()
         Base.metadata.drop_all(self.session.bind)
         self.session.close()
+
+    def test_table_world(self):
+        world_dao: WorldMappingDAO = to_dao(self.table_world)
+
+        for body in world_dao.bodies:
+            for collision in body.collision:
+                print(collision.origin)
+
+        self.session.add(world_dao)
+        self.session.commit()
+
+        bodies_from_db = self.session.scalars(select(BodyDAO)).all()
+        self.assertEqual(len(bodies_from_db), len(self.table_world.bodies))
+
+        connections_from_db = self.session.scalars(select(ConnectionDAO)).all()
+        self.assertEqual(len(connections_from_db), len(self.table_world.connections))
 
     def test_insert(self):
         reference_frame = PrefixedName("reference_frame", "world")
@@ -50,8 +69,9 @@ class ORMTest(unittest.TestCase):
             collision=[shape1]
         )
 
-        body_dao = BodyDAO.to_dao(b1)
-        self.session.add(body_dao)
+        dao: BodyDAO = to_dao(b1)
+
+        self.session.add(dao)
         self.session.commit()
         result = self.session.scalar(select(ShapeDAO))
         self.assertIsInstance(result, BoxDAO)
