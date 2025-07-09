@@ -92,8 +92,7 @@ class ViewTestCase(unittest.TestCase):
 
 
     def test_table_view(self):
-        self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)  #, update_existing_views=True)        # doesn't work anymore
-
+        self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)
 
     def test_windows_view(self):
         self.fit_rules_for_a_view_in_apartment(Windows, scenario=self.test_windows_view)
@@ -101,15 +100,60 @@ class ViewTestCase(unittest.TestCase):
     def test_walls_view(self):
         self.fit_rules_for_a_view_in_apartment(Walls, scenario=self.test_walls_view)
 
-    # BRB
-    def test_table_detaled_view(self):
-        self.fit_rules_for_a_view_in_table(Table, scenario=self.test_table_view)
-
     def test_leg_view(self):
         self.fit_rules_for_a_view_in_table(Leg, scenario=self.test_leg_view)
 
     def test_surface_view(self):
-        self.fit_rules_for_a_view_in_table(Surface, scenario=self.test_surface_view)        # edit Rule to have one Leg as a parent
+        self.fit_rules_for_a_view_in_table(Surface, scenario=self.test_surface_view)
+
+    def test_DetailedTable_view(self):
+        self.fit_rules_for_a_view_in_table(DetailedTable, scenario=self.test_DetailedTable_view)#, update_existing_views=True)
+
+    def test_Armchair_view(self):
+        self.fit_rules_for_a_view_in_apartment(Armchair, scenario=self.test_Armchair_view)
+
+    '''
+    def test_ArmRest_view(self):
+        self.fit_rules_for_a_view_in_apartment(ArmRest, scenario=self.test_ArmRest_view)
+
+    def test_base_view(self):
+        self.fit_rules_for_a_view_in_apartment(Base, scenario=self.test_base_view)
+        
+    def test_DetailedArmchair_view(self):
+        self.fit_rules_for_a_view_in_apartment(DetailedArmchair, scenario=self.test_DetailedArmchair_view)
+    '''
+
+    def test_sofa_view(self):
+        self.fit_rules_for_a_view_in_apartment(Sofa, scenario=self.test_sofa_view)
+
+    '''
+    def test_DetailedSofa_view(self):
+        self.fit_rules_for_a_view_in_apartment(DetailedSofa, scenario=self.test_DetailedSofa_view)
+    
+    def test_cushion_view(self):
+        self.fit_rules_for_a_view_in_apartment(Cushion, scenario=self.test_cushion_view)
+    '''
+
+    def test_oven_view(self):
+        self.fit_rules_for_a_view_in_apartment(Oven, scenario=self.test_oven_view)
+
+    def test_sides_view(self):
+        self.fit_rules_for_a_view_in_apartment(Sides, scenario=self.test_sides_view)
+
+    def test_countertop_view(self):
+        self.fit_rules_for_a_view_in_apartment(Countertop, scenario=self.test_countertop_view)
+
+    def test_cooktop_view(self):
+        self.fit_rules_for_a_view_in_apartment(Cooktop, scenario=self.test_cooktop_view)
+
+    def test_hotplate_view(self):
+        self.fit_rules_for_a_view_in_apartment(Hotplates, scenario=self.test_hotplate_view)
+
+    def test_DetailedCooktop_view(self):
+        self.fit_rules_for_a_view_in_apartment(DetailedCooktop, scenario=self.test_DetailedCooktop_view)
+
+    def test_sink_view(self):
+        self.fit_rules_for_a_view_in_apartment(Sink, scenario=self.test_sink_view)
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
@@ -214,7 +258,7 @@ class ViewTestCase(unittest.TestCase):
         """
         self.fit_rules_for_a_view_and_assert(self.table_world, view_type,
                                              update_existing_views=update_existing_views,
-                                             world_factory=self.get_apartment_world, scenario=scenario)
+                                             world_factory=self.get_table_world, scenario=scenario)
 
     def fit_rules_for_a_view_and_assert(self, world: World, view_type: Type[View], update_existing_views: bool = False,
                                         world_factory: Optional[Callable] = None,

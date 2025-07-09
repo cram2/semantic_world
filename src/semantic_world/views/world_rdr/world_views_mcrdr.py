@@ -1,15 +1,15 @@
 from ripple_down_rules.datastructures.case import Case, create_case
-from typing_extensions import Optional, Set
 from ripple_down_rules.utils import make_set
+from typing_extensions import Optional, Set
 from .world_views_mcrdr_defs import *
 
 
 attribute_name = 'views'
-conclusion_type = (Door, Leg, Drawer, set, Surface, list, Roots, Handle, Cabinet, Container, Windows, Walls, Table, Fridge,)
+conclusion_type = (Armchair, Windows, Surface, Cooktop, Roots, DetailedTable, Countertop, Walls, Sofa, Handle, Hotplates, Table, Oven, Sides, Leg, Drawer, list, Sink, Door, set, Cabinet, Container, DetailedCooktop, Fridge,)
 mutually_exclusive = False
 
 
-def classify(case: World, **kwargs) -> Set[Union[Door, Leg, Drawer, Surface, Roots, Handle, Cabinet, Container, Windows, Walls, Table, Fridge]]:
+def classify(case: World, **kwargs) -> Set[Union[Armchair, Windows, Surface, Cooktop, Roots, DetailedTable, Countertop, Walls, Sofa, Handle, Hotplates, Table, Oven, Sides, Leg, Drawer, Sink, Door, Cabinet, Container, DetailedCooktop, Fridge]]:
     if not isinstance(case, Case):
         case = create_case(case, max_recursion_idx=3)
     conclusions = set()
@@ -49,4 +49,40 @@ def classify(case: World, **kwargs) -> Set[Union[Door, Leg, Drawer, Surface, Roo
 
     if conditions_170324961522120215684260382462355539164(case):
         conclusions.update(make_set(conclusion_170324961522120215684260382462355539164(case)))
+
+    if conditions_60036782519178869340024639996969746162(case):
+        conclusions.update(make_set(conclusion_60036782519178869340024639996969746162(case)))
+
+    if conditions_288834628390404953380091650362350670286(case):
+        conclusions.update(make_set(conclusion_288834628390404953380091650362350670286(case)))
+
+    if conditions_4158886126664067940413153133916413099(case):
+        conclusions.update(make_set(conclusion_4158886126664067940413153133916413099(case)))
+
+    if conditions_108388395825945088225234017461290017170(case):
+        conclusions.update(make_set(conclusion_108388395825945088225234017461290017170(case)))
+
+    if conditions_264797936917281996243473352554665640669(case):
+        conclusions.update(make_set(conclusion_264797936917281996243473352554665640669(case)))
+
+    if conditions_307594597833937094056821330832591786276(case):
+        conclusions.update(make_set(conclusion_307594597833937094056821330832591786276(case)))
+
+    if conditions_12040197202477135811012547523782725108(case):
+        conclusions.update(make_set(conclusion_12040197202477135811012547523782725108(case)))
+
+    if conditions_271228146146808625034016035840195655394(case):
+        conclusions.update(make_set(conclusion_271228146146808625034016035840195655394(case)))
+
+    if conditions_63632553025287441678606225860106156564(case):
+        conclusions.update(make_set(conclusion_63632553025287441678606225860106156564(case)))
+
+    if conditions_79493164061606858785270566977975488425(case):
+        conclusions.update(make_set(conclusion_79493164061606858785270566977975488425(case)))
+
+    if conditions_318258669409180299293189838893993003603(case):
+        conclusions.update(make_set(conclusion_318258669409180299293189838893993003603(case)))
+
+    if conditions_22893914216819585647057541370007578525(case):
+        conclusions.update(make_set(conclusion_22893914216819585647057541370007578525(case)))
     return conclusions
