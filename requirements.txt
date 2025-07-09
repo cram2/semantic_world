@@ -8,7 +8,7 @@ casadi~=3.7.0
 hypothesis
 pytest
 scipy
-ormatic>=1.1.0
+ormatic>=1.1.1
 sqlacodegen
 ripple_down_rules
 pytest-order
