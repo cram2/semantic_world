@@ -123,7 +123,7 @@ def quaternion_from_rotation_matrix(matrix: Union[List[List[float]], np.ndarray]
     :return: array length 4
     """
     q = np.empty((4,), dtype=np.float64)
-    M = np.array(matrix, dtype=np.float64, copy=False)[:4, :4]
+    M = np.array(matrix, dtype=np.float64)[:4, :4]
     t = np.trace(M)
     if t > M[3, 3]:
         q[3] = t

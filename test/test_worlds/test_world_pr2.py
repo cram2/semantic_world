@@ -11,25 +11,7 @@ from semantic_world.robots import PR2
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.world import World, Body
-
-
-@pytest.fixture
-def pr2_world():
-    urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
-    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
-    world = World()
-    with world.modify_world():
-        localization_body = Body(PrefixedName('odom_combined'))
-        world.add_body(localization_body)
-
-        pr2_parser = URDFParser(pr2)
-        world_with_pr2 = pr2_parser.parse()
-        # world_with_pr2.plot_kinematic_structure()
-        pr2_root = world_with_pr2.root
-        world.merge_world(world_with_pr2)
-        c_root_bf = OmniDrive(parent=localization_body, child=pr2_root, _world=world)
-        world.add_connection(c_root_bf)
-    return world
+from semantic_world.testing import pr2_world
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world):
