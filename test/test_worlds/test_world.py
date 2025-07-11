@@ -211,3 +211,68 @@ def test_apply_control_commands(world_setup):
     assert world.state[connection.dof.name].acceleration == 100. * dt
     assert world.state[connection.dof.name].velocity == 100. * dt * dt
     assert world.state[connection.dof.name].position == 100. * dt * dt * dt
+
+
+def test_compute_relative_pose(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: PrismaticConnection = world.get_connection(l1, l2)
+    world.state[connection.dof.name].position = 1.
+    world.notify_state_change()
+
+    pose = np.eye(4)
+    relative_pose = world.compute_relative_pose(pose, l1, l2)
+    expected_pose = np.array([[1., 0, 0., 1.],
+                              [0., 1., 0., 0.],
+                              [0., 0., 1., 0.],
+                              [0., 0., 0., 1.]])
+
+    np.testing.assert_array_almost_equal(relative_pose, expected_pose)
+
+def test_compute_relative_pose_both(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    world.get_connection(world.root, bf).origin = np.array([[0., -1., 0., 1.],
+                                                        [1., 0., 0., 0.],
+                                                        [0., 0., 1., 0.],
+                                                        [0., 0., 0., 1.]])
+    world.notify_state_change()
+
+    pose = np.eye(4)
+    pose[0, 3] = 1.0  # Translate along x-axis
+    relative_pose = world.compute_relative_pose(pose, world.root, bf)
+    expected_pose = np.array([[0., -1., 0., 1.],
+                              [1., 0., 0., 1.],
+                              [0., 0., 1., 0.],
+                              [0., 0., 0., 1.]])
+
+    np.testing.assert_array_almost_equal(relative_pose, expected_pose)
+
+def test_compute_relative_pose_only_translation(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: PrismaticConnection = world.get_connection(l1, l2)
+    world.state[connection.dof.name].position = 1.
+    world.notify_state_change()
+
+    pose = np.eye(4)
+    pose[0, 3] = 2.0  # Translate along x-axis
+    relative_pose = world.compute_relative_pose(pose, l1, l2)
+    expected_pose = np.array([[1., 0, 0., 3.],
+                              [0., 1., 0., 0.],
+                              [0., 0., 1., 0.],
+                              [0., 0., 0., 1.]])
+
+    np.testing.assert_array_almost_equal(relative_pose, expected_pose)
+
+def test_compute_relative_pose_only_rotation(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: RevoluteConnection = world.get_connection(r1, r2)
+    world.state[connection.dof.name].position = np.pi / 2  # 90 degrees
+    world.notify_state_change()
+
+    pose = np.eye(4)
+    relative_pose = world.compute_relative_pose(pose, r1, r2)
+    expected_pose = np.array([[0., -1., 0., 0.],
+                              [1., 0., 0., 0.],
+                              [0., 0., 1., 0.],
+                              [0., 0., 0., 1.]])
+
+    np.testing.assert_array_almost_equal(relative_pose, expected_pose)
