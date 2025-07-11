@@ -4,6 +4,7 @@ import sys
 import unittest
 
 import pytest
+from numpy.ma.testutils import assert_equal
 
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -61,6 +62,25 @@ class ViewTestCase(unittest.TestCase):
         if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
             cls.viewer = RDRCaseViewer()
+
+    def test_bodies_property(self):
+        world_view = MultiBodyView()
+
+        body_subset = self.kitchen_world.bodies[:10]
+        [world_view.add_body(body) for body in body_subset]
+
+        view1 = MultiBodyView()
+        view1_subset = self.kitchen_world.bodies[10:20]
+        [view1.add_body(body) for body in view1_subset]
+
+        view2 = MultiBodyView()
+        view2_subset = self.kitchen_world.bodies[2:]
+        [view2.add_body(body) for body in view2_subset]
+
+        view1.add_view(view2)
+        world_view.add_view(view1)
+
+        assert_equal(world_view.aggregated_bodies, set(self.kitchen_world.bodies))
 
     def test_id(self):
         v1 = Handle(1)

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+from collections import deque
+from collections.abc import Iterable
+from dataclasses import dataclass, field, fields
+from functools import reduce
+from typing import List, Optional, TYPE_CHECKING, Set, get_args, get_type_hints
+import numpy as np
+from numpy import ndarray
+
+from .geometry import Shape, BoundingBox, BoundingBoxCollection
 from dataclasses import dataclass, field
 from typing import List, Optional, TYPE_CHECKING
 
 from .geometry import Shape
 from .prefixed_name import PrefixedName
+from .spatial_types.spatial_types import TransformationMatrix, Expression, Point3
 from .spatial_types import spatial_types as cas
 from .spatial_types.spatial_types import TransformationMatrix, Expression
 from .types import NpMatrix4x4
@@ -94,6 +104,47 @@ class Body(WorldEntity):
         return self._world.compute_parent_body(self)
 
     @property
+    def bounding_box_collection(self) -> BoundingBoxCollection:
+        """
+        Return the bounding box collection of the link with the given name.
+        This method computes the bounding box of the link in world coordinates by transforming the local axis-aligned
+        bounding boxes of the link's geometry to world coordinates.
+
+        Note: These bounding boxes may not be disjoint, however the random events library always makes them disjoint. If
+        this is the case, and we feed he non-disjoint bounding boxes into the gcs, it may trigger unexpected behavior.
+
+        :return: A BoundingBoxCollection containing the bounding boxes of the link's geometry in world
+        """
+        world = self._world
+        body_transform: ndarray = world.compute_forward_kinematics_np(world.root, self)
+        world_bboxes = []
+
+        for shape in self.collision:
+            shape_transform: ndarray = shape.origin.to_np()
+
+            world_transform: ndarray = body_transform @ shape_transform
+            body_pos = world_transform[:3, 3]
+            body_rotation_matrix = world_transform[:3, :3]
+
+            local_bb: BoundingBox = shape.as_bounding_box()
+
+            # Get all 8 corners of the BB in link-local space
+            corners = np.array([corner.to_np()[:3] for corner in local_bb.get_points()])  # shape (8, 3)
+
+            # Transform each corner to world space: R * corner + T
+            transformed_corners = (corners @ body_rotation_matrix.T) + body_pos
+
+            # Compute world-space bounding box from transformed corners
+            min_corner = np.min(transformed_corners, axis=0)
+            max_corner = np.max(transformed_corners, axis=0)
+
+            world_bb = BoundingBox.from_min_max(Point3.from_xyz(*min_corner), Point3.from_xyz(*max_corner))
+            world_bboxes.append(world_bb)
+
+        return BoundingBoxCollection(world_bboxes)
+
+
+    @property
     def global_pose(self) -> NpMatrix4x4:
         """
         Computes the pose of the body in the world frame.
@@ -127,6 +178,57 @@ class View(WorldEntity):
     This class can hold references to certain bodies that gain meaning in this context.
     """
 
+    @property
+    def aggregated_bodies(self) -> Set[Body]:
+        """
+        Recursively traverses the view and its attributes to find all bodies contained within it.
+
+        :return: A set of bodies that are part of this view.
+        """
+        bodies: Set[Body] = set()
+        visited: Set[int] = set()
+        stack: deque = deque([self])
+
+        # Use a stack to traverse the view and its attributes
+        while stack:
+            obj = stack.pop()
+            oid = id(obj)
+            if oid in visited:
+                continue
+            visited.add(oid)
+
+            match obj:
+                # Bodies are aggregated directly
+                case Body():
+                    bodies.add(obj)
+
+                # Views are traversed recursively
+                case View():
+                    for f in fields(obj):
+                        value = getattr(obj, f.name)
+                        if isinstance(value, Body):
+                            bodies.add(value)
+                        elif isinstance(value, View):
+                            stack.append(value)
+                        elif isinstance(value, (list, set)):
+                            stack.extend(value)
+
+                # Iterables are traversed
+                case Iterable() if not isinstance(obj, (str, bytes, bytearray)):
+                    stack.extend(obj)
+        return bodies
+
+    def as_bounding_box_collection(self) -> BoundingBoxCollection:
+        """
+        Returns a bounding box collection that contains the bounding boxes of all bodies in this view.
+        """
+        bbs = reduce(
+            lambda accumulator, bb_collection: accumulator.merge(bb_collection),
+            (body.bounding_box_collection for body in self.aggregated_bodies if body.has_collision())
+        )
+        return bbs
+
+
 @dataclass
 class RootedView(View):
     """
@@ -139,7 +241,6 @@ class EnvironmentView(View):
     """
     Represents a view of the environment.
     """
-
 
 @dataclass
 class Connection(WorldEntity):

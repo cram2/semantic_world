@@ -13,4 +13,7 @@ sqlacodegen
 ripple_down_rules
 pytest-order
 sqlalchemy
+random_events
+plotly
+rtree
 daqp

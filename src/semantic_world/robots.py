@@ -68,7 +68,7 @@ class Gripper(Manipulator):
     thumb: Optional[Finger] = None
 
 
-@dataclass
+@dataclass(eq=False)
 class Sensor(RobotBody):
     """
     Represents any kind of sensor in a robot.
@@ -82,7 +82,7 @@ class FieldOfView:
     horizontal_angle: float
 
 
-@dataclass
+@dataclass(eq=False)
 class Camera(Sensor):
     """
     Represents a camera sensor in a robot.

@@ -108,7 +108,9 @@
         <origin xyz="1 1 0"/>
     </joint>
 
-    <joint name="left_front_leg_to_top" type="fixed">
+    <joint name="left_front_leg_to_top" type="revolute">
+        <axis xyz="1. 0. 0.0"/>
+        <limit effort="10" lower="-0.01" upper="0.01" velocity="10"/>
         <parent link="left_front_leg"/>
         <child link="top"/>
         <origin xyz="0.5 0.5 0.6"/>
