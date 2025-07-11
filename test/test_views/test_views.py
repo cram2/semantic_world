@@ -53,7 +53,7 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
-    use_gui: bool = False
+    use_gui: bool = True
 
     @classmethod
     def setUpClass(cls):
