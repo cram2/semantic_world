@@ -7,6 +7,7 @@ import numpy as np
 import casadi as ca  # type: ignore
 
 from scipy import sparse as sp
+from ..connections import UnitVector
 
 from ..prefixed_name import PrefixedName
 
@@ -310,6 +311,7 @@ class Vector3(Symbol_, GeometricType):
     def __init__(self, data: Optional[Union[Expression, Point3, Vector3,
                                             ca.SX,
                                             np.ndarray,
+                                            UnitVector,
                                             Iterable[symbol_expr_float]]] = None,
                  reference_frame: Optional[PrefixedName] = None): ...
 

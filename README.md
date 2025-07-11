@@ -1,14 +1,32 @@
 # Welcome to the Semantic World Package
 
-The semantic world is a Python package for querying and manipulating robot simulation data.
-It originates from PyCRAMs abstract world and unifies the functionality needed by multiple packages.
+The semantic world is a Python package for querying and manipulating robot simulation data.  
+It originates from PyCRAM's abstract world and unifies the functionality needed by multiple packages.
 
-# Installation
-The package can be installed locally using pip:
+# User Installation
+
+
+You can install the package directly from PyPI:
 
 ```bash
-git clone git@github.com:tomsch420/semantic_world.git
-pip install semantic_world
+pip install -U semantic_world
 ```
 
-Read the docs here [here](https://tomsch420.github.io/semantic_world/intro.html)!
+# Contributing
+
+If you are interested in contributing, you can check out the source code from GitHub:
+
+```bash
+git clone https://github.com/cram2/semantic_world.git
+```
+
+# Tests
+The tests can be run using `pytest` after installing the package.
+
+```bash
+pytest test/
+```
+
+# Documentation
+
+You can read the official documentation [here](https://cram2.github.io/semantic_world/intro.html)!

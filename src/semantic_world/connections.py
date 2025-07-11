@@ -10,8 +10,50 @@ from . import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
 from .spatial_types.derivatives import Derivatives
-from .spatial_types.math import rpy_from_quaternion
+from .spatial_types.math import quaternion_from_rotation_matrix
 from .world_entity import Connection
+
+
+class Has1DOFState:
+    """
+    Mixin class that implements state access for connections with 1 degree of freedom.
+    """
+
+    @property
+    def position(self) -> float:
+        return self._world.state[Derivatives.position, self.dof.state_idx]
+
+    @position.setter
+    def position(self, value: float) -> None:
+        self._world.state[Derivatives.position, self.dof.state_idx] = value
+        self._world.notify_state_change()
+
+    @property
+    def velocity(self) -> float:
+        return self._world.state[Derivatives.velocity, self.dof.state_idx]
+
+    @velocity.setter
+    def velocity(self, value: float) -> None:
+        self._world.state[Derivatives.velocity, self.dof.state_idx] = value
+        self._world.notify_state_change()
+
+    @property
+    def acceleration(self) -> float:
+        return self._world.state[Derivatives.acceleration, self.dof.state_idx]
+
+    @acceleration.setter
+    def acceleration(self, value: float) -> None:
+        self._world.state[Derivatives.acceleration, self.dof.state_idx] = value
+        self._world.notify_state_change()
+
+    @property
+    def jerk(self) -> float:
+        return self._world.state[Derivatives.jerk, self.dof.state_idx]
+
+    @jerk.setter
+    def jerk(self, value: float) -> None:
+        self._world.state[Derivatives.jerk, self.dof.state_idx] = value
+        self._world.notify_state_change()
 
 
 @dataclass
@@ -39,12 +81,60 @@ class PassiveConnection(Connection):
 
 
 @dataclass
-class PrismaticConnection(ActiveConnection):
+class UnitVector:
+    """
+    Represents a unit vector which is always of size 1.
+    """
+
+    x: float
+    y: float
+    z: float
+
+    def __post_init__(self):
+        self.normalize()
+
+    def normalize(self):
+        length = self.length
+        self.x /= length
+        self.y /= length
+        self.z /= length
+
+    @property
+    def length(self):
+        return np.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
+
+    def __getitem__(self, item: int) -> float:
+        if item == 0:
+            return self.x
+        if item == 1:
+            return self.y
+        if item == 2:
+            return self.z
+        raise IndexError
+
+    def as_tuple(self) -> Tuple[float, float, float]:
+        return self.x, self.y, self.z
+
+    @classmethod
+    def X(cls):
+        return cls(1, 0, 0)
+
+    @classmethod
+    def Y(cls):
+        return cls(0, 1, 0)
+
+    @classmethod
+    def Z(cls):
+        return cls(0, 0, 1)
+
+
+@dataclass
+class PrismaticConnection(ActiveConnection, Has1DOFState):
     """
     Allows the movement along an axis.
     """
 
-    axis: Tuple[float, float, float] = field(kw_only=True)
+    axis: UnitVector = field(kw_only=True)
     """
     Connection moves along this axis, should be a unit vector.
     The axis is defined relative to the local reference frame of the parent body.
@@ -84,16 +174,19 @@ class PrismaticConnection(ActiveConnection):
         parent_T_child = cas.TransformationMatrix.from_xyz_rpy(x=translation_axis[0],
                                                                y=translation_axis[1],
                                                                z=translation_axis[2])
-        self.origin = self.origin.dot(parent_T_child)
+        self.origin_expression = self.origin_expression.dot(parent_T_child)
+
+    def __hash__(self):
+        return hash((self.parent, self.child))
 
 
 @dataclass
-class RevoluteConnection(ActiveConnection):
+class RevoluteConnection(ActiveConnection, Has1DOFState):
     """
     Allows rotation about an axis.
     """
 
-    axis: Tuple[float, float, float] = field(kw_only=True)
+    axis: UnitVector = field(kw_only=True)
     """
     Connection rotates about this axis, should be a unit vector.
     The axis is defined relative to the local reference frame of the parent body.
@@ -131,7 +224,10 @@ class RevoluteConnection(ActiveConnection):
         motor_expression = self.dof.get_symbol(Derivatives.position) * self.multiplier + self.offset
         rotation_axis = cas.Vector3(self.axis)
         parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, motor_expression)
-        self.origin = self.origin.dot(cas.TransformationMatrix(parent_R_child))
+        self.origin_expression = self.origin_expression.dot(cas.TransformationMatrix(parent_R_child))
+
+    def __hash__(self):
+        return hash((self.parent, self.child))
 
 
 @dataclass
@@ -180,16 +276,26 @@ class Connection6DoF(PassiveConnection):
                                          self.qy.get_symbol(Derivatives.position),
                                          self.qz.get_symbol(Derivatives.position),
                                          self.qw.get_symbol(Derivatives.position))).to_rotation_matrix()
-        self.origin = cas.TransformationMatrix.from_point_rotation_matrix(parent_P_child, parent_R_child)
+        self.origin_expression = cas.TransformationMatrix.from_point_rotation_matrix(point=parent_P_child,
+                                                                          rotation_matrix=parent_R_child,
+                                                                          reference_frame=self.parent.name,
+                                                                          child_frame=self.child.name)
 
-    def update_transform(self, position: np.ndarray, orientation: np.ndarray) -> None:
-        self._world.state[Derivatives.position][self.x.state_idx] = position[0]
-        self._world.state[Derivatives.position][self.y.state_idx] = position[1]
-        self._world.state[Derivatives.position][self.z.state_idx] = position[2]
+    @property
+    def origin(self) -> np.ndarray:
+        return super().origin
+
+    @origin.setter
+    def origin(self, transformation: np.ndarray) -> None:
+        orientation = quaternion_from_rotation_matrix(transformation)
+        self._world.state[Derivatives.position][self.x.state_idx] = transformation[0, 3]
+        self._world.state[Derivatives.position][self.y.state_idx] = transformation[1, 3]
+        self._world.state[Derivatives.position][self.z.state_idx] = transformation[2, 3]
         self._world.state[Derivatives.position][self.qx.state_idx] = orientation[0]
         self._world.state[Derivatives.position][self.qy.state_idx] = orientation[1]
         self._world.state[Derivatives.position][self.qz.state_idx] = orientation[2]
         self._world.state[Derivatives.position][self.qw.state_idx] = orientation[3]
+        self._world.notify_state_change()
 
 
 class HasUpdateState(ABC):
@@ -258,16 +364,7 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
                                                             roll=self.roll.get_symbol(Derivatives.position),
                                                             pitch=self.pitch.get_symbol(Derivatives.position),
                                                             yaw=0)
-        self.origin = odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
-
-    def update_transform(self, position: np.ndarray, orientation: np.ndarray) -> None:
-        roll, pitch, yaw = rpy_from_quaternion(*orientation)
-        self._world.state[Derivatives.position, self.x.state_idx] = position[0]
-        self._world.state[Derivatives.position, self.y.state_idx] = position[1]
-        self._world.state[Derivatives.position, self.z.state_idx] = position[2]
-        self._world.state[Derivatives.position, self.roll.state_idx] = roll
-        self._world.state[Derivatives.position, self.pitch.state_idx] = pitch
-        self._world.state[Derivatives.position, self.yaw.state_idx] = yaw
+        self.origin_expression = odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
 
     def update_state(self, dt: float) -> None:
         state = self._world.state
