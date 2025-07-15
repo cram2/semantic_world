@@ -4,3 +4,4 @@ numpy
 sphinx-autoapi
 sphinxcontrib-plantuml
 pylint
+semantic_world

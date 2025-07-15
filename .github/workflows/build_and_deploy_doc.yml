@@ -11,6 +11,9 @@ on:
     #
     # paths:
     # - some-subfolder/**
+  pull_request:
+    branches:
+    - main
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:

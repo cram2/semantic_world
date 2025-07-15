@@ -35,10 +35,20 @@ You can read more about GCS [here](https://arxiv.org/abs/2101.11565).
 Let's get hands on! First, we need to create a world that makes navigation non-trivial.
 
 ```{code-cell} ipython2
-urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
-box = os.path.join(urdf_dir, "box.urdf")
-box_parser = URDFParser(box)
-box_world = box_parser.parse()
+from semantic_world.geometry import Box, Scale, Color
+from semantic_world.prefixed_name import PrefixedName
+from semantic_world.spatial_types import TransformationMatrix
+from semantic_world.world import World
+from semantic_world.world_entity import Body
+
+box_world = World()
+
+with box_world.modify_world():
+    box = Body(name=PrefixedName("box"), collision=[Box(scale=Scale(0.5, 0.5, 0.5),
+                                                        color=Color(1., 1., 1., 1.),
+                                                        origin=TransformationMatrix.from_xyz_rpy(0,0,0,0,0,0),) ])
+    box_world.add_body(box)
+    
 ```
 
 Next, we create a connectivity graph of the space so we can solve navigation problems.
@@ -83,13 +93,15 @@ from semantic_world.spatial_types import Point3
 start = Point3.from_xyz(-0.75, 0, 0.15)
 goal = Point3.from_xyz(0.75, 0, 0.15)
 path = gcs.path_from_to(start, goal)
-print("A potential path is", [(point.position.x, point.position.y) for point in path])
+print("A potential path is", [(point.x, point.y) for point in path])
 ```
 
 This minimal example demonstrates a concept that can be applied to the entire belief state of the robot. Let's load a more complex environment and look at the connectivity of it.
 
 ```{code-cell} ipython2
-apartment = os.path.join(urdf_dir, "kitchen.urdf")
+from semantic_world.adapters.urdf import URDFParser
+
+apartment = "../resources/urdf/kitchen.urdf"
 apartment_parser = URDFParser(apartment)
 world = apartment_parser.parse()
 
@@ -128,7 +140,7 @@ Finally, let's find a way from here to there:
 start = Point3.from_xyz(-0.75, 0, 0.15)
 goal = Point3.from_xyz(0.75, 0, 0.15)
 path = gcs.path_from_to(start, goal)
-print("A potential path is", [(point.position.x, point.position.y, point.position.z) for point in path])
+print("A potential path is", [(point.x, point.y, point.z) for point in path])
 ```
 
 Known limitations and potential improvements are:

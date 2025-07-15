@@ -3,8 +3,15 @@
 
 format: jb-book
 root: intro
-chapters:
-- file: bibliography
-- file: kinematic_world
-- file: autoapi/index
-- file: style_guide
+parts:
+- caption: Concepts
+  chapters:
+    - file: kinematic_world
+    - file: style_guide
+- caption: Examples
+  chapters:
+    - file: examples/graph_of_convex_sets
+- caption: References
+  chapters:
+    - file: autoapi/index
+    - file: bibliography

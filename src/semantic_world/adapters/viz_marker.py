@@ -22,6 +22,9 @@ class VizMarkerPublisher:
         The Publisher creates an Array of Visualization marker with a Marker for each link of each Object in th
         World. This Array is published with a rate of interval.
 
+        :param world: The world of which the Visualization Marker should be published.
+        :param node: The ROS node that is used to create the publisher, e. g. node=Node("viz_marker_publisher").
+        The destruction of the node is not handled by this class, so it is the responsibility of the caller to ensure that the node is destroyed properly.
         :param topic_name: The name of the topic to which the Visualization Marker should be published.
         :param interval: The interval at which the visualization marker should be published, in seconds.
         :param reference_frame: The reference frame of the visualization marker.
