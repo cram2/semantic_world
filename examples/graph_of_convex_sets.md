@@ -100,9 +100,15 @@ This minimal example demonstrates a concept that can be applied to the entire be
 
 ```{code-cell} ipython2
 import os
+from pathlib import Path
 from semantic_world.adapters.urdf import URDFParser
-print(os.getcwd())
-apartment = os.path.realpath(os.path.join(os.getcwd(), 'resources', 'urdf', 'kitchen.urdf'))
+root = next(
+    parent
+    for parent in [Path.cwd(), *Path.cwd().parents]
+    if (parent / "pyproject.toml").exists()
+)
+
+apartment = os.path.realpath(os.path.join(root, "resources", "urdf", "kitchen.urdf"))
 
 apartment_parser = URDFParser(apartment)
 world = apartment_parser.parse()
