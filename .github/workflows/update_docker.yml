@@ -2,9 +2,9 @@ name: update_docker
 on:
   push:
     branches:
-      - docker
+      - main
     paths:
-      - 'requirements.txt'
+      - 'docker/Dockerfile'
 # only run when a commit has changes in the requirements.txt file
 
 jobs:
