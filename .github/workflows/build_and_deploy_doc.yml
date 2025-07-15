@@ -28,14 +28,19 @@ jobs:
       id-token: write
     steps:
     - uses: actions/checkout@v4
-
-    # Install dependencies
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
-        cache: pip # Implicitly uses requirements.txt for cache key
-    
+        path: "ros/src/semantic_world"
+        repository: ${{ github.repository }}
+        ref: ${{ github.ref }}
+        submodules: 'false'
+
+    - name: Update semantic_world source files
+      run: |
+        rm -rf /opt/ros/overlay_ws/src/semantic_world/* 
+        cd /opt/ros/overlay_ws/src/semantic_world
+        rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/overlay_ws/src
+
     - name: Install dependencies
       run: |
         sudo apt-get update

@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - docker
+    paths:
+      - 'requirements.txt'
 # only run when a commit has changes in the requirements.txt file
 
 jobs:
