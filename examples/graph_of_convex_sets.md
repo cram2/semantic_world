@@ -101,8 +101,8 @@ This minimal example demonstrates a concept that can be applied to the entire be
 ```{code-cell} ipython2
 import os
 from semantic_world.adapters.urdf import URDFParser
-
-apartment = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..', 'resources/urdf/kitchen.urdf'))
+print(os.getcwd())
+apartment = os.path.realpath(os.path.join(os.getcwd(), 'resources', 'urdf', 'kitchen.urdf'))
 
 apartment_parser = URDFParser(apartment)
 world = apartment_parser.parse()
