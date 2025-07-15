@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import numpy as np
 import pytest
 
@@ -9,37 +7,8 @@ from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.math import rotation_matrix_from_rpy
 from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world import World, Body
+from semantic_world.testing import world_setup
 from semantic_world.world_entity import View
-
-
-@pytest.fixture
-def world_setup() -> Tuple[World, Body, Body, Body, Body, Body]:
-    world = World()
-    root = Body(name=PrefixedName(name='root', prefix='world'))
-    l1 = Body(name=PrefixedName('l1'))
-    l2 = Body(name=PrefixedName('l2'))
-    bf = Body(name=PrefixedName('bf'))
-    r1 = Body(name=PrefixedName('r1'))
-    r2 = Body(name=PrefixedName('r2'))
-
-    with world.modify_world():
-        [world.add_body(b) for b in [root, l1, l2, bf, r1, r2]]
-        dof = world.create_degree_of_freedom(name=PrefixedName('dof'), lower_limits={Derivatives.velocity: -1},
-                                             upper_limits={Derivatives.velocity: 1})
-
-        c_l1_l2 = PrismaticConnection(parent=l1, child=l2, dof=dof, axis=UnitVector(1, 0, 0))
-        c_r1_r2 = RevoluteConnection(parent=r1, child=r2, dof=dof, axis=UnitVector(0, 0, 1))
-        bf_root_l1 = FixedConnection(parent=bf, child=l1)
-        bf_root_r1 = FixedConnection(parent=bf, child=r1)
-        world.add_connection(c_l1_l2)
-        world.add_connection(c_r1_r2)
-        world.add_connection(bf_root_l1)
-        world.add_connection(bf_root_r1)
-        c_root_bf = Connection6DoF(parent=root, child=bf, _world=world)
-        world.add_connection(c_root_bf)
-
-    return world, l1, l2, bf, r1, r2
 
 
 def test_set_state(world_setup):

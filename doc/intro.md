@@ -17,12 +17,12 @@ This project aims to unify it under one solution that is flexible enough for all
 
 ## World
 
-The central datastructure for interaction with a scene is the {py:class}`semantic_world.world.World`.
+The central datastructure for interaction with a scene is the {py:class}`semantic_world.world_entity.World`.
 The world is a mediator for bodies and their connections.
 It handles the validation of the world's kinematic structure and the communication between the objects.
 
-Physical Objects can be spawned by constructing a {py:class}`semantic_world.world.Body` and a kinematic chain of 
-those elements is added by specifying a {py:class}`semantic_world.world.Connection` between bodies.
+Physical Objects can be spawned by constructing a {py:class}`semantic_world.world_entity.Body` and a kinematic chain of 
+those elements is added by specifying a {py:class}`semantic_world.world_entity.Connection` between bodies.
 
 All those things have to be added to the world for full functionality.
 More information on the kinematic world model can be found [here](kinematic_world.md).
@@ -30,7 +30,7 @@ More information on the kinematic world model can be found [here](kinematic_worl
 ## Views
 
 Views are aggregation objects for bodies and connections in the world. 
-Semantically, a `semantic_world.world.View` is an interpretation of a set of links and connections.
+Semantically, a `semantic_world.world_entity.View` is an interpretation of a set of links and connections.
 For instance, a Drawer can be seen as a view on a handle and a container that is connected via a fixed connection
 and where the container has some prismatic connection.
 
@@ -48,6 +48,6 @@ This is due to the fact, that this package uses casadi to speed up forward kinem
 The types for sqlalchemy are defined in {py:mod}`semantic_world.orm.model`.
 The interface to sqlalchemy is auto-generated to {py:mod}`semantic_world.orm.ormatic_interface`.
 The script
-to recreate the interface is found in [here](https://github.com/tomsch420/semantic_world/blob/main/scripts/generate_orm.py).
+to recreate the interface is found in [here](https://github.com/cram2/semantic_world/blob/main/scripts/generate_orm.py).
 
 

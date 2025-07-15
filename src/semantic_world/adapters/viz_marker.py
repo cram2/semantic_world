@@ -19,8 +19,9 @@ class VizMarkerPublisher:
 
     def __init__(self, world: World, node, topic_name="/semworld/viz_marker", interval=0.1, reference_frame="map"):
         """
-        The Publisher creates an Array of Visualization marker with a Marker for each link of each Object in th
-        World. This Array is published with a rate of interval.
+        The Publisher creates an Array of Visualization marker with a Marker for each body in the World and publishes
+        it to the given topic name at a fixed interval. The publisher automatically stops publishing when the process
+        is killed.
 
         :param world: The world of which the Visualization Marker should be published.
         :param node: The ROS node that is used to create the publisher, e. g. node=Node("viz_marker_publisher").
