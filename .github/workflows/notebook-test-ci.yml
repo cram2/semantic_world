@@ -54,6 +54,7 @@ jobs:
           cd /opt/ros/overlay_ws/src/semantic_world
           pip install -r requirements.txt
           pip install jupytext treon
+          pip install -e .
 
       # ----------------------------------------------------------------------------------------------------------------
       - name: Convert Notebooks
