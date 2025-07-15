@@ -4,3 +4,4 @@ __pycache__
 .hypothesis
 _build
 *.egg-info
+build
