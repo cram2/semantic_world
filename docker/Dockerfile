@@ -9,7 +9,7 @@ ARG OVERLAY_WS=/opt/ros/overlay_ws
 WORKDIR $OVERLAY_WS/src
 SHELL ["/bin/bash", "-c"]
 
-RUN apt update && apt install python3.12-venv ros-jazzy-xacro python3-vcstool git ros-dev-tools default-jre -y
+RUN apt update && apt install python3.12-venv ros-jazzy-xacro python3-vcstool git ros-dev-tools default-jre graphviz graphviz-dev -y
 RUN vcs import --input https://raw.githubusercontent.com/LucaKro/semantic_world/main/rosinstall/semantic_world-https.rosinstall
 RUN source /opt/ros/jazzy/setup.bash && cd $OVERLAY_WS && colcon build --symlink-install
 RUN echo "source $OVERLAY_WS/install/setup.bash" >> ~/.bashrc
