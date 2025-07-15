@@ -72,7 +72,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: "doc/_build/html"
+        path: "/opt/ros/overlay_ws/src/semantic_world/doc/_build/html"
 
     # Deploy the book's HTML to GitHub Pages
     - name: Deploy to GitHub Pages
