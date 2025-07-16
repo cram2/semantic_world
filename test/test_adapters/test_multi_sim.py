@@ -120,7 +120,7 @@ class MultiverseMujocoConnectorTestCase(unittest.TestCase):
 class MultiSimTestCase(unittest.TestCase):
     file_path = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
     headless = False
-    step_size = 5E-4
+    step_size = 1E-3
 
     def test_multi_sim_in_5s(self):
         world = World()
@@ -203,7 +203,7 @@ class MultiSimTestCase(unittest.TestCase):
         multi_sim.stop_simulation()
         self.assertAlmostEqual(time.time() - start_time, 5.0, delta=0.1)
 
-    def test_read_and_write_objects_to_multi_sim_in_5s(self):
+    def test_read_and_write_objects_to_multi_sim_in_10s(self):
         world = World()
         read_objects = {
             "box": {
@@ -224,22 +224,23 @@ class MultiSimTestCase(unittest.TestCase):
         self.assertIs(multi_sim.simulator.headless, self.headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
-        start_time = time.time()
+        time.sleep(1) # Ensure the simulation is running before setting objects
         box_positions = [[0.0, 0.0, 1.0],
                          [1.0, 0.0, 1.0],
                          [1.0, 1.0, 1.0],
                          [0.0, 1.0, 1.0],
                          [0.0, 0.0, 1.0]]
+        start_time = time.time()
         for box_position in box_positions:
             write_objects["box"]["position"] = box_position
             multi_sim.pause_simulation()
             multi_sim.set_write_objects(write_objects=write_objects)
-            time.sleep(2)
+            time.sleep(1)
             multi_sim.unpause_simulation()
             multi_sim.set_write_objects(write_objects={})
-            time.sleep(2)
+            time.sleep(1)
         multi_sim.stop_simulation()
-        self.assertAlmostEqual(time.time() - start_time, 20.0, delta=0.1)
+        self.assertAlmostEqual(time.time() - start_time, 10.0, delta=0.1)
 
 if __name__ == '__main__':
     unittest.main()
