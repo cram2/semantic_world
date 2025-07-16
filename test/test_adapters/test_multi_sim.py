@@ -124,7 +124,8 @@ class MultiSimTestCase(unittest.TestCase):
 
     def test_multi_sim_in_5s(self):
         world = World()
-        multi_sim = MultiSim(file_path=self.file_path, world=world, headless=self.headless, step_size=self.step_size)
+        viewer = MultiverseViewer()
+        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=self.headless, step_size=self.step_size)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, self.file_path)
         self.assertIs(multi_sim.simulator.headless, self.headless)
@@ -232,10 +233,10 @@ class MultiSimTestCase(unittest.TestCase):
         for box_position in box_positions:
             write_objects["box"]["position"] = box_position
             multi_sim.pause_simulation()
-            # multi_sim.set_write_objects(write_objects=write_objects)
+            multi_sim.set_write_objects(write_objects=write_objects)
             time.sleep(2)
             multi_sim.unpause_simulation()
-            # multi_sim.set_write_objects(write_objects={})
+            multi_sim.set_write_objects(write_objects={})
             time.sleep(2)
         multi_sim.stop_simulation()
         self.assertAlmostEqual(time.time() - start_time, 20.0, delta=0.1)
