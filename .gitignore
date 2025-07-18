@@ -5,3 +5,4 @@ __pycache__
 _build
 *.egg-info
 build
+resources/procthor_environments

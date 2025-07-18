@@ -20,3 +20,4 @@ plotly
 rtree
 daqp
 pathlib
+probabilistic_model

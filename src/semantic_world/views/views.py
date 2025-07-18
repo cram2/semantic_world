@@ -1,7 +1,12 @@
 from dataclasses import dataclass, field
 
+import numpy as np
+from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from typing_extensions import List
 
+from semantic_world.geometry import BoundingBox, BoundingBoxCollection
+from semantic_world.spatial_types import Point3
+from semantic_world.variables import SpatialVariables
 from semantic_world.world import View, Body
 
 
@@ -27,6 +32,33 @@ class Door(View):  # Door has a Footprint
 class Fridge(View):
     body: Body
     door: Door
+
+@dataclass(unsafe_hash=True)
+class Table(View):
+    """
+    A view that represents a table.
+    """
+
+    top: Body
+    """
+    The body that represents the table's top surface.
+    """
+
+    def points_on_table(self, amount: int = 100) -> List[Point3]:
+        """
+        Get points that are on the table.
+
+        :amount: The number of points to return.
+        :returns: A list of points that are on the table.
+        """
+        area_of_table = BoundingBoxCollection.from_shapes(self.top.collision)
+        event = area_of_table.event
+        p = uniform_measure_of_event(event)
+        p = p.marginal(SpatialVariables.xy)
+        samples = p.sample(amount)
+        z_coordinate = np.full((amount, 1), max([b.max_z for b in area_of_table]) + 0.01)
+        samples = np.concatenate((samples, z_coordinate), axis=1)
+        return [Point3.from_xyz(*s, reference_frame=self.top) for s in samples]
 
 ################################
 

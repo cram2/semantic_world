@@ -42,12 +42,10 @@ The entire world can be saved to any database
 that has an [sqlalchemy](https://docs.sqlalchemy.org/en/20/index.html) connector.
 The definitions and relationships for the database are automatically derived from the datastructures
 derived in the python package via the [ormatic](https://github.com/tomsch420/ormatic) package.
-Since the datastructures for the forward calculations of the world are not defined compatibly, the types
-from {py:mod}`semantic_world.spatial_types.spatial_types` are mapped via JSON as columns.
-This is due to the fact, that this package uses casadi to speed up forward kinematics.
 The types for sqlalchemy are defined in {py:mod}`semantic_world.orm.model`.
 The interface to sqlalchemy is auto-generated to {py:mod}`semantic_world.orm.ormatic_interface`.
-The script
-to recreate the interface is found in [here](https://github.com/cram2/semantic_world/blob/main/scripts/generate_orm.py).
+The script to recreate the interface is found in [here](https://github.com/cram2/semantic_world/blob/main/scripts/generate_orm.py).
+
+Learn more about the ORM in TODO.
 
 

@@ -11,6 +11,7 @@ parts:
 - caption: Examples
   chapters:
     - file: examples/graph_of_convex_sets
+    - file: examples/orm_querying
 - caption: References
   chapters:
     - file: autoapi/index
