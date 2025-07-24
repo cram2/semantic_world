@@ -343,6 +343,31 @@ class Connection(WorldEntity):
         if self.name is None:
             self.name = PrefixedName(f'{self.parent.name.name}_T_{self.child.name.name}', prefix=self.child.name.prefix)
 
+    def _post_init_world_part(self):
+        """
+        Executes post-initialization logic based on the presence of a world attribute.
+        """
+        if self._world is None:
+            self._post_init_without_world()
+        else:
+            self._post_init_with_world()
+
+    def _post_init_with_world(self):
+        """
+        This method is invoked to initialize or perform additional setup operations
+        that are required after the main initialization step. It is intended for
+        use cases involving world-related configurations or any specific setup
+        details required post object creation.
+        """
+        pass
+
+    def _post_init_without_world(self):
+        """
+        This method is intended for internal initialization processes and is not meant for external use.
+        It performs operations post-initialization, called when _world is None.
+        """
+        pass
+
     def __hash__(self):
         return hash((self.parent, self.child))
 
