@@ -260,6 +260,11 @@ class World:
     Is set to True, when a function with @modifies_world is called or world.modify_world context is used.
     """
 
+    name: Optional[str] = None
+    """
+    Name of the world. May act as default namespace for all bodies and views in the world which do not have a prefix.
+    """
+
     @property
     def root(self) -> Body:
         """
@@ -476,6 +481,7 @@ class World:
         :param root_connection: If provided, this connection will be used to connect the two worlds. Otherwise, a new Connection6DoF will be created
         :return: None
         """
+
         self_root = self.root
         other_root = other.root
         for dof in other.degrees_of_freedom:
@@ -607,7 +613,18 @@ class World:
         :param body: The body for which to compute child bodies.
         :return: A list of child bodies.
         """
-        return list(self.kinematic_structure.successors(body))
+        return list(self.kinematic_structure.successors(body.index))
+
+    def compute_child_bodies_recursive(self, body: Body) -> List[Body]:
+        """
+        Computes all child bodies of a given body in the world recursively.
+        :param body: The body for which to compute child bodies.
+        :return: A list of all child bodies.
+        """
+        children = self.compute_child_bodies(body)
+        for child in children:
+            children.extend(self.compute_child_bodies_recursive(child))
+        return children
 
 
     @lru_cache(maxsize=None)

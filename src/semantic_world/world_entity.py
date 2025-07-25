@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+import inspect
+from abc import abstractmethod
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, fields
+from functools import reduce
+from typing import List, Optional, TYPE_CHECKING, Set, get_args, get_type_hints, Deque
+import numpy as np
+from numpy import ndarray
+from typing_extensions import Self
+
+from .geometry import Shape, BoundingBox, BoundingBoxCollection
 from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import lru_cache
@@ -41,7 +51,7 @@ class WorldEntity:
     The backreference to the world this entity belongs to.
     """
 
-    _views: List[View] = field(default_factory=list, init=False, repr=False, hash=False)
+    _views: Set[View] = field(default_factory=set, init=False, repr=False, hash=False)
     """
     The views this entity is part of.
     """
@@ -248,18 +258,45 @@ class View(WorldEntity):
     This class can hold references to certain bodies that gain meaning in this context.
     """
 
-    @property
-    def aggregated_bodies(self) -> Set[Body]:
+    @staticmethod
+    def _is_body_view_or_iterable(obj: object) -> bool:
         """
-        Recursively traverses the view and its attributes to find all bodies contained within it.
+        Determines if an object is a Body, a View, or an Iterable (excluding strings and bytes).
+        """
+        return (
+                isinstance(obj, (Body, View)) or
+                (isinstance(obj, Iterable) and not isinstance(obj, (str, bytes, bytearray)))
+        )
 
-        :return: A set of bodies that are part of this view.
+    def _attr_values(self):
         """
+        Yields all dataclass fields and set properties of this view.
+        Skips private fields (those starting with '_'), as well as the 'aggregated_bodies' property.
+        """
+        for f in fields(self):
+            if f.name.startswith('_'):
+                continue
+            v = getattr(self, f.name, None)
+            if self._is_body_view_or_iterable(v):
+                yield v
+
+        for name, prop in inspect.getmembers(type(self), lambda o: isinstance(o, property)):
+            if name == "bodies" or name.startswith('_'):
+                continue
+            try:
+                v = getattr(self, name)
+            except Exception:
+                continue
+            if self._is_body_view_or_iterable(v):
+                yield v
+
+    def _bodies(self, visited: Set[int]) -> Set[Body]:
+        """
+        Recursively collects all bodies that are part of this view.
+        """
+        stack: Deque[object] = deque([self])
         bodies: Set[Body] = set()
-        visited: Set[int] = set()
-        stack: deque = deque([self])
 
-        # Use a stack to traverse the view and its attributes
         while stack:
             obj = stack.pop()
             oid = id(obj)
@@ -268,25 +305,28 @@ class View(WorldEntity):
             visited.add(oid)
 
             match obj:
-                # Bodies are aggregated directly
                 case Body():
                     bodies.add(obj)
 
-                # Views are traversed recursively
                 case View():
-                    for f in fields(obj):
-                        value = getattr(obj, f.name)
-                        if isinstance(value, Body):
-                            bodies.add(value)
-                        elif isinstance(value, View):
-                            stack.append(value)
-                        elif isinstance(value, (list, set)):
-                            stack.extend(value)
+                    stack.extend(obj._attr_values())
 
-                # Iterables are traversed
+                case Mapping():
+                    stack.extend(v for v in obj.values() if self._is_body_view_or_iterable(v))
+
                 case Iterable() if not isinstance(obj, (str, bytes, bytearray)):
-                    stack.extend(obj)
+                    stack.extend(v for v in obj if self._is_body_view_or_iterable(v))
+
         return bodies
+
+    @property
+    def bodies(self) -> Iterable[Body]:
+        """
+        Returns a Iterable of all relevant bodies in this view. The default behaviour is to aggregate all bodies that are accessible
+        through the properties and fields of this view, recursively.
+        If this behaviour is not desired for a specific view, it can be overridden by implementing the `bodies` property.
+        """
+        return self._bodies(set())
 
     def as_bounding_box_collection(self) -> BoundingBoxCollection:
         """
@@ -294,9 +334,17 @@ class View(WorldEntity):
         """
         bbs = reduce(
             lambda accumulator, bb_collection: accumulator.merge(bb_collection),
-            (body.bounding_box_collection for body in self.aggregated_bodies if body.has_collision())
+            (body.bounding_box_collection for body in self.bodies if body.has_collision())
         )
         return bbs
+
+    @classmethod
+    def create(cls, *args, **kwargs) -> Self:
+        """
+        Creates a new view of the world.
+        This method should be implemented by subclasses to create specific types of views.
+        """
+        raise NotImplementedError(f"{cls.__name__}.create() is not implemented.")
 
 
 @dataclass
@@ -308,10 +356,17 @@ class RootedView(View):
 
 
 @dataclass
-class EnvironmentView(View):
+class EnvironmentView(RootedView):
     """
     Represents a view of the environment.
     """
+
+    @property
+    def bodies(self) -> Set[Body]:
+        """
+        Returns a set of all bodies in the environment view.
+        """
+        return set(self._world.compute_child_bodies_recursive(self.root))
 
 
 @dataclass

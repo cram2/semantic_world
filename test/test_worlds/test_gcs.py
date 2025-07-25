@@ -6,14 +6,11 @@ from random_events.interval import SimpleInterval
 from random_events.product_algebra import SimpleEvent
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.graph_of_convex_sets import GraphOfConvexSets, PoseOccupiedError
-from semantic_world.variables import SpatialVariables
 from semantic_world.geometry import BoundingBox, BoundingBoxCollection
-from semantic_world.prefixed_name import PrefixedName
+from semantic_world.graph_of_convex_sets import GraphOfConvexSets, PoseOccupiedError
 from semantic_world.spatial_types import Point3
-from semantic_world.views import MultiBodyView
+from semantic_world.variables import SpatialVariables
 from semantic_world.world import World
-from semantic_world.world_entity import Body
 
 
 class GCSTestCase(unittest.TestCase):

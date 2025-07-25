@@ -125,19 +125,3 @@ class Cabinet(Cupboard):
 @dataclass
 class Wardrobe(Cupboard):
     doors: List[Door] = field(default_factory=list)
-
-@dataclass
-class MultiBodyView(View):
-    """
-    A Generic View for multiple bodies.
-    """
-    bodies: List[Body] = field(default_factory=list, hash=False)
-    views: List[View] = field(default_factory=list, hash=False)
-
-    def add_body(self, body: Body):
-        self.bodies.append(body)
-        body._views.append(self)
-
-    def add_view(self, view: View):
-        self.views.append(view)
-        view._views.append(self)

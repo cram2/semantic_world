@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 
 from .geometry import BoundingBox, BoundingBoxCollection
 from .variables import SpatialVariables
-from .views import MultiBodyView
 from .world import World
-from .world_entity import View
+from .world_entity import View, EnvironmentView
 
 logger = logging.getLogger(__name__)
 
@@ -225,8 +224,7 @@ class GraphOfConvexSets:
 
         :return: An event representing the obstacles in the search space.
         """
-        world_view = MultiBodyView()
-        [world_view.add_body(body) for body in world.bodies]
+        world_view = EnvironmentView(root=world.root)
         return cls.obstacles_from_views(world_view, search_space=search_space, bloat_obstacles=bloat_obstacles)
 
 
@@ -360,8 +358,7 @@ class GraphOfConvexSets:
         :return: The connectivity graph.
         """
 
-        view = MultiBodyView()
-        [view.add_body(body) for body in world.bodies]
+        view = EnvironmentView(root=world.root, _world=world)
 
         return cls.free_space_from_view(view, tolerance=tolerance, search_space=search_space,
                                         bloat_obstacles=bloat_obstacles)
@@ -437,8 +434,7 @@ class GraphOfConvexSets:
         :return: The connectivity graph.
         """
 
-        view = MultiBodyView()
-        [view.add_body(body) for body in world.bodies]
+        view = EnvironmentView(root=world.root, _world=world)
 
         return cls.navigation_map_from_view(view, tolerance=tolerance, search_space=search_space,
                                             bloat_obstacles=bloat_obstacles)
