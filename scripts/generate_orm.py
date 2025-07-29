@@ -38,7 +38,7 @@ classes |= set(classes_of_module(semantic_world.degree_of_freedom))
 
 # remove classes that should not be mapped
 classes -= {ResetStateContextManager, WorldModelUpdateContextManager, HasUpdateState,
-            World, ForwardKinematicsVisitor, Has1DOFState}
+            World, ForwardKinematicsVisitor, Has1DOFState, DegreeOfFreedom}
 classes -= set(recursive_subclasses(Enum))
 
 def generate_orm():

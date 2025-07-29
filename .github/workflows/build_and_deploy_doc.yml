@@ -1,38 +1,53 @@
 name: deploy-book
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
 
 # Run this when the master or main branch changes
 on:
   push:
     branches:
     - main
+
     # If your git repository has the Jupyter Book within some-subfolder next to
     # unrelated files, you can make this run only if a file within that specific
     # folder has been modified.
     #
     # paths:
     # - some-subfolder/**
+  pull_request:
+    branches:
+    - main
 
 # This job installs dependencies, builds the book, and pushes it to `gh-pages`
 jobs:
   deploy-book:
     runs-on: ubuntu-latest
+    container:
+      image: "pycram/semantic_world:jazzy"
     permissions:
       pages: write
       id-token: write
     steps:
     - uses: actions/checkout@v4
-
-    # Install dependencies
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
-        cache: pip # Implicitly uses requirements.txt for cache key
-    
+        path: "ros/src/semantic_world"
+        repository: ${{ github.repository }}
+        ref: ${{ github.ref }}
+        submodules: 'false'
+
+    - name: Update semantic_world source files
+      run: |
+        rm -rf /opt/ros/overlay_ws/src/semantic_world/* 
+        cd /opt/ros/overlay_ws/src/semantic_world
+        rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/overlay_ws/src
+
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt install graphviz graphviz-dev
+        cd /opt/ros/overlay_ws/src/semantic_world
+        source ../semantic_world-venv/bin/activate    
         pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
 
     # (optional) Cache your executed notebooks between runs
@@ -48,15 +63,19 @@ jobs:
     # Build the book
     - name: Build the book
       run: |
+        cd /opt/ros/overlay_ws/src/semantic_world
+        source ../semantic_world-venv/bin/activate 
         jupyter-book build doc
 
     # Upload the book's HTML as an artifact
     - name: Upload artifact
+      if: github.event_name == 'push'
       uses: actions/upload-pages-artifact@v3
       with:
-        path: "doc/_build/html"
+        path: "/opt/ros/overlay_ws/src/semantic_world/doc/_build/html"
 
     # Deploy the book's HTML to GitHub Pages
     - name: Deploy to GitHub Pages
+      if: github.event_name == 'push'
       id: deployment
       uses: actions/deploy-pages@v4

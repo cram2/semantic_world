@@ -5,31 +5,14 @@ import pytest
 from rustworkx import NoPathFound
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.connections import Connection6DoF, OmniDrive
+from semantic_world.connections import OmniDrive
+from semantic_world.ik_solver import MaxIterationsException, UnreachableException
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.robots import PR2
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.world import World, Body
-
-
-@pytest.fixture
-def pr2_world():
-    urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
-    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
-    world = World()
-    with world.modify_world():
-        localization_body = Body(PrefixedName('odom_combined'))
-        world.add_body(localization_body)
-
-        pr2_parser = URDFParser(pr2)
-        world_with_pr2 = pr2_parser.parse()
-        # world_with_pr2.plot_kinematic_structure()
-        pr2_root = world_with_pr2.root
-        world.merge_world(world_with_pr2)
-        c_root_bf = OmniDrive(parent=localization_body, child=pr2_root, _world=world)
-        world.add_connection(c_root_bf)
-    return world
+from semantic_world.testing import pr2_world
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world):
@@ -125,53 +108,84 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world):
 
     fk_expr = pr2_world.compose_forward_kinematics_expression(root, tip)
     fk_expr_compiled = fk_expr.compile()
-    fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
+    fk2 = fk_expr_compiled.fast_call(symbol_manager.resolve_symbols(*fk_expr_compiled.symbol_parameters))
 
     np.testing.assert_array_almost_equal(fk2, np.array(
         [[0.988771, 0., -0.149438, 0.4], [0., 1., 0., 0.], [0.149438, 0., 0.988771, 0.], [0., 0., 0., 1.]]))
 
+def test_compute_ik(pr2_world):
+    bf = pr2_world.root
+    eef = pr2_world.get_body_by_name('r_gripper_tool_frame')
+    fk = pr2_world.compute_forward_kinematics_np(bf, eef)
+    fk[0, 3] -= 0.2
+    joint_state = pr2_world.compute_inverse_kinematics(bf, eef, fk)
+    for joint, state in joint_state.items():
+        pr2_world.state[joint.name].position = state
+    pr2_world.notify_state_change()
+    actual_fk = pr2_world.compute_forward_kinematics_np(bf, eef)
+    assert np.allclose(actual_fk, fk, atol=1e-3)
+
+def test_compute_ik_max_iter(pr2_world):
+    bf = pr2_world.root
+    eef = pr2_world.get_body_by_name('r_gripper_tool_frame')
+    fk = pr2_world.compute_forward_kinematics_np(bf, eef)
+    fk[2, 3] = 10
+    with pytest.raises(MaxIterationsException):
+        pr2_world.compute_inverse_kinematics(bf, eef, fk)
+
+def test_compute_ik_unreachable(pr2_world):
+    bf = pr2_world.root
+    eef = pr2_world.get_body_by_name('base_footprint')
+    fk = pr2_world.compute_forward_kinematics_np(bf, eef)
+    fk[2, 3] = -1
+    with pytest.raises(UnreachableException):
+        pr2_world.compute_inverse_kinematics(bf, eef, fk)
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world):
-    omni_drive: OmniDrive = pr2_world.get_connection_by_name(
-        PrefixedName(name='odom_combined_T_base_footprint', prefix='pr2_kinematic_tree'))
+    omni_drive: OmniDrive = pr2_world.get_connection_by_name('odom_combined_T_base_footprint')
     cmd = np.zeros((len(pr2_world.degrees_of_freedom)), dtype=float)
-    cmd[-3] = 100
-    cmd[-2] = 100
-    cmd[-1] = 100
+    cmd[pr2_world.state._index[omni_drive.x_vel.name]] = 100
+    cmd[pr2_world.state._index[omni_drive.y_vel.name]] = 100
+    cmd[pr2_world.state._index[omni_drive.yaw.name]] = 100
     dt = 0.1
     pr2_world.apply_control_commands(cmd, dt, Derivatives.jerk)
-    assert pr2_world.state[Derivatives.jerk, omni_drive.yaw.state_idx] == 100.
-    assert pr2_world.state[Derivatives.acceleration, omni_drive.yaw.state_idx] == 100. * dt
-    assert pr2_world.state[Derivatives.velocity, omni_drive.yaw.state_idx] == 100. * dt * dt
-    assert pr2_world.state[Derivatives.position, omni_drive.yaw.state_idx] == 100. * dt * dt * dt
+    assert pr2_world.state[omni_drive.yaw.name].jerk == 100.
+    assert pr2_world.state[omni_drive.yaw.name].acceleration == 100. * dt
+    assert pr2_world.state[omni_drive.yaw.name].velocity == 100. * dt * dt
+    assert pr2_world.state[omni_drive.yaw.name].position == 100. * dt * dt * dt
 
-    assert pr2_world.state[Derivatives.jerk, omni_drive.x_vel.state_idx] == 100.
-    assert pr2_world.state[Derivatives.acceleration, omni_drive.x_vel.state_idx] == 100. * dt
-    assert pr2_world.state[Derivatives.velocity, omni_drive.x_vel.state_idx] == 100. * dt * dt
-    assert pr2_world.state[Derivatives.position, omni_drive.x_vel.state_idx] == 0
+    assert pr2_world.state[omni_drive.x_vel.name].jerk == 100.
+    assert pr2_world.state[omni_drive.x_vel.name].acceleration == 100. * dt
+    assert pr2_world.state[omni_drive.x_vel.name].velocity == 100. * dt * dt
+    assert pr2_world.state[omni_drive.x_vel.name].position == 0
 
-    assert pr2_world.state[Derivatives.jerk, omni_drive.y_vel.state_idx] == 100.
-    assert pr2_world.state[Derivatives.acceleration, omni_drive.y_vel.state_idx] == 100. * dt
-    assert pr2_world.state[Derivatives.velocity, omni_drive.y_vel.state_idx] == 100. * dt * dt
-    assert pr2_world.state[Derivatives.position, omni_drive.y_vel.state_idx] == 0
+    assert pr2_world.state[omni_drive.y_vel.name].jerk == 100.
+    assert pr2_world.state[omni_drive.y_vel.name].acceleration == 100. * dt
+    assert pr2_world.state[omni_drive.y_vel.name].velocity == 100. * dt * dt
+    assert pr2_world.state[omni_drive.y_vel.name].position == 0
 
-    assert pr2_world.state[Derivatives.jerk, omni_drive.x.state_idx] == 0.
-    assert pr2_world.state[Derivatives.acceleration, omni_drive.x.state_idx] == 0.
-    assert pr2_world.state[Derivatives.velocity, omni_drive.x.state_idx] == 0.8951707486311977
-    assert pr2_world.state[Derivatives.position, omni_drive.x.state_idx] == 0.08951707486311977
+    assert pr2_world.state[omni_drive.x.name].jerk == 0.
+    assert pr2_world.state[omni_drive.x.name].acceleration == 0.
+    assert pr2_world.state[omni_drive.x.name].velocity == 0.8951707486311977
+    assert pr2_world.state[omni_drive.x.name].position == 0.08951707486311977
 
-    assert pr2_world.state[Derivatives.jerk, omni_drive.y.state_idx] == 0.
-    assert pr2_world.state[Derivatives.acceleration, omni_drive.y.state_idx] == 0.
-    assert pr2_world.state[Derivatives.velocity, omni_drive.y.state_idx] == 1.094837581924854
-    assert pr2_world.state[Derivatives.position, omni_drive.y.state_idx] == 0.1094837581924854
+    assert pr2_world.state[omni_drive.y.name].jerk == 0.
+    assert pr2_world.state[omni_drive.y.name].acceleration == 0.
+    assert pr2_world.state[omni_drive.y.name].velocity == 1.094837581924854
+    assert pr2_world.state[omni_drive.y.name].position == 0.1094837581924854
 
 def test_pr2_view(pr2_world):
-    pr2 = PR2.get_view(pr2_world)
-    print(pr2)
+    pr2 = PR2.from_world(pr2_world)
+
+    # Ensure there are no loose bodies
+    pr2_world._notify_model_change()
 
     assert len(pr2.manipulators) == 2
     assert len(pr2.manipulator_chains) == 2
     assert len(pr2.sensors) == 1
     assert len(pr2.sensor_chains) == 1
-    assert pr2.sensor_chains[0].sensors == pr2.sensors
+    assert pr2.neck == list(pr2.sensor_chains)[0]
+    assert pr2.torso.name.name == 'torso'
+    assert len(pr2.torso.sensors) == 0
+    assert list(pr2.sensor_chains)[0].sensors == pr2.sensors
     assert pr2.odom.name.name == 'odom_combined'

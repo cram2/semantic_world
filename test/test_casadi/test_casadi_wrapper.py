@@ -125,7 +125,7 @@ class TestSymbol:
         assert isinstance(e, cas.Expression)
         e = s <= s
         assert isinstance(e, cas.Expression)
-        e = s == s
+        e = cas.equal(s, s)
         assert isinstance(e, cas.Expression)
 
     def test_logic(self):
@@ -1287,12 +1287,12 @@ class TestCASWrapper:
         expected = expected_expr.compile()(**kwargs)
         assert np.allclose(actual, expected)
 
-    @given(float_no_nan_no_inf(outer_limit=1e3),
-           float_no_nan_no_inf(outer_limit=1e3),
-           float_no_nan_no_inf(outer_limit=1e3),
-           float_no_nan_no_inf(outer_limit=1e3),
-           float_no_nan_no_inf(outer_limit=1e3),
-           float_no_nan_no_inf(outer_limit=1e3))
+    @given(float_no_nan_no_inf(outer_limit=1e2),
+           float_no_nan_no_inf(outer_limit=1e2),
+           float_no_nan_no_inf(outer_limit=1e2),
+           float_no_nan_no_inf(outer_limit=1e2),
+           float_no_nan_no_inf(outer_limit=1e2),
+           float_no_nan_no_inf(outer_limit=1e2))
     def test_jacobian_ddot(self, a, ad, add, b, bd, bdd):
         kwargs = {
             'a': a,

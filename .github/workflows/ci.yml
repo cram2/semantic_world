@@ -1,6 +1,10 @@
 # .github/workflows/ci.yml
 name: CI
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
 
+    
 on:
   push:
     branches: [ main ]
@@ -10,38 +14,35 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10']
-
+    container:
+      image: "pycram/semantic_world:jazzy"
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
       with:
-        python-version: ${{ matrix.python-version }}
+        path: "ros/src/semantic_world"
+        repository: ${{ github.repository }}
+        ref: ${{ github.ref }}
+        submodules: 'false'
+    - name: Update semantic_world source files
+      run: |
+        rm -rf /opt/ros/overlay_ws/src/semantic_world/* 
+        cd /opt/ros/overlay_ws/src/semantic_world
+        rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/overlay_ws/src
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt install graphviz graphviz-dev
-        python -m pip install --upgrade pip
-        pip install virtualenv
-        python -m virtualenv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-        pip install pytest mypy flake8 black isort
-        pip install .
-        git clone https://github.com/Multiverse-Framework/Multiverse-Parser.git
-        pip install -r ./Multiverse-Parser/requirements.txt
-        pip install -e ./Multiverse-Parser
-        echo "PATH=$PWD/ultiverse-Parser/ext/blender:$PWD/ultiverse-Parser/USD/linux/lib/python:$PWD/ultiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
-        echo "PYTHONPATH=$PWD/ultiverse-Parser/USD/linux/lib/python:$PWD/src" >> $GITHUB_ENV
+        cd /opt/ros/overlay_ws/src/semantic_world
+        source ../semantic_world-venv/bin/activate    
+        pip install -U pip && pip install -r requirements.txt && pip install -e . && pip install pytest
+        echo "PATH=/opt/ros/overlay_ws/src/Multiverse-Parser/ext/blender:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/src" >> $GITHUB_ENV
+
 
     - name: Run tests
       run: |
-        source venv/bin/activate
-        echo "PATH is: $PATH"
-        echo "PYTHONPATH is: $PYTHONPATH"
-        PATH=$PATH PYTHONPATH=$PYTHONPATH pytest -v test/
+        source /opt/ros/overlay_ws/install/setup.bash
+        source /opt/ros/overlay_ws/src/semantic_world-venv/bin/activate
+        cd /opt/ros/overlay_ws/src/semantic_world
+        python -m pytest -v test/

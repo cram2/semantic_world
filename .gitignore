@@ -4,3 +4,5 @@ __pycache__
 .hypothesis
 _build
 *.egg-info
+build
+resources/procthor_environments

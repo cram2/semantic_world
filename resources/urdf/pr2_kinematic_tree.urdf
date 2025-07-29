@@ -1683,7 +1683,7 @@
     <child link="r_shoulder_pan_link"/>
     <origin rpy="0 0 0" xyz="0 -0.188 0"/>
     <axis xyz="0 0 1"/>
-    <limit effort="30" lower="-2.2853981634" upper="0.714601836603" velocity="2.088"/>
+    <limit effort="30" lower="-2.2853981634" upper="0.714601836603" velocity="0.15"/>
     <dynamics damping="10.0"/>
     <safety_controller k_position="100" k_velocity="10" soft_lower_limit="-2.1353981634" soft_upper_limit="0.564601836603"/>
     <calibration rising="-0.781463230055"/>
@@ -1713,7 +1713,7 @@
     <child link="r_shoulder_lift_link"/>
     <origin rpy="0 0 0" xyz="0.1 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit effort="30" lower="-0.5236" upper="1.3963" velocity="2.082"/>
+    <limit effort="30" lower="-0.5236" upper="1.3963" velocity="0.2"/>
     <dynamics damping="10.0"/>
     <safety_controller k_position="100" k_velocity="10" soft_lower_limit="-0.3536" soft_upper_limit="1.2963"/>
     <calibration falling="-0.006751039265"/>

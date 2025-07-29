@@ -4,6 +4,9 @@ import sys
 import unittest
 
 import pytest
+from numpy.ma.testutils import assert_equal
+
+from semantic_world.reasoner import WorldReasoner
 
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -15,15 +18,56 @@ except ImportError as e:
 
 from typing_extensions import Type, Optional, Callable
 
-from ripple_down_rules.datastructures.dataclasses import CaseQuery
-from ripple_down_rules.rdr import GeneralRDR
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
+
 try:
-    from semantic_world.views.world_rdr import world_rdr
+    from semantic_world.world_rdr import world_rdr
 except ImportError as e:
     world_rdr = None
 from semantic_world.world import World
+
+@dataclass
+class TestView(View):
+    """
+    A Generic View for multiple bodies.
+    """
+    _private_body: Body = field(default=Body)
+    body_list: List[Body] = field(default_factory=list, hash=False)
+    views: List[View] = field(default_factory=list, hash=False)
+    root_body_1: Body = field(default=Body)
+    root_body_2: Body = field(default=Body)
+    tip_body_1: Body = field(default=Body)
+    tip_body_2: Body = field(default=Body)
+
+    def add_body(self, body: Body):
+        self.body_list.append(body)
+        body._views.add(self)
+
+    def add_view(self, view: View):
+        self.views.append(view)
+        view._views.add(self)
+
+    @property
+    def chain(self) -> list[Body]:
+        """
+        Returns itself as a kinematic chain.
+        """
+        return self._world.compute_chain_of_bodies(self.root_body_1, self.tip_body_1)
+
+    @property
+    def _private_chain(self) -> list[Body]:
+        """
+        Returns itself as a kinematic chain.
+        """
+        return self._world.compute_chain_of_bodies(self.root_body_2, self.tip_body_2)
+
+    def __hash__(self):
+        """
+        Custom hash function to ensure that the view is hashable.
+        """
+        return hash((self._private_body, tuple(self.body_list), tuple(self.views),
+                     self.root_body_1, self.root_body_2, self.tip_body_1, self.tip_body_2))
 
 
 class ViewTestCase(unittest.TestCase):
@@ -53,7 +97,7 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
-    use_gui: bool = True
+    use_gui: bool = False
 
     @classmethod
     def setUpClass(cls):
@@ -64,10 +108,38 @@ class ViewTestCase(unittest.TestCase):
             cls.app = QApplication(sys.argv)
             cls.viewer = RDRCaseViewer()
 
-    def test_id(self):
-        v1 = Handle(1)
-        v2 = Handle(2)
-        self.assertTrue(v1 is not v2)
+    def test_aggregate_bodies(self):
+        world_view = TestView(_world=self.kitchen_world)
+
+        # Test bodies added to a private dataclass field are not aggregated
+        world_view._private_body = self.kitchen_world.bodies[0]
+
+        # Test aggregation of bodies added in custom properties
+        world_view.root_body_1 = self.kitchen_world.bodies[1]
+        world_view.tip_body_1 = self.kitchen_world.bodies[4]
+
+        # Test aggregation of normal dataclass field
+        body_subset = self.kitchen_world.bodies[5:10]
+        [world_view.add_body(body) for body in body_subset]
+
+        # Test aggregation of bodies in a new as well as a nested view
+        view1 = TestView()
+        view1_subset = self.kitchen_world.bodies[10:18]
+        [view1.add_body(body) for body in view1_subset]
+
+        view2 = TestView()
+        view2_subset = self.kitchen_world.bodies[20:]
+        [view2.add_body(body) for body in view2_subset]
+
+        view1.add_view(view2)
+        world_view.add_view(view1)
+
+        # Test that bodies added in a custom private property are not aggregated
+        world_view.root_body_2 = self.kitchen_world.bodies[18]
+        world_view.tip_body_2 = self.kitchen_world.bodies[20]
+
+        # The aggregation should not include the private dataclass field body or the body added exclusively in the private property
+        assert_equal(world_view.bodies, set(self.kitchen_world.bodies) - {self.kitchen_world.bodies[0], self.kitchen_world.bodies[19]})
 
     def test_handle_view(self):
         self.fit_rules_for_a_view_in_apartment(Handle, scenario=self.test_handle_view)
@@ -118,7 +190,7 @@ class ViewTestCase(unittest.TestCase):
 
     def test_base_view(self):
         self.fit_rules_for_a_view_in_apartment(Base, scenario=self.test_base_view)
-        
+
     def test_DetailedArmchair_view(self):
         self.fit_rules_for_a_view_in_apartment(DetailedArmchair, scenario=self.test_DetailedArmchair_view)
     '''
@@ -129,7 +201,7 @@ class ViewTestCase(unittest.TestCase):
     '''
     def test_DetailedSofa_view(self):
         self.fit_rules_for_a_view_in_apartment(DetailedSofa, scenario=self.test_DetailedSofa_view)
-    
+
     def test_cushion_view(self):
         self.fit_rules_for_a_view_in_apartment(Cushion, scenario=self.test_cushion_view)
     '''
@@ -155,6 +227,7 @@ class ViewTestCase(unittest.TestCase):
     def test_sink_view(self):
         self.fit_rules_for_a_view_in_apartment(Sink, scenario=self.test_sink_view)
 
+
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
         self.fit_rules_for_a_view_in_apartment(Wardrobe, scenario=self.test_wardrobe_view)
@@ -168,29 +241,27 @@ class ViewTestCase(unittest.TestCase):
 
     @pytest.mark.order("second_to_last")
     def test_apartment_views(self):
-        rdr = self.fit_views_and_get_rdr(self.apartment_world, [Handle, Container, Drawer, Cabinet],
-                                         world_factory=self.get_apartment_world, scenario=self.test_apartment_views)
+        world_reasoner = WorldReasoner(self.apartment_world)
+        world_reasoner.fit_views([Handle, Container, Drawer, Cabinet],
+                                 world_factory=self.get_apartment_world, scenario=self.test_apartment_views)
 
-        found_views = rdr.classify(self.apartment_world)
+        found_views = world_reasoner.infer_views()
 
-        drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
-                                  type(v) is Container]
+        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
 
         self.assertTrue(len(drawer_container_names) == 19)
 
     @pytest.mark.order("last")
     def test_kitchen_views(self):
-        rdr = self.fit_views_and_get_rdr(self.kitchen_world, [Handle, Container, Drawer, Cabinet],
-                                         world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
+        world_reasoner = WorldReasoner(self.kitchen_world)
+        world_reasoner.fit_views([Handle, Container, Drawer, Cabinet],
+                                 world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
 
-        found_views = rdr.classify(self.kitchen_world)
+        found_views = world_reasoner.infer_views()
 
-        drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
-                                  type(v) is Container]
+        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
+
         self.assertTrue(len(drawer_container_names) == 14)
-
-
-
 
     @classmethod
     def get_kitchen_world(cls) -> World:
@@ -247,20 +318,8 @@ class ViewTestCase(unittest.TestCase):
                                              update_existing_views=update_existing_views,
                                              world_factory=self.get_apartment_world, scenario=scenario)
 
-    def fit_rules_for_a_view_in_table(self, view_type: Type[View], update_existing_views: bool = False,
-                                          scenario: Optional[Callable] = None) -> None:
-        """
-        Template method to test a specific view type in the apartment world.
-
-        :param view_type: The type of view to fit and assert.
-        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
-        :param scenario: Optional callable that represents the test method or scenario that is being executed.
-        """
-        self.fit_rules_for_a_view_and_assert(self.table_world, view_type,
-                                             update_existing_views=update_existing_views,
-                                             world_factory=self.get_table_world, scenario=scenario)
-
-    def fit_rules_for_a_view_and_assert(self, world: World, view_type: Type[View], update_existing_views: bool = False,
+    @staticmethod
+    def fit_rules_for_a_view_and_assert(world: World, view_type: Type[View], update_existing_views: bool = False,
                                         world_factory: Optional[Callable] = None,
                                         scenario: Optional[Callable] = None) -> None:
         """
@@ -272,61 +331,10 @@ class ViewTestCase(unittest.TestCase):
         :param world_factory: Optional callable that can be used to recreate the world object.
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
-        rdr = self.fit_views_and_get_rdr(world, [view_type], update_existing_views=update_existing_views,
-                                         world_factory=world_factory, scenario=scenario)
+        world_reasoner = WorldReasoner(world)
+        world_reasoner.fit_views([view_type], update_existing_views=update_existing_views,
+                                 world_factory=world_factory, scenario=scenario)
 
-        found_views = rdr.classify(world)['views']
+        found_views = world_reasoner.infer_views()
 
         assert any(isinstance(v, view_type) for v in found_views)
-
-    def fit_views_and_get_rdr(self, world: World, required_views: List[Type[View]],
-                              update_existing_views: bool = False, world_factory: Optional[Callable] = None,
-                              scenario: Optional[Callable] = None) -> GeneralRDR:
-        """
-        Fit rules to the specified views in the given world and return the RDR.
-
-        :param world: The world to fit the views to.
-        :param required_views: A list of view types that the RDR should be fitted to.
-        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
-        :param world_factory: Optional callable that can be used to recreate the world object.
-        :param scenario: Optional callable that represents the test method or scenario that is being executed.
-        :return: An instance of GeneralRDR fitted to the specified views.
-        """
-        rdr = self.load_or_create_rdr()
-
-        self.fit_rdr_to_views(rdr, required_views, world, update_existing_views=update_existing_views,
-                              world_factory=world_factory, scenario=scenario)
-        rdr.save(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
-
-        return rdr
-
-    def load_or_create_rdr(self) -> GeneralRDR:
-        """
-        Load an existing RDR or create a new one if it does not exist.
-
-        :return: An instance of GeneralRDR loaded from the specified directory or a new instance of GeneralRDR.
-        """
-        if not os.path.exists(os.path.join(self.views_dir, self.views_rdr_model_name)):
-            return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name)
-        else:
-            rdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
-        return rdr
-
-    @staticmethod
-    def fit_rdr_to_views(rdr: GeneralRDR, required_views: List[Type[View]], world: World,
-                         update_existing_views: bool = False,
-                         world_factory: Optional[Callable] = None,
-                         scenario: Optional[Callable] = None) -> None:
-        """
-        Fits the given RDR to the required views in the world.
-
-        :param rdr: The RDR to fit.
-        :param required_views: A list of view types that the RDR should be fitted to.
-        :param world: The world that contains or should contain the views.
-        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
-        :param world_factory: Optional callable that can be used to recreate the world object.
-        :param scenario: Optional callable that represents the test method or scenario that is being executed.
-        """
-        for view in required_views:
-            case_query = CaseQuery(world, "views", (view,), False, case_factory=world_factory, scenario=scenario)
-            rdr.fit_case(case_query, update_existing_rules=update_existing_views)

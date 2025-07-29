@@ -9,8 +9,8 @@ from multiverse_parser import (InertiaSource,
                                JointBuilder, JointType)
 from pxr import UsdUrdf
 
-from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection
-from ..spatial_types.derivatives import Derivatives
+from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection, UnitVector
+from ..spatial_types.derivatives import DerivativeMap
 from ..prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..world import World, Body, Connection
@@ -115,13 +115,13 @@ class MultiParser:
             transform = body_builder.xform.GetLocalTransformation()
             pos = transform.ExtractTranslation()
             quat = transform.ExtractRotationQuat()
-            origin = cas.TransformationMatrix.from_xyz_quat(pos_x=pos[0],
-                                                            pos_y=pos[1],
-                                                            pos_z=pos[2],
-                                                            quat_w=quat.GetReal(),
-                                                            quat_x=quat.GetImaginary()[0],
-                                                            quat_y=quat.GetImaginary()[1],
-                                                            quat_z=quat.GetImaginary()[2])
+            point_expr = cas.Point3((pos[0], pos[1], pos[2]))
+            quaternion_expr = cas.Quaternion((quat.GetImaginary()[0],
+                                              quat.GetImaginary()[1],
+                                              quat.GetImaginary()[2],
+                                              quat.GetReal()))
+            origin = cas.TransformationMatrix.from_point_rotation_matrix(point=point_expr,
+                                                                         rotation_matrix=quaternion_expr.to_rotation_matrix())
             connection = FixedConnection(parent=parent_body, child=child_body, origin_expression=origin)
             connections.append(connection)
 
@@ -132,13 +132,13 @@ class MultiParser:
         joint_name = joint_prim.GetName()
         joint_pos = joint_builder.pos
         joint_quat = joint_builder.quat
-        origin = cas.TransformationMatrix.from_xyz_quat(pos_x=joint_pos[0],
-                                                        pos_y=joint_pos[1],
-                                                        pos_z=joint_pos[2],
-                                                        quat_w=joint_quat.GetReal(),
-                                                        quat_x=joint_quat.GetImaginary()[0],
-                                                        quat_y=joint_quat.GetImaginary()[1],
-                                                        quat_z=joint_quat.GetImaginary()[2])
+        point_expr = cas.Point3((joint_pos[0], joint_pos[1], joint_pos[2]))
+        quaternion_expr = cas.Quaternion((joint_quat.GetImaginary()[0],
+                                          joint_quat.GetImaginary()[1],
+                                          joint_quat.GetImaginary()[2],
+                                          joint_quat.GetReal()))
+        origin = cas.TransformationMatrix.from_point_rotation_matrix(point=point_expr,
+                                                                     rotation_matrix=quaternion_expr.to_rotation_matrix())
         free_variable_name = PrefixedName(joint_name)
         offset = None
         multiplier = None
@@ -153,16 +153,20 @@ class MultiParser:
         elif joint_builder.type == JointType.FIXED:
             return FixedConnection(parent=parent_body, child=child_body, origin_expression=origin)
         elif joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS, JointType.PRISMATIC]:
-            axis = (float(joint_builder.axis.to_array()[0]),
-                    float(joint_builder.axis.to_array()[1]),
-                    float(joint_builder.axis.to_array()[2]))
-            if free_variable_name in world.degrees_of_freedom:
-                dof = world.degrees_of_freedom[free_variable_name]
-            else:
+            axis = UnitVector(float(joint_builder.axis.to_array()[0]),
+                              float(joint_builder.axis.to_array()[1]),
+                              float(joint_builder.axis.to_array()[2]))
+            try:
+                dof = world.get_degree_of_freedom_by_name(free_variable_name)
+            except KeyError:
                 if joint_builder.type == JointType.CONTINUOUS:
+                    lower_limits = DerivativeMap()
+                    lower_limits.position = joint_builder.joint.GetLowerLimitAttr().Get()
+                    upper_limits = DerivativeMap()
+                    upper_limits.position = joint_builder.joint.GetUpperLimitAttr().Get()
                     dof = world.create_degree_of_freedom(name=PrefixedName(joint_name),
-                                                         lower_limits={Derivatives.position: joint_builder.joint.GetLowerLimitAttr().Get()},
-                                                         upper_limits={Derivatives.position: joint_builder.joint.GetUpperLimitAttr().Get()})
+                                                         lower_limits=lower_limits,
+                                                         upper_limits=upper_limits)
                 else:
                     dof = world.create_degree_of_freedom(name=PrefixedName(joint_name))
             if joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS]:

@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import functools
 from enum import IntEnum
-from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict, TypeVar
+from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict, TypeVar, \
+    TYPE_CHECKING
 import numpy as np
 import casadi as ca  # type: ignore
 
 from scipy import sparse as sp
 from ..connections import UnitVector
 
-from ..prefixed_name import PrefixedName
+if TYPE_CHECKING:
+    from ..world_entity import Body
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, float, Quaternion]
@@ -22,21 +24,23 @@ pi: float
 def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeError: ...
 
 class ReferenceFrameMixin:
-    reference_frame: PrefixedName
+    reference_frame: Optional[Body]
+
 
 class StackedCompiledFunction:
     compiled_f: CompiledFunction
     split_out_view: List[np.ndarray]
-    str_params: List[str]
+    symbol_parameters: List[Symbol]
 
-    def __init__(self, expressions: List[Expression], parameters: Optional[List[str]] = None,
+    def __init__(self,
+                 expressions: List[Expression],
+                 parameters: Optional[Union[List[Symbol], List[List[Symbol]]]] = None,
                  additional_views: Optional[List[slice]] = None): ...
 
-    def fast_call(self, filtered_args: np.ndarray) -> np.ndarray: ...
+    def fast_call(self, *args: np.ndarray) -> np.ndarray: ...
 
 
 class CompiledFunction:
-    str_parameters: List[str]
     symbol_parameters: List[Symbol]
     compiled_casadi_function: ca.Function
     function_buffer: ca.FunctionBuffer
@@ -44,11 +48,14 @@ class CompiledFunction:
     out: Union[np.ndarray, sp.csc_matrix]
     sparse: bool
 
-    def __init__(self,  expression: Symbol_, parameters: Optional[List[str]] = None, sparse: bool = False): ...
+    def __init__(self,
+                 expression: Symbol_,
+                 parameters: Optional[Union[List[Symbol], List[List[Symbol]]]] = None,
+                 sparse: bool = False): ...
 
     def __call__(self, **kwargs) -> np.ndarray: ...
 
-    def fast_call(self, filtered_args: np.ndarray) -> Union[np.ndarray, sp.csc_matrix]: ...
+    def fast_call(self, *args: np.ndarray) -> Union[np.ndarray, sp.csc_matrix]: ...
 
 
 class Symbol_:
@@ -68,7 +75,8 @@ class Symbol_:
 
     def to_np(self) -> Union[float, np.ndarray]: ...
 
-    def compile(self, parameters: Optional[List[Symbol]] = None, sparse: bool = False) -> CompiledFunction: ...
+    def compile(self, parameters: Optional[Union[List[Symbol], List[List[Symbol]]]] = None, sparse: bool = False) \
+            -> CompiledFunction: ...
 
     def __hash__(self) -> int: ...
 
@@ -76,6 +84,9 @@ class Symbol_:
 
 
 class Symbol(Symbol_):
+    _registry: Dict[str, Symbol]
+    name: str
+
     def __init__(self, name: str): ...
 
     @overload
@@ -216,7 +227,7 @@ class Expression(Symbol_):
     def reshape(self, new_shape: Tuple[int, int]) -> Expression: ...
 
 
-class Point3(Symbol_, GeometricType):
+class Point3(Symbol_, ReferenceFrameMixin):
 
     @property
     def x(self) -> Expression: ...
@@ -235,14 +246,14 @@ class Point3(Symbol_, GeometricType):
                                             ca.SX,
                                             np.ndarray,
                                             Iterable[symbol_expr_float]]] = None,
-                 reference_frame: Optional[PrefixedName] = None): ...
+                 reference_frame: Optional[Body] = None): ...
 
     @classmethod
     def from_xyz(cls,
                  x: Optional[symbol_expr_float] = None,
                  y: Optional[symbol_expr_float] = None,
                  z: Optional[symbol_expr_float] = None,
-                 reference_frame: Optional[PrefixedName] = None) -> Point3: ...
+                 reference_frame: Optional[Body] = None) -> Point3: ...
 
     def norm(self) -> Expression: ...
 
@@ -292,8 +303,8 @@ class Point3(Symbol_, GeometricType):
     def dot(self, other: Vector3) -> Expression: ...
 
 
-class Vector3(Symbol_, GeometricType):
-    vis_frame: Optional[PrefixedName]
+class Vector3(Symbol_, ReferenceFrameMixin):
+    vis_frame: Optional[Body]
 
     @property
     def x(self) -> Expression: ...
@@ -313,14 +324,14 @@ class Vector3(Symbol_, GeometricType):
                                             np.ndarray,
                                             UnitVector,
                                             Iterable[symbol_expr_float]]] = None,
-                 reference_frame: Optional[PrefixedName] = None): ...
+                 reference_frame: Optional[Body] = None): ...
 
     @classmethod
     def from_xyz(cls,
                  x: Optional[symbol_expr_float] = None,
                  y: Optional[symbol_expr_float] = None,
                  z: Optional[symbol_expr_float] = None,
-                 reference_frame: Optional[PrefixedName] = None) -> Vector3: ...
+                 reference_frame: Optional[Body] = None) -> Vector3: ...
 
     def norm(self) -> Expression: ...
 
@@ -393,12 +404,8 @@ BinaryFalse: Expression
 
 
 
-class GeometricType:
-    reference_frame: Optional[PrefixedName]
-
-
-class TransformationMatrix(Symbol_, GeometricType):
-    child_frame: Optional[PrefixedName]
+class TransformationMatrix(Symbol_, ReferenceFrameMixin):
+    child_frame: Optional[Body]
 
     def __init__(self, data: Optional[Union[TransformationMatrix,
                                             RotationMatrix,
@@ -406,8 +413,8 @@ class TransformationMatrix(Symbol_, GeometricType):
                                             np.ndarray,
                                             Expression,
                                             Iterable[Iterable[symbol_expr_float]]]] = None,
-                 reference_frame: Optional[PrefixedName] = None,
-                 child_frame: Optional[PrefixedName] = None,
+                 reference_frame: Optional[Body] = None,
+                 child_frame: Optional[Body] = None,
                  sanity_check: bool = True): ...
 
     @property
@@ -432,6 +439,15 @@ class TransformationMatrix(Symbol_, GeometricType):
     @overload
     def dot(self, other: TransformationMatrix) -> TransformationMatrix: ...
 
+    @overload
+    def __matmul__(self, other: Point3) -> Point3: ...
+    @overload
+    def __matmul__(self, other: Vector3) -> Vector3: ...
+    @overload
+    def __matmul__(self, other: RotationMatrix) -> RotationMatrix: ...
+    @overload
+    def __matmul__(self, other: TransformationMatrix) -> TransformationMatrix: ...
+
     def to_rotation(self) -> RotationMatrix: ...
     def to_quaternion(self) -> Quaternion: ...
     def to_position(self) -> Point3: ...
@@ -445,19 +461,21 @@ class TransformationMatrix(Symbol_, GeometricType):
                      roll: Optional[symbol_expr_float] = None,
                      pitch: Optional[symbol_expr_float] = None,
                      yaw: Optional[symbol_expr_float] = None,
-                     reference_frame: Optional[PrefixedName] = None,
-                     child_frame: Optional[PrefixedName] = None) -> TransformationMatrix: ...
+                     reference_frame: Optional[Body] = None,
+                     child_frame: Optional[Body] = None) -> TransformationMatrix: ...
     @classmethod
     def from_point_rotation_matrix(cls,
                                    point: Optional[Point3] = None,
                                    rotation_matrix: Optional[RotationMatrix] = None,
-                                   reference_frame: Optional[PrefixedName] = None,
-                                   child_frame: Optional[PrefixedName] = None) -> TransformationMatrix: ...
+                                   reference_frame: Optional[Body] = None,
+                                   child_frame: Optional[Body] = None) -> TransformationMatrix: ...
 
     def inverse(self) -> TransformationMatrix: ...
 
 
-class RotationMatrix(Symbol_, GeometricType):
+class RotationMatrix(Symbol_, ReferenceFrameMixin):
+    child_frame: Optional[Body]
+
     def __init__(self, data: Optional[Union[TransformationMatrix,
                                             RotationMatrix,
                                             Expression,
@@ -465,38 +483,43 @@ class RotationMatrix(Symbol_, GeometricType):
                                             ca.SX,
                                             np.ndarray,
                                             Iterable[Iterable[symbol_expr_float]]]] = None,
-                 reference_frame: Optional[PrefixedName] = None,
+                 reference_frame: Optional[Body] = None,
+                 child_frame: Optional[Body] = None,
                  sanity_check: bool = True): ...
     @classmethod
     def __quaternion_to_rotation_matrix(cls, q: Quaternion) -> RotationMatrix: ...
 
     @classmethod
-    def from_axis_angle(cls, axis: Vector3, angle: symbol_expr_float, reference_frame: Optional[PrefixedName] = None) \
+    def from_axis_angle(cls, axis: Vector3, angle: symbol_expr_float, reference_frame: Optional[Body] = None) \
             -> RotationMatrix: ...
     @classmethod
     def from_quaternion(cls, q: Quaternion) -> RotationMatrix: ...
     @classmethod
     @overload
-    def from_vectors(cls, x: Vector3, y: Vector3, reference_frame: Optional[PrefixedName] = None) -> RotationMatrix: ...
+    def from_vectors(cls, x: Vector3, y: Vector3, reference_frame: Optional[Body] = None) -> RotationMatrix: ...
     @classmethod
     @overload
-    def from_vectors(cls, x: Vector3, z: Vector3, reference_frame: Optional[PrefixedName] = None) -> RotationMatrix: ...
+    def from_vectors(cls, x: Vector3, z: Vector3, reference_frame: Optional[Body] = None) -> RotationMatrix: ...
     @classmethod
     @overload
-    def from_vectors(cls, y: Vector3, z: Vector3, reference_frame: Optional[PrefixedName] = None) -> RotationMatrix: ...
+    def from_vectors(cls, y: Vector3, z: Vector3, reference_frame: Optional[Body] = None) -> RotationMatrix: ...
     @classmethod
     @overload
     def from_vectors(cls, x: Optional[Vector3] = None,
                      y: Optional[Vector3] = None,
                      z: Optional[Vector3] = None,
-                     reference_frame: Optional[PrefixedName] = None) -> RotationMatrix: ...
+                     reference_frame: Optional[Body] = None) -> RotationMatrix: ...
 
     @classmethod
     def from_rpy(cls,
                  roll: Optional[symbol_expr_float] = None,
                  pitch: Optional[symbol_expr_float] = None,
                  yaw: Optional[symbol_expr_float] = None,
-                 reference_frame: Optional[PrefixedName] = None) -> RotationMatrix: ...
+                 reference_frame: Optional[Body] = None) -> RotationMatrix: ...
+
+    def x_vector(self) -> Vector3: ...
+    def y_vector(self) -> Vector3: ...
+    def z_vector(self) -> Vector3: ...
 
     def to_axis_angle(self) -> Tuple[Vector3, Expression]: ...
     def to_angle(self, hint: Optional[Callable] = None) -> Expression: ...
@@ -512,13 +535,22 @@ class RotationMatrix(Symbol_, GeometricType):
     @overload
     def dot(self, other: TransformationMatrix) -> TransformationMatrix: ...
 
+    @overload
+    def __matmul__(self, other: Point3) -> Point3: ...
+    @overload
+    def __matmul__(self, other: Vector3) -> Vector3: ...
+    @overload
+    def __matmul__(self, other: RotationMatrix) -> RotationMatrix: ...
+    @overload
+    def __matmul__(self, other: TransformationMatrix) -> TransformationMatrix: ...
+
     def normalize(self): ...
     def inverse(self) -> RotationMatrix: ...
     @property
     def T(self) -> RotationMatrix: ...
 
 
-class Quaternion(Symbol_, GeometricType):
+class Quaternion(Symbol_, ReferenceFrameMixin):
     @property
     def x(self) -> Expression: ...
     @x.setter
@@ -543,7 +575,7 @@ class Quaternion(Symbol_, GeometricType):
                                                   symbol_expr_float,
                                                   symbol_expr_float,
                                                   symbol_expr_float]]] = None,
-                 reference_frame: Optional[PrefixedName] = None): ...
+                 reference_frame: Optional[Body] = None): ...
 
     @classmethod
     def from_xyzw(cls,
@@ -551,14 +583,14 @@ class Quaternion(Symbol_, GeometricType):
                   y: symbol_expr_float,
                   z: symbol_expr_float,
                   w: symbol_expr_float,
-                  reference_frame: Optional[PrefixedName] = None) -> Quaternion: ...
+                  reference_frame: Optional[Body] = None) -> Quaternion: ...
 
     @classmethod
-    def from_axis_angle(cls, axis: Vector3, angle: symbol_expr_float, reference_frame: Optional[PrefixedName] = None) \
+    def from_axis_angle(cls, axis: Vector3, angle: symbol_expr_float, reference_frame: Optional[Body] = None) \
             -> Quaternion: ...
     @classmethod
     def from_rpy(cls, roll: symbol_expr_float, pitch: symbol_expr_float, yaw: symbol_expr_float,
-                 reference_frame: Optional[PrefixedName] = None) -> Quaternion: ...
+                 reference_frame: Optional[Body] = None) -> Quaternion: ...
     @classmethod
     def from_rotation_matrix(cls, r: Union[RotationMatrix, TransformationMatrix]) -> Quaternion: ...
 
@@ -587,8 +619,9 @@ def save_division(nominator: symbol_expr_float, denominator: symbol_expr_float,
 
 def diag(args: Union[List[symbol_expr_float], Expression]) -> Expression: ...
 
-def jacobian(expressions: Union[symbol_expr, List[symbol_expr]],
-             symbols: Iterable[Symbol]) -> Expression: ...
+def hessian(expressions: Union[symbol_expr, List[symbol_expr]], symbols: Iterable[Symbol]) -> Expression: ...
+
+def jacobian(expressions: Union[symbol_expr, List[symbol_expr]], symbols: Iterable[Symbol]) -> Expression: ...
 
 def jacobian_dot(expressions: Expression, symbols: List[symbol_expr], symbols_dot: List[symbol_expr]) -> Expression: ...
 
@@ -601,7 +634,7 @@ def var(variables_names: str) -> List[Symbol]: ...
 
 def free_symbols(expression: all_expressions) -> List[ca.SX]: ...
 
-def create_symbols(names: List[str]) -> List[Symbol]: ...
+def create_symbols(names: Union[List[str], int]) -> List[Symbol]: ...
 
 def compile_and_execute(f: Callable[..., all_expressions],
                         params: Union[List[Union[float, np.ndarray]], np.ndarray]) \
@@ -683,6 +716,9 @@ def if_greater(a: symbol_expr_float, b: symbol_expr_float, if_result: Point3,
 def if_greater(a: symbol_expr_float, b: symbol_expr_float, if_result: symbol_expr_float,
                else_result: symbol_expr_float) -> Expression: ...
 
+@overload
+def if_less(a: symbol_expr_float, b: symbol_expr_float, if_result: Quaternion,
+            else_result: Quaternion) -> Quaternion: ...
 @overload
 def if_less(a: symbol_expr_float, b: symbol_expr_float, if_result: Vector3,
             else_result: Vector3) -> Vector3: ...
@@ -901,6 +937,8 @@ def distance_point_to_plane_signed(frame_P_current: Point3, frame_V_v1: Vector3,
         Tuple[Expression, Point3]: ...
 
 def project_to_cone(frame_V_current: Vector3, frame_V_cone_axis: Vector3, cone_theta: Union[Symbol, float, Expression]) -> Vector3: ...
+
+def project_to_plane(frame_V_plane_vector1: Vector3, frame_V_plane_vector2: Vector3, frame_P_point: Point3) -> Point3: ...
 
 def angle_between_vector(v1: Vector3, v2: Vector3) -> Expression: ...
 

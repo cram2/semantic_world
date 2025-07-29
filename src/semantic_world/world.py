@@ -1,26 +1,33 @@
+from __future__ import absolute_import
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import wraps, lru_cache
-from typing import Dict, Tuple, OrderedDict, Union, Optional
+from typing import Dict, Tuple, OrderedDict, Union, Optional, Type
 
 import matplotlib.pyplot as plt
 import numpy as np
 import rustworkx as rx
 import rustworkx.visit
 import rustworkx.visualization
-from typing_extensions import List
+from typing_extensions import List, Type
 
-from .connections import HasUpdateState, Has1DOFState
+from .connections import HasUpdateState, Has1DOFState, Connection6DoF
 from .degree_of_freedom import DegreeOfFreedom
+from .exceptions import AddingAnExistingViewError, DuplicateViewError
+from .ik_solver import InverseKinematicsSolver
 from .prefixed_name import PrefixedName
 from .spatial_types import spatial_types as cas
-from .spatial_types.derivatives import Derivatives
+from .spatial_types.derivatives import Derivatives, DerivativeMap
 from .spatial_types.math import inverse_frame
+from .spatial_types.spatial_types import TransformationMatrix
+from .types import NpMatrix4x4
 from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection, View
+from .world_state import WorldState
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +93,7 @@ class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
                 continue
             collision_fks.append(self.child_body_to_fk_expr[body.name])
         collision_fks = cas.vstack(collision_fks)
-        params = [v.get_symbol(Derivatives.position) for v in self.world.degrees_of_freedom.values()]
+        params = [v.symbols.position for v in self.world.degrees_of_freedom]
         self.compiled_all_fks = all_fks.compile(parameters=params)
         self.compiled_collision_fks = collision_fks.compile(parameters=params)
         self.compiled_tf = tf.compile(parameters=params)
@@ -97,7 +104,7 @@ class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
         Clears cache and recomputes all forward kinematics. Should be called after a state update.
         """
         self.compute_forward_kinematics_np.cache_clear()
-        self.subs = self.world.state[Derivatives.position]
+        self.subs = self.world.state.positions
         self.forward_kinematics_for_all_bodies = self.compiled_all_fks.fast_call(self.subs)
 
     def compute_tf(self) -> np.ndarray:
@@ -112,7 +119,7 @@ class ForwardKinematicsVisitor(rustworkx.visit.DFSVisitor):
         return self.compiled_tf.fast_call(self.subs)
 
     @lru_cache(maxsize=None)
-    def compute_forward_kinematics_np(self, root: Body, tip: Body) -> np.ndarray:
+    def compute_forward_kinematics_np(self, root: Body, tip: Body) -> NpMatrix4x4:
         """
         Computes the forward kinematics from the root body to the tip body, root_T_tip.
 
@@ -162,7 +169,7 @@ class ResetStateContextManager:
         self.world = world
 
     def __enter__(self) -> None:
-        self.state = self.world.state.copy()
+        self.state = deepcopy(self.world.state)
 
     def __exit__(self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Optional[type]) -> None:
         if exc_type is None:
@@ -198,6 +205,7 @@ def modifies_world(func):
     """
     Decorator that marks a method as a modification to the state or model of a world.
     """
+
     @wraps(func)
     def wrapper(self: World, *args, **kwargs):
         with self.modify_world() as context_manager:
@@ -228,9 +236,9 @@ class World:
     All views the world is aware of.
     """
 
-    degrees_of_freedom: Dict[PrefixedName, DegreeOfFreedom] = field(default_factory=dict)
+    degrees_of_freedom: List[DegreeOfFreedom] = field(default_factory=list)
 
-    state: np.ndarray = field(default_factory=lambda: np.empty((4, 0), dtype=float))
+    state: WorldState = field(default_factory=WorldState)
     """
     2d array where rows are derivatives and columns are dof values for that derivative.
     """
@@ -252,6 +260,11 @@ class World:
     Is set to True, when a function with @modifies_world is called or world.modify_world context is used.
     """
 
+    name: Optional[str] = None
+    """
+    Name of the world. May act as default namespace for all bodies and views in the world which do not have a prefix.
+    """
+
     @property
     def root(self) -> Body:
         """
@@ -267,22 +280,23 @@ class World:
         else:
             raise ValueError(f"No root found.")
 
-
     def __hash__(self):
         return hash(id(self))
 
-    def validate(self) -> None:
+    def validate(self) -> bool:
         """
         Validate the world.
 
         The world must be a tree.
+        :return: True if the world is valid, raises an AssertionError otherwise.
         """
         assert len(self.bodies) == (len(self.connections) + 1)
         assert rx.is_weakly_connected(self.kinematic_structure)
+        return True
 
     @modifies_world
-    def create_degree_of_freedom(self, name: PrefixedName, lower_limits: Optional[Dict[Derivatives, float]] = None,
-                                 upper_limits: Optional[Dict[Derivatives, float]] = None) -> DegreeOfFreedom:
+    def create_degree_of_freedom(self, name: PrefixedName, lower_limits: Optional[DerivativeMap[float]] = None,
+                                 upper_limits: Optional[DerivativeMap[float]] = None) -> DegreeOfFreedom:
         """
         Create a degree of freedom in the world and return it.
         For dependent kinematics, DoFs must be created with this method and passed to the connection's conctructor.
@@ -291,17 +305,17 @@ class World:
         :param upper_limits: If the DoF is actively controlled, it must have at least velocity limits.
         :return: The already registered DoF.
         """
-        dof = DegreeOfFreedom(name=name, _lower_limits=lower_limits, _upper_limits=upper_limits, _world=self)
+        dof = DegreeOfFreedom(name=name, lower_limits=lower_limits, upper_limits=upper_limits, _world=self)
         initial_position = 0
-        lower_limit = dof.get_lower_limit(derivative=Derivatives.position)
+        lower_limit = dof.lower_limits.position
         if lower_limit is not None:
             initial_position = max(lower_limit, initial_position)
-        upper_limit = dof.get_upper_limit(derivative=Derivatives.position)
+        upper_limit = dof.upper_limits.position
         if upper_limit is not None:
             initial_position = min(upper_limit, initial_position)
-        full_initial_state = np.array([initial_position, 0, 0, 0], dtype=float).reshape((4, 1))
-        self.state = np.hstack((self.state, full_initial_state))
-        self.degrees_of_freedom[name] = dof
+        self.state[name].position = initial_position
+        assert [dof for dof in self.degrees_of_freedom if dof.name == name].count(dof) == 0
+        self.degrees_of_freedom.append(dof)
         return dof
 
     def modify_world(self) -> WorldModelUpdateContextManager:
@@ -325,7 +339,7 @@ class World:
         self.compute_chain_of_bodies.cache_clear()
         self.compute_chain_of_connections.cache_clear()
         # self.is_link_controlled.cache_clear()
-        for dof in self.degrees_of_freedom.values():
+        for dof in self.degrees_of_freedom:
             dof.reset_cache()
 
     def notify_state_change(self) -> None:
@@ -402,6 +416,51 @@ class World:
         connection._world = self
         self.kinematic_structure.add_edge(connection.parent.index, connection.child.index, connection)
 
+    def add_view(self, view: View, exists_ok: bool = False) -> None:
+        """
+        Adds a view to the current list of views if it doesn't already exist. Ensures
+        that the `view` is associated with the current instance and maintains the
+        integrity of unique view names.
+
+        :param view: The view instance to be added. Its name must be unique within
+            the current context.
+        :param exists_ok: Whether to raise an error or not when a view already exists.
+
+        :raises AddingAnExistingViewError: If exists_ok is False and a view with the same name and type already exists.
+        """
+        if self.get_view_by_name_and_type(view.name, type(view)):
+            if not exists_ok:
+                raise AddingAnExistingViewError(view)
+        else:
+            view._world = self
+            self.views.append(view)
+
+    def get_view_by_name_and_type(self, name: Union[str, PrefixedName], view_type: Type[View]) -> Optional[View]:
+        """
+        Retrieves a View from the list of view based on its name.
+        If the input is of type `PrefixedName`, it checks whether the prefix is specified and looks for an
+        exact match. Otherwise, it matches based on the name's string representation.
+        If more than one body with the same name is found, an assertion error is raised.
+        If no matching body is found, a `ValueError` is raised.
+
+        :param name: The name of the view to search for. Can be a string or a `PrefixedName` object.
+        :param view_type: The class (type) of the view to search for.
+        :return: The `View` object that matches the given name.
+        """
+        if isinstance(name, PrefixedName):
+            if name.prefix is not None:
+                matches = [view for view in self.views if view.name == name and type(view) == view_type]
+            else:
+                matches = [view for view in self.views if view.name.name == name.name and type(view) == view_type]
+        else:
+            matches = [view for view in self.views if view.name.name == name and type(view) == view_type]
+        if len(matches) > 1:
+            raise DuplicateViewError(matches)
+        if matches:
+            return matches[0]
+        return None
+
+
     @modifies_world
     def remove_body(self, body: Body) -> None:
         if body._world is self and body.index is not None:
@@ -411,20 +470,27 @@ class World:
         else:
             logger.debug("Trying to remove a body that is not part of this world.")
 
+
     @modifies_world
-    def merge_world(self, other: World) -> None:
+    def merge_world(self, other: World, root_connection: Connection = None) -> None:
         """
         Merge a world into the existing one by merging degrees of freedom, states, connections, and bodies.
         This removes all bodies and connections from `other`.
 
         :param other: The world to be added.
+        :param root_connection: If provided, this connection will be used to connect the two worlds. Otherwise, a new Connection6DoF will be created
         :return: None
         """
-        for dof in other.degrees_of_freedom.values():
-            dof.state_idx += len(self.degrees_of_freedom)
+
+        self_root = self.root
+        other_root = other.root
+        for dof in other.degrees_of_freedom:
+            self.state[dof.name].position = other.state[dof.name].position
+            self.state[dof.name].velocity = other.state[dof.name].velocity
+            self.state[dof.name].acceleration = other.state[dof.name].acceleration
+            self.state[dof.name].jerk = other.state[dof.name].jerk
             dof._world = self
-        self.degrees_of_freedom.update(other.degrees_of_freedom)
-        self.state = np.hstack((self.state, other.state))
+        self.degrees_of_freedom.extend(other.degrees_of_freedom)
 
         # do not trigger computations in other
         other.world_is_being_modified = True
@@ -434,11 +500,28 @@ class World:
             self.add_connection(connection)
         other.world_is_being_modified = False
 
+        connection = root_connection or Connection6DoF(parent=self_root, child=other_root, _world=self)
+        self.add_connection(connection)
+
+    def merge_world_at_pose(self, other: World, pose: NpMatrix4x4) -> None:
+        """
+        Merge another world into the existing one, creates a 6DoF connection between the root of this world and the root
+        of the other world.
+        :param other: The world to be added.
+        :param pose: world_root_T_other_root, the pose of the other world's root with respect to the current world's root
+        """
+        root_connection = Connection6DoF(parent=self.root, child=other.root, _world=self)
+        root_connection.origin = pose
+        self.merge_world(other, root_connection)
+        self.add_connection(root_connection)
+
     def __str__(self):
         return f"{self.__class__.__name__} with {len(self.bodies)} bodies."
 
+
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
+
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """
@@ -463,7 +546,33 @@ class World:
             raise ValueError(f'Multiple bodies with name {name} found')
         if matches:
             return matches[0]
-        raise ValueError(f'Body with name {name} not found')
+        raise KeyError(f'Body with name {name} not found')
+
+    def get_degree_of_freedom_by_name(self, name: Union[str, PrefixedName]) -> DegreeOfFreedom:
+        """
+        Retrieves a DegreeOfFreedom from the list of DegreeOfFreedom based on its name.
+        If the input is of type `PrefixedName`, it checks whether the prefix is specified and looks for an
+        exact match. Otherwise, it matches based on the name's string representation.
+        If more than one body with the same name is found, an assertion error is raised.
+        If no matching body is found, a `ValueError` is raised.
+
+        :param name: The name of the DegreeOfFreedom to search for. Can be a string or a `PrefixedName` object.
+        :return: The `DegreeOfFreedom` object that matches the given name.
+        :raises ValueError: If multiple or no DegreeOfFreedom with the specified name are found.
+        """
+        if isinstance(name, PrefixedName):
+            if name.prefix is not None:
+                matches = [dof for dof in self.degrees_of_freedom if dof.name == name]
+            else:
+                matches = [dof for dof in self.degrees_of_freedom if dof.name.name == name.name]
+        else:
+            matches = [dof for dof in self.degrees_of_freedom if dof.name.name == name]
+        if len(matches) > 1:
+            raise ValueError(f'Multiple DegreeOfFreedom with name {name} found')
+        if matches:
+            return matches[0]
+        raise KeyError(f'DegreeOfFreedom with name {name} not found')
+
 
     def get_connection_by_name(self, name: Union[str, PrefixedName]) -> Connection:
         """
@@ -494,7 +603,8 @@ class World:
             raise ValueError(f'Multiple connections with name {name} found')
         if matches:
             return matches[0]
-        raise ValueError(f'Connection with name {name} not found')
+        raise KeyError(f'Connection with name {name} not found')
+
 
     @lru_cache(maxsize=None)
     def compute_child_bodies(self, body: Body) -> List[Body]:
@@ -503,7 +613,19 @@ class World:
         :param body: The body for which to compute child bodies.
         :return: A list of child bodies.
         """
-        return list(self.kinematic_structure.successors(body))
+        return list(self.kinematic_structure.successors(body.index))
+
+    def compute_child_bodies_recursive(self, body: Body) -> List[Body]:
+        """
+        Computes all child bodies of a given body in the world recursively.
+        :param body: The body for which to compute child bodies.
+        :return: A list of all child bodies.
+        """
+        children = self.compute_child_bodies(body)
+        for child in children:
+            children.extend(self.compute_child_bodies_recursive(child))
+        return children
+
 
     @lru_cache(maxsize=None)
     def compute_parent_body(self, body: Body) -> Body:
@@ -514,6 +636,7 @@ class World:
         """
         return next(iter(self.kinematic_structure.predecessors(body.index)))
 
+
     @lru_cache(maxsize=None)
     def compute_parent_connection(self, body: Body) -> Connection:
         """
@@ -522,6 +645,7 @@ class World:
         :return: The parent connection of the given body.
         """
         return self.kinematic_structure.get_edge_data(self.compute_parent_body(body).index, body.index)
+
 
     @lru_cache(maxsize=None)
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
@@ -534,10 +658,12 @@ class World:
 
         return [self.kinematic_structure[index] for index in shortest_paths[0]]
 
+
     @lru_cache(maxsize=None)
     def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
         body_chain = self.compute_chain_of_bodies(root, tip)
         return [self.get_connection(body_chain[i], body_chain[i + 1]) for i in range(len(body_chain) - 1)]
+
 
     @lru_cache(maxsize=None)
     def compute_split_chain_of_bodies(self, root: Body, tip: Body) -> Tuple[List[Body], List[Body], List[Body]]:
@@ -554,6 +680,7 @@ class World:
             return [], [root], []
         root_chain = self.compute_chain_of_bodies(self.root, root)
         tip_chain = self.compute_chain_of_bodies(self.root, tip)
+        i = 0
         for i in range(min(len(root_chain), len(tip_chain))):
             if root_chain[i] != tip_chain[i]:
                 break
@@ -566,6 +693,7 @@ class World:
         tip_chain = self.compute_chain_of_bodies(common_ancestor, tip)
         tip_chain = tip_chain[1:]
         return root_chain, [common_ancestor], tip_chain
+
 
     @lru_cache(maxsize=None)
     def compute_split_chain_of_connections(self, root: Body, tip: Body) -> Tuple[List[Connection], List[Connection]]:
@@ -592,9 +720,11 @@ class World:
             tip_connections.append(self.get_connection(tip_chain[i], tip_chain[i + 1]))
         return root_connections, tip_connections
 
+
     @property
     def layers(self) -> List[List[Body]]:
         return rx.layers(self.kinematic_structure, [self.root.index], index_output=False)
+
 
     def bfs_layout(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> Dict[int, np.array]:
         """
@@ -632,6 +762,7 @@ class World:
         pos = dict(zip([node.index for node in nodes], pos))
         return pos
 
+
     def plot_kinematic_structure(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> None:
         """
         Plots the kinematic structure of the world.
@@ -642,13 +773,14 @@ class World:
 
         pos = self.bfs_layout(scale=scale, align=align)
 
-
-        rustworkx.visualization.mpl_draw(self.kinematic_structure, pos=pos, labels=lambda body: str(body.name), with_labels=True,
+        rustworkx.visualization.mpl_draw(self.kinematic_structure, pos=pos, labels=lambda body: str(body.name),
+                                         with_labels=True,
                                          edge_labels=lambda edge: edge.__class__.__name__)
 
         plt.title("World Kinematic Structure")
         plt.axis('off')  # Hide axes
         plt.show()
+
 
     def _travel_branch(self, body: Body, visitor: rustworkx.visit.DFSVisitor) -> None:
         """
@@ -659,6 +791,7 @@ class World:
         """
         rx.dfs_search(self.kinematic_structure, [body.index], visitor)
 
+
     def compile_forward_kinematics_expressions(self) -> None:
         """
         Traverse the kinematic structure and compile forward kinematics expressions for fast evaluation.
@@ -668,8 +801,10 @@ class World:
         new_fks.compile_forward_kinematics()
         self._fk_computer = new_fks
 
+
     def _recompute_forward_kinematics(self) -> None:
         self._fk_computer.recompute()
+
 
     @copy_lru_cache()
     def compose_forward_kinematics_expression(self, root: Body, tip: Body) -> cas.TransformationMatrix:
@@ -689,11 +824,12 @@ class World:
             fk = fk.dot(tip_T_root)
         for connection in tip_chain:
             fk = fk.dot(connection.origin_expression)
-        fk.reference_frame = root.name
-        fk.child_frame = tip.name
+        fk.reference_frame = root
+        fk.child_frame = tip
         return fk
 
-    def compute_forward_kinematics_np(self, root: Body, tip: Body) -> np.ndarray:
+
+    def compute_forward_kinematics_np(self, root: Body, tip: Body) -> NpMatrix4x4:
         """
         Computes the forward kinematics from the root body to the tip body, root_T_tip.
 
@@ -704,7 +840,49 @@ class World:
         :param tip: Tip body to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
         """
-        return self._fk_computer.compute_forward_kinematics_np(root, tip)
+        return self._fk_computer.compute_forward_kinematics_np(root, tip).copy()
+
+
+    def compute_relative_pose(self, pose: NpMatrix4x4, target_body: Body, pose_body: Body) -> NpMatrix4x4:
+        """
+        Computes the relative pose to a body given another body as reference.
+        :param pose: The pose to be transformed
+        :param target_body: The body to which the pose should be transformed
+        :param pose_body: The body which should be used as reference frame for the pose
+        :return: The pose relative to the target body.
+        """
+        target_T_pose = self.compute_forward_kinematics_np(target_body, pose_body)
+        return target_T_pose @ pose
+
+
+    def find_dofs_for_position_symbols(self, symbols: List[cas.Symbol]) -> List[DegreeOfFreedom]:
+        result = []
+        for s in symbols:
+            for dof in self.degrees_of_freedom:
+                if s == dof.symbols.position:
+                    result.append(dof)
+        return result
+
+
+    def compute_inverse_kinematics(self, root: Body, tip: Body, target: NpMatrix4x4,
+                                   dt: float = 0.05, max_iterations: int = 200,
+                                   translation_velocity: float = 0.2, rotation_velocity: float = 0.2) \
+            -> Dict[DegreeOfFreedom, float]:
+        """
+        Compute inverse kinematics using quadratic programming.
+
+        :param root: Root body of the kinematic chain
+        :param tip: Tip body of the kinematic chain
+        :param target: Desired tip pose relative to the root body
+        :param dt: Time step for integration
+        :param max_iterations: Maximum number of iterations
+        :param translation_velocity: Maximum translation velocity
+        :param rotation_velocity: Maximum rotation velocity
+        :return: Dictionary mapping DOF names to their computed positions
+        """
+        ik_solver = InverseKinematicsSolver(self)
+        return ik_solver.solve(root, tip, target, dt, max_iterations, translation_velocity, rotation_velocity)
+
 
     def apply_control_commands(self, commands: np.ndarray, dt: float, derivative: Derivatives) -> None:
         """
@@ -723,14 +901,15 @@ class World:
             raise ValueError(
                 f"Commands length {len(commands)} does not match number of free variables {len(self.degrees_of_freedom)}")
 
-        self.state[derivative] = commands
+        self.state.set_derivative(derivative, commands)
 
         for i in range(derivative - 1, -1, -1):
-            self.state[i] += self.state[i + 1] * dt
+            self.state.set_derivative(i, self.state.get_derivative(i) + self.state.get_derivative(i + 1) * dt)
         for connection in self.connections:
             if isinstance(connection, HasUpdateState):
                 connection.update_state(dt)
         self.notify_state_change()
+
 
     def set_positions_1DOF_connection(self, new_state: Dict[Has1DOFState, float]) -> None:
         for connection, value in new_state.items():

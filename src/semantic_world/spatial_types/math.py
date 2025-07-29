@@ -3,7 +3,7 @@ from typing import Tuple, Union, List
 import numpy as np
 
 from .derivatives import Derivatives
-
+from ..types import NpMatrix4x4, AnyMatrix4x4
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
     x0, y0, z0, w0 = quaternion0
@@ -44,7 +44,7 @@ def quaternion_from_axis_angle(axis: Union[List[float], Tuple[float, float, floa
 _EPS = np.finfo(float).eps * 4.0
 
 
-def rpy_from_matrix(rotation_matrix: np.ndarray) -> Tuple[float, float, float]:
+def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> Tuple[float, float, float]:
     """
     :param rotation_matrix: 4x4 Matrix
     :type rotation_matrix: Matrix
@@ -71,7 +71,7 @@ def rpy_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Tuple[flo
     return rpy_from_matrix(rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
-def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
+def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> NpMatrix4x4:
     """
     Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -92,7 +92,7 @@ def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarra
     return np.dot(np.dot(rz, ry), rx)
 
 
-def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> np.ndarray:
+def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> NpMatrix4x4:
     """
     Unit quaternion to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -109,7 +109,7 @@ def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> n
 
 
 def rotation_matrix_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float) \
-        -> np.ndarray:
+        -> NpMatrix4x4:
     return rotation_matrix_from_quaternion(*quaternion_from_axis_angle(axis, angle))
 
 
@@ -117,13 +117,13 @@ def quaternion_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     return quaternion_from_rotation_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
-def quaternion_from_rotation_matrix(matrix: Union[List[List[float]], np.ndarray]) -> np.ndarray:
+def quaternion_from_rotation_matrix(matrix: AnyMatrix4x4) -> np.ndarray:
     """
     :param matrix: 4x4 Matrix
     :return: array length 4
     """
     q = np.empty((4,), dtype=np.float64)
-    M = np.array(matrix, dtype=np.float64, copy=False)[:4, :4]
+    M = np.array(matrix, dtype=np.float64)[:4, :4]
     t = np.trace(M)
     if t > M[3, 3]:
         q[3] = t
@@ -168,7 +168,7 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
     return np.array([x, y, z]), angle
 
 
-def axis_angle_from_rotation_matrix(m: np.ndarray) -> Tuple[np.ndarray, float]:
+def axis_angle_from_rotation_matrix(m: NpMatrix4x4) -> Tuple[np.ndarray, float]:
     return axis_angle_from_quaternion(*quaternion_from_rotation_matrix(m))
 
 
@@ -200,7 +200,7 @@ def limit(a: float, lower_limit: float, upper_limit: float) -> float:
     return max(lower_limit, min(upper_limit, a))
 
 
-def inverse_frame(f1_T_f2: np.ndarray) -> np.ndarray:
+def inverse_frame(f1_T_f2: NpMatrix4x4) -> NpMatrix4x4:
     """
     :param f1_T_f2: 4x4 Matrix
     :return: f2_T_f1
