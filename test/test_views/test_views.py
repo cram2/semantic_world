@@ -317,6 +317,19 @@ class ViewTestCase(unittest.TestCase):
                                              update_existing_views=update_existing_views,
                                              world_factory=self.get_apartment_world, scenario=scenario)
 
+    def fit_rules_for_a_view_in_table(self, view_type: Type[View], update_existing_views: bool = False,
+                                          scenario: Optional[Callable] = None) -> None:
+        """
+        Template method to test a specific view type in the table world.
+
+        :param view_type: The type of view to fit and assert.
+        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
+        :param scenario: Optional callable that represents the test method or scenario that is being executed.
+        """
+        self.fit_rules_for_a_view_and_assert(self.table_world, view_type,
+                                             update_existing_views=update_existing_views,
+                                             world_factory=self.get_table_world, scenario=scenario)
+
     @staticmethod
     def fit_rules_for_a_view_and_assert(world: World, view_type: Type[View], update_existing_views: bool = False,
                                         world_factory: Optional[Callable] = None,

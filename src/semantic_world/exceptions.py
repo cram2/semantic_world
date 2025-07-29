@@ -29,3 +29,10 @@ class DuplicateViewError(UsageError):
     def __init__(self, views: List[View]):
         msg = f'Views {views} are duplicates, while views elements should be unique.'
         super().__init__(msg)
+
+
+class ParsingError(Exception):
+    """
+    An error that happens during parsing of files.
+    """
+    ...
