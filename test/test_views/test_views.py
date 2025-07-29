@@ -162,7 +162,6 @@ class ViewTestCase(unittest.TestCase):
     def test_roots_view(self):
         self.fit_rules_for_a_view_in_apartment(Roots, scenario=self.test_roots_view)
 
-
     def test_table_view(self):
         self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)
 
@@ -179,7 +178,8 @@ class ViewTestCase(unittest.TestCase):
         self.fit_rules_for_a_view_in_table(Surface, scenario=self.test_surface_view)
 
     def test_DetailedTable_view(self):
-        self.fit_rules_for_a_view_in_table(DetailedTable, scenario=self.test_DetailedTable_view)#, update_existing_views=True)
+        self.fit_rules_for_a_view_in_table(DetailedTable,
+                                           scenario=self.test_DetailedTable_view)  # , update_existing_views=True)
 
     def test_Armchair_view(self):
         self.fit_rules_for_a_view_in_apartment(Armchair, scenario=self.test_Armchair_view)
@@ -226,7 +226,6 @@ class ViewTestCase(unittest.TestCase):
 
     def test_sink_view(self):
         self.fit_rules_for_a_view_in_apartment(Sink, scenario=self.test_sink_view)
-
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
