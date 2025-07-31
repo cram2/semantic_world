@@ -383,7 +383,7 @@ class BoundingBox:
 
         :return: A list of Point3 objects representing the corners of the bounding box.
         """
-        return [Point3.from_xyz(x, y, z)
+        return [Point3(x, y, z)
                 for x in (self.min_x, self.max_x)
                 for y in (self.min_y, self.max_y)
                 for z in (self.min_z, self.max_z)]

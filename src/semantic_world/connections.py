@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Union
 
 import numpy as np
 
 from . import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
-from .spatial_types.derivatives import Derivatives, DerivativeMap
+from .spatial_types.derivatives import DerivativeMap
 from .spatial_types.math import quaternion_from_rotation_matrix
 from .types import NpMatrix4x4
 from .world_entity import Connection
@@ -112,60 +112,12 @@ class PassiveConnection(Connection):
 
 
 @dataclass
-class UnitVector:
-    """
-    Represents a unit vector which is always of size 1.
-    """
-
-    x: float
-    y: float
-    z: float
-
-    def __post_init__(self):
-        self.normalize()
-
-    def normalize(self):
-        length = self.length
-        self.x /= length
-        self.y /= length
-        self.z /= length
-
-    @property
-    def length(self):
-        return np.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
-
-    def __getitem__(self, item: int) -> float:
-        if item == 0:
-            return self.x
-        if item == 1:
-            return self.y
-        if item == 2:
-            return self.z
-        raise IndexError
-
-    def as_tuple(self) -> Tuple[float, float, float]:
-        return self.x, self.y, self.z
-
-    @classmethod
-    def X(cls):
-        return cls(1, 0, 0)
-
-    @classmethod
-    def Y(cls):
-        return cls(0, 1, 0)
-
-    @classmethod
-    def Z(cls):
-        return cls(0, 0, 1)
-
-
-@dataclass
 class PrismaticConnection(ActiveConnection, Has1DOFState):
     """
     Allows the movement along an axis.
     """
 
-    axis: UnitVector = field(kw_only=True)
+    axis: cas.Vector3 = field(kw_only=True)
     """
     Connection moves along this axis, should be a unit vector.
     The axis is defined relative to the local reference frame of the parent body.
@@ -200,7 +152,7 @@ class PrismaticConnection(ActiveConnection, Has1DOFState):
         self._post_init_world_part()
 
         motor_expression = self.dof.symbols.position * self.multiplier + self.offset
-        translation_axis = cas.Vector3(self.axis) * motor_expression
+        translation_axis = cas.Vector3.from_iterable(self.axis) * motor_expression
         parent_T_child = cas.TransformationMatrix.from_xyz_rpy(x=translation_axis[0],
                                                                y=translation_axis[1],
                                                                z=translation_axis[2])
@@ -230,7 +182,7 @@ class RevoluteConnection(ActiveConnection, Has1DOFState):
     Allows rotation about an axis.
     """
 
-    axis: UnitVector = field(kw_only=True)
+    axis: cas.Vector3 = field(kw_only=True)
     """
     Connection rotates about this axis, should be a unit vector.
     The axis is defined relative to the local reference frame of the parent body.
@@ -265,9 +217,8 @@ class RevoluteConnection(ActiveConnection, Has1DOFState):
         self._post_init_world_part()
 
         motor_expression = self.dof.symbols.position * self.multiplier + self.offset
-        rotation_axis = cas.Vector3(self.axis)
-        parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, motor_expression)
-        self.origin_expression = self.origin_expression.dot(cas.TransformationMatrix(parent_R_child))
+        parent_R_child = cas.RotationMatrix.from_axis_angle(self.axis, motor_expression)
+        self.origin_expression = self.origin_expression @ cas.TransformationMatrix(parent_R_child)
         self.origin_expression.reference_frame = self.parent
         self.origin_expression.child_frame = self.child
 
@@ -318,13 +269,13 @@ class Connection6DoF(PassiveConnection):
     def __post_init__(self):
         super().__post_init__()
         self._post_init_world_part()
-        parent_P_child = cas.Point3((self.x.symbols.position,
-                                     self.y.symbols.position,
-                                     self.z.symbols.position))
-        parent_R_child = cas.Quaternion((self.qx.symbols.position,
-                                         self.qy.symbols.position,
-                                         self.qz.symbols.position,
-                                         self.qw.symbols.position)).to_rotation_matrix()
+        parent_P_child = cas.Point3(x=self.x.symbols.position,
+                                    y=self.y.symbols.position,
+                                    z=self.z.symbols.position)
+        parent_R_child = cas.Quaternion(x=self.qx.symbols.position,
+                                        y=self.qy.symbols.position,
+                                        z=self.qz.symbols.position,
+                                        w=self.qw.symbols.position).to_rotation_matrix()
         self.origin_expression = cas.TransformationMatrix.from_point_rotation_matrix(point=parent_P_child,
                                                                                      rotation_matrix=parent_R_child,
                                                                                      reference_frame=self.parent,
@@ -354,11 +305,13 @@ class Connection6DoF(PassiveConnection):
         return [self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw]
 
     @property
-    def origin(self) -> NpMatrix4x4:
+    def origin(self) -> cas.TransformationMatrix:
         return super().origin
 
     @origin.setter
-    def origin(self, transformation: NpMatrix4x4) -> None:
+    def origin(self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]) -> None:
+        if isinstance(transformation, cas.TransformationMatrix):
+            transformation = transformation.to_np()
         orientation = quaternion_from_rotation_matrix(transformation)
         self._world.state[self.x.name].position = transformation[0, 3]
         self._world.state[self.y.name].position = transformation[1, 3]

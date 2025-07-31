@@ -39,8 +39,8 @@ class GCSTestCase(unittest.TestCase):
         cls.gcs = gcs
 
     def test_reachability(self):
-        start_point = Point3.from_xyz(-1, -1, 0.5)
-        target_point = Point3.from_xyz(2, 2, 0.5)
+        start_point = Point3(-1, -1, 0.5)
+        target_point = Point3(2, 2, 0.5)
 
         path = self.gcs.path_from_to(start_point, target_point)
         self.assertEqual(len(path), 4)
@@ -75,8 +75,8 @@ class GCSFromWorldTestCase(unittest.TestCase):
         self.assertGreater(len(gcs.graph.nodes()), 0)
         self.assertGreater(len(gcs.graph.edges()), 0)
 
-        start = Point3.from_xyz(-4.5, -0.5, 0.4)
-        target = Point3.from_xyz(-2.5, 1.5, 0.9)
+        start = Point3(-4.5, -0.5, 0.4)
+        target = Point3(-2.5, 1.5, 0.9)
 
         path = gcs.path_from_to(start, target)
 
@@ -84,8 +84,8 @@ class GCSFromWorldTestCase(unittest.TestCase):
         self.assertGreater(len(path), 1)
 
         with self.assertRaises(PoseOccupiedError):
-            start = Point3.from_xyz(-10, -10, -10)
-            target = Point3.from_xyz(10, 10, 10)
+            start = Point3(-10, -10, -10)
+            target = Point3(10, 10, 10)
             gcs.path_from_to(start, target)
 
     def test_navigation_map_from_world(self):

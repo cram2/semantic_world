@@ -491,7 +491,7 @@ class PR2(AbstractRobot):
 
         # Create camera and neck
         camera = Camera(name=PrefixedName('wide_stereo_optical_frame', prefix=robot.name.name),
-                        forward_facing_axis=Vector3.from_xyz(0, 0, 1),
+                        forward_facing_axis=Vector3(0, 0, 1),
                         field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
                         minimal_height=1.27,
                         maximal_height=1.60,
