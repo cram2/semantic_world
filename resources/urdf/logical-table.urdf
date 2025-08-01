@@ -90,13 +90,13 @@
         <origin xyz="-0.5 -0.5 -0.625"/>
     </joint>
 
-	<joint name="surfacd_to_left_back_leg" type="fixed">
+	<joint name="surface_to_left_back_leg" type="fixed">
         <parent link="surface"/>
         <child link="left_back_leg"/>
         <origin xyz="-0.5 0.5 -0.6"/>
     </joint>
 
-	<joint name="srface_to_right_front_leg" type="fixed">
+	<joint name="surface_to_right_front_leg" type="fixed">
         <parent link="surface"/>
         <child link="right_front_leg"/>
         <origin xyz="0.5 -0.5 -0.6"/>

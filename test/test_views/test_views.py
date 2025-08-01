@@ -97,7 +97,7 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
-    use_gui: bool = False
+    use_gui: bool = True
 
     @classmethod
     def setUpClass(cls):
@@ -159,8 +159,8 @@ class ViewTestCase(unittest.TestCase):
     def test_fridge_view(self):
         self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view, update_existing_views=False)
 
-    def test_roots_view(self):
-        self.fit_rules_for_a_view_in_apartment(Roots, scenario=self.test_roots_view)
+    def test_root_view(self):
+        self.fit_rules_for_a_view_in_apartment(Root, scenario=self.test_root_view)
 
     def test_table_view(self):
         self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)
@@ -168,8 +168,8 @@ class ViewTestCase(unittest.TestCase):
     def test_windows_view(self):
         self.fit_rules_for_a_view_in_apartment(Windows, scenario=self.test_windows_view)
 
-    def test_walls_view(self):
-        self.fit_rules_for_a_view_in_apartment(Walls, scenario=self.test_walls_view)
+    def test_wall_view(self):
+        self.fit_rules_for_a_view_in_apartment(Wall, scenario=self.test_wall_view)
 
     def test_leg_view(self):
         self.fit_rules_for_a_view_in_table(Leg, scenario=self.test_leg_view)
@@ -179,7 +179,7 @@ class ViewTestCase(unittest.TestCase):
 
     def test_DetailedTable_view(self):
         self.fit_rules_for_a_view_in_table(DetailedTable,
-                                           scenario=self.test_DetailedTable_view)  # , update_existing_views=True)
+                                           scenario=self.test_DetailedTable_view)
 
     def test_Armchair_view(self):
         self.fit_rules_for_a_view_in_apartment(Armchair, scenario=self.test_Armchair_view)
@@ -285,7 +285,7 @@ class ViewTestCase(unittest.TestCase):
     @classmethod
     def get_table_world(cls) -> World:
         """
-        Return the apartment world parsed from the URDF file.
+        Return the table world parsed from the URDF file.
         """
         parser = URDFParser(cls.table)
         world = parser.parse()

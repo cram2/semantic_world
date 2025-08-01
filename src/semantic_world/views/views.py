@@ -13,9 +13,9 @@ from semantic_world.world import View, Body
 
 
 @dataclass(unsafe_hash=True)
-class Roots(View):
+class Root(View):
     """
-    Represents root-level components or aka Floor
+    Represents root-level components
     """
     body: Body
 
@@ -23,7 +23,7 @@ class Roots(View):
         self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Walls(View):
+class Wall(View):
     """
     Represents wall components or surrounding partitions.
     """
