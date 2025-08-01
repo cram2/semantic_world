@@ -89,6 +89,7 @@ class ViewTestCase(unittest.TestCase):
     urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
     kitchen = os.path.join(urdf_dir, "kitchen-small.urdf")
     apartment = os.path.join(urdf_dir, "apartment.urdf")
+    table = os.path.join(urdf_dir, "logical-table.urdf")
     main_dir = os.path.join(os.path.dirname(__file__), '..', '..')
     views_dir = os.path.join(main_dir, "src/semantic_world/views")
     views_rdr_model_name = "world_rdr"
@@ -96,12 +97,13 @@ class ViewTestCase(unittest.TestCase):
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
-    use_gui: bool = False
+    use_gui: bool = True
 
     @classmethod
     def setUpClass(cls):
         cls.kitchen_world = cls.get_kitchen_world()
         cls.apartment_world = cls.get_apartment_world()
+        cls.table_world = cls.get_table_world()
         if RDRCaseViewer is not None and QApplication is not None and cls.use_gui:
             cls.app = QApplication(sys.argv)
             cls.viewer = RDRCaseViewer()
@@ -156,6 +158,74 @@ class ViewTestCase(unittest.TestCase):
 
     def test_fridge_view(self):
         self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view, update_existing_views=False)
+
+    def test_root_view(self):
+        self.fit_rules_for_a_view_in_apartment(Root, scenario=self.test_root_view)
+
+    def test_table_view(self):
+        self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)
+
+    def test_windows_view(self):
+        self.fit_rules_for_a_view_in_apartment(Windows, scenario=self.test_windows_view)
+
+    def test_wall_view(self):
+        self.fit_rules_for_a_view_in_apartment(Wall, scenario=self.test_wall_view)
+
+    def test_leg_view(self):
+        self.fit_rules_for_a_view_in_table(Leg, scenario=self.test_leg_view)
+
+    def test_surface_view(self):
+        self.fit_rules_for_a_view_in_table(Surface, scenario=self.test_surface_view)
+
+    def test_DetailedTable_view(self):
+        self.fit_rules_for_a_view_in_table(DetailedTable,
+                                           scenario=self.test_DetailedTable_view)
+
+    def test_Armchair_view(self):
+        self.fit_rules_for_a_view_in_apartment(Armchair, scenario=self.test_Armchair_view)
+
+    '''
+    def test_ArmRest_view(self):
+        self.fit_rules_for_a_view_in_apartment(ArmRest, scenario=self.test_ArmRest_view)
+
+    def test_base_view(self):
+        self.fit_rules_for_a_view_in_apartment(Base, scenario=self.test_base_view)
+
+    def test_DetailedArmchair_view(self):
+        self.fit_rules_for_a_view_in_apartment(DetailedArmchair, scenario=self.test_DetailedArmchair_view)
+    '''
+
+    def test_sofa_view(self):
+        self.fit_rules_for_a_view_in_apartment(Sofa, scenario=self.test_sofa_view)
+
+    '''
+    def test_DetailedSofa_view(self):
+        self.fit_rules_for_a_view_in_apartment(DetailedSofa, scenario=self.test_DetailedSofa_view)
+
+    def test_cushion_view(self):
+        self.fit_rules_for_a_view_in_apartment(Cushion, scenario=self.test_cushion_view)
+    '''
+
+    def test_oven_view(self):
+        self.fit_rules_for_a_view_in_apartment(Oven, scenario=self.test_oven_view)
+
+    def test_sides_view(self):
+        self.fit_rules_for_a_view_in_apartment(Sides, scenario=self.test_sides_view)
+
+    def test_countertop_view(self):
+        self.fit_rules_for_a_view_in_apartment(Countertop, scenario=self.test_countertop_view)
+
+    def test_cooktop_view(self):
+        self.fit_rules_for_a_view_in_apartment(Cooktop, scenario=self.test_cooktop_view)
+
+    def test_hotplate_view(self):
+        self.fit_rules_for_a_view_in_apartment(Hotplates, scenario=self.test_hotplate_view)
+
+    def test_DetailedCooktop_view(self):
+        self.fit_rules_for_a_view_in_apartment(DetailedCooktop, scenario=self.test_DetailedCooktop_view)
+
+    def test_sink_view(self):
+        self.fit_rules_for_a_view_in_apartment(Sink, scenario=self.test_sink_view)
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
@@ -212,6 +282,16 @@ class ViewTestCase(unittest.TestCase):
         world.validate()
         return world
 
+    @classmethod
+    def get_table_world(cls) -> World:
+        """
+        Return the table world parsed from the URDF file.
+        """
+        parser = URDFParser(cls.table)
+        world = parser.parse()
+        world.validate()
+        return world
+
     def fit_rules_for_a_view_in_kitchen(self, view_type: Type[View], update_existing_views: bool = False,
                                         scenario: Optional[Callable] = None) -> None:
         """
@@ -236,6 +316,19 @@ class ViewTestCase(unittest.TestCase):
         self.fit_rules_for_a_view_and_assert(self.apartment_world, view_type,
                                              update_existing_views=update_existing_views,
                                              world_factory=self.get_apartment_world, scenario=scenario)
+
+    def fit_rules_for_a_view_in_table(self, view_type: Type[View], update_existing_views: bool = False,
+                                          scenario: Optional[Callable] = None) -> None:
+        """
+        Template method to test a specific view type in the table world.
+
+        :param view_type: The type of view to fit and assert.
+        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
+        :param scenario: Optional callable that represents the test method or scenario that is being executed.
+        """
+        self.fit_rules_for_a_view_and_assert(self.table_world, view_type,
+                                             update_existing_views=update_existing_views,
+                                             world_factory=self.get_table_world, scenario=scenario)
 
     @staticmethod
     def fit_rules_for_a_view_and_assert(world: World, view_type: Type[View], update_existing_views: bool = False,
