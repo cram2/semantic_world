@@ -257,7 +257,7 @@ def test_add_view(world_setup):
     v = View(name=PrefixedName('muh'))
     world.add_view(v)
     with pytest.raises(AddingAnExistingViewError):
-        world.add_view(v)
+        world.add_view(v, exists_ok=False)
     assert world.get_view_by_name(v.name) == v
 
 

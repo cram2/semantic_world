@@ -1,8 +1,10 @@
+import builtins
 import os
 from enum import Enum
 
 import semantic_world.degree_of_freedom
 import semantic_world.geometry
+import semantic_world.robots
 import semantic_world.views.views
 import semantic_world.world_entity
 from ormatic.ormatic import ORMatic
@@ -29,6 +31,8 @@ classes |= set(classes_of_module(semantic_world.world_entity))
 classes |= set(classes_of_module(semantic_world.connections))
 classes |= set(classes_of_module(semantic_world.views.views))
 classes |= set(classes_of_module(semantic_world.degree_of_freedom))
+classes |= set(classes_of_module(semantic_world.robots))
+#classes |= set(recursive_subclasses(ViewFactory))
 
 # remove classes that should not be mapped
 classes -= {ResetStateContextManager, WorldModelUpdateContextManager, HasUpdateState,
@@ -40,15 +44,14 @@ def generate_orm():
     """
     Generate the ORM classes for the pycram package.
     """
-
     # Create an ORMatic object with the classes to be mapped
-    ormatic = ORMatic(list(classes))
+    ormatic = ORMatic(list(classes), type_mappings={trimesh.Trimesh: TrimeshType})
 
     # Generate the ORM classes
     ormatic.make_all_tables()
 
     path = os.path.abspath(os.path.join(os.getcwd(), '../src/semantic_world/orm/'))
-    with open(os.path.join(path, 'ormatic_interface.py'), 'w') as f:
+    with builtins.open(os.path.join(path, 'ormatic_interface.py'), 'w') as f:
         ormatic.to_sqlalchemy_file(f)
 
 

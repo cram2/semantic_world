@@ -19,3 +19,7 @@ class SpatialVariables(Enum):
     @classproperty
     def xy(cls):
         return SortedSet([cls.x.value, cls.y.value])
+
+    @classproperty
+    def yz(cls):
+        return SortedSet([cls.y.value, cls.z.value])

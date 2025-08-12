@@ -253,13 +253,15 @@ class GraphOfConvexSets:
             else:
                 return bb.bloat(0, bloat_walls, 0.01)
 
+        world_root = list(obstacle_view.bodies)[0]._world.root
+
         bloated_obstacles: BoundingBoxCollection = BoundingBoxCollection([
-            bloat_obstacle(bb) for bb in obstacle_view.as_bounding_box_collection()
+            bloat_obstacle(bb) for bb in obstacle_view.as_bounding_box_collection(world_root)
         ])
 
         if wall_view is not None:
             bloated_walls: BoundingBoxCollection = BoundingBoxCollection([
-                bloat_wall(bb) for bb in wall_view.as_bounding_box_collection()
+                bloat_wall(bb) for bb in wall_view.as_bounding_box_collection(world_root)
             ])
             bloated_obstacles.merge(bloated_walls)
 

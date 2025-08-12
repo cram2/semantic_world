@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -9,6 +10,22 @@ from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types import Point3
 from semantic_world.variables import SpatialVariables
 from semantic_world.world import View, Body
+from semantic_world.world_entity import Region
+
+
+@dataclass
+class HasDrawers:
+    """
+    A mixin class for views that have drawers.
+    """
+    drawers: List[Drawer] = field(default_factory=list, hash=False)
+
+@dataclass
+class HasDoors:
+    """
+    A mixin class for views that have doors.
+    """
+    doors: List[Door] = field(default_factory=list, hash=False)
 
 
 @dataclass(unsafe_hash=True)
@@ -16,7 +33,8 @@ class Handle(View):
     body: Body
 
     def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 
 @dataclass(unsafe_hash=True)
@@ -24,7 +42,8 @@ class Container(View):
     body: Body
 
     def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 
 @dataclass(unsafe_hash=True)
@@ -44,7 +63,8 @@ class Fridge(View):
     door: Door
 
     def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 @dataclass(unsafe_hash=True)
 class Table(View):
@@ -98,7 +118,8 @@ class Door(Components):
     handle: Handle
 
     def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 
 @dataclass(unsafe_hash=True)
@@ -107,7 +128,22 @@ class Drawer(Components):
     handle: Handle
 
     def __post_init__(self):
-        self.name = self.container.name
+        if self.name is None:
+            self.name = self.container.name
+
+@dataclass
+class SupportingSurface(View):
+    """
+    A view that represents a supporting surface.
+    """
+    region: Region
+    """
+    The body that represents the supporting surface.
+    """
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.region.reference_frame.name
 
 
 ############################### subclasses to Furniture
@@ -115,6 +151,24 @@ class Drawer(Components):
 class Cupboard(Furniture):
     ...
 
+@dataclass
+class Shelf(Furniture, HasDoors, HasDrawers):
+    container: Container = field(default=None, hash=False)
+    supporting_surfaces: List[SupportingSurface] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.container.name
+
+@dataclass
+class Dresser(Furniture):
+    container: Container
+    drawers: List[Drawer] = field(default_factory=list, hash=False)
+    doors: List[Door] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.container.name
 
 ############################### subclasses to Cupboard
 @dataclass(unsafe_hash=True)

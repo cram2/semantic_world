@@ -1,13 +1,25 @@
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
 
 import numpy
-from multiverse_parser import (InertiaSource,
-                               UsdImporter, MjcfImporter, UrdfImporter,
-                               BodyBuilder,
-                               JointBuilder, JointType)
-from pxr import UsdUrdf
+try:
+    from multiverse_parser import (InertiaSource,
+                                   UsdImporter, MjcfImporter, UrdfImporter,
+                                   BodyBuilder,
+                                   JointBuilder, JointType)
+    from pxr import UsdUrdf
+except ImportError as e:
+    logging.info(e)
+    InertiaSource = None
+    UsdImporter = None
+    MjcfImporter = None
+    UrdfImporter = None
+    BodyBuilder = None
+    JointBuilder = None
+    JointType = None
+    UsdUrdf = None
 
 from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection
 from ..spatial_types.derivatives import DerivativeMap

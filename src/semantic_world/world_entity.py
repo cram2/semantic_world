@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, fields
 from functools import reduce
 from typing import List, Optional, TYPE_CHECKING, Set, get_args, get_type_hints, Deque
 import numpy as np
+import rustworkx
 from numpy import ndarray
 from typing_extensions import Self
 
@@ -177,9 +178,17 @@ class Body(WorldEntity):
     @property
     def child_bodies(self) -> List[Body]:
         """
-        Returns the child bodies of this body.
+        Returns the direct child bodies of this body.
         """
         return self._world.compute_child_bodies(self)
+
+    @property
+    def recursive_child_bodies(self) -> List[Body]:
+        """
+        Returns the recursive child bodies of this body.
+        :return: All child bodies of this body.
+        """
+        return [self._world.kinematic_structure[i] for i in rustworkx.descendants(self._world.kinematic_structure, self.index)]
 
     @property
     def parent_body(self) -> Body:
@@ -188,42 +197,25 @@ class Body(WorldEntity):
         """
         return self._world.compute_parent_body(self)
 
-    @property
-    def bounding_box_collection(self) -> BoundingBoxCollection:
+    def as_bounding_box_collection(self, reference_frame: Optional[Body] = None) -> BoundingBoxCollection:
         """
-        Return the bounding box collection of the link with the given name.
-        This method computes the bounding box of the link in world coordinates by transforming the local axis-aligned
-        bounding boxes of the link's geometry to world coordinates.
+        Provides the bounding box collection for the current object based on its
+        relative transformations and collision shapes.
 
-        Note: These bounding boxes may not be disjoint, however the random events library always makes them disjoint. If
-        this is the case, and we feed he non-disjoint bounding boxes into the gcs, it may trigger unexpected behavior.
+        This property computes the forward kinematics to determine the object's
+        position and orientation in world space. Bounding boxes for each shape in the
+        collision attribute are transformed to world coordinates. The world-space bounding
+        boxes are then aggregated into a BoundingBoxCollection.
 
-        :return: A BoundingBoxCollection containing the bounding boxes of the link's geometry in world
+        :returns: A collection of bounding boxes in world-space coordinates.
+        :rtype: BoundingBoxCollection
         """
-        world = self._world
-        body_transform: ndarray = world.compute_forward_kinematics_np(world.root, self)
         world_bboxes = []
 
         for shape in self.collision:
-            shape_transform: ndarray = shape.origin.to_np()
-
-            world_transform: ndarray = body_transform @ shape_transform
-            body_pos = world_transform[:3, 3]
-            body_rotation_matrix = world_transform[:3, :3]
-
-            local_bb: BoundingBox = shape.as_bounding_box()
-
-            # Get all 8 corners of the BB in link-local space
-            corners = np.array([corner.to_np()[:3] for corner in local_bb.get_points()])  # shape (8, 3)
-
-            # Transform each corner to world space: R * corner + T
-            transformed_corners = (corners @ body_rotation_matrix.T) + body_pos
-
-            # Compute world-space bounding box from transformed corners
-            min_corner = np.min(transformed_corners, axis=0)
-            max_corner = np.max(transformed_corners, axis=0)
-
-            world_bb = BoundingBox.from_min_max(Point3(*min_corner), Point3(*max_corner))
+            if shape.origin.reference_frame is None:
+                continue
+            world_bb = shape.as_bounding_box(reference_frame)
             world_bboxes.append(world_bb)
 
         return BoundingBoxCollection(world_bboxes)
@@ -300,15 +292,31 @@ class View(WorldEntity):
         """
         return self._bodies(set())
 
-    def as_bounding_box_collection(self) -> BoundingBoxCollection:
+    def as_bounding_box_collection(self, reference_frame: Optional[Body] = None) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this view.
         """
         bbs = reduce(
             lambda accumulator, bb_collection: accumulator.merge(bb_collection),
-            (body.bounding_box_collection for body in self.bodies if body.has_collision())
+            (body.as_bounding_box_collection(reference_frame) for body in self.bodies if body.has_collision())
         )
         return bbs
+
+
+@dataclass
+class Region(WorldEntity):
+    """
+    Virtual Body representing a semantic region in the world.
+    """
+    reference_frame: Optional[Body] = field(default=None, repr=False, hash=False)
+    areas: List[Shape] = field(default_factory=list, hash=False)
+
+    def as_bounding_box_collection(self, reference_frame: Optional[Body] = None)  -> BoundingBoxCollection:
+        """
+        Returns a bounding box collection that contains the bounding boxes of all areas in this region.
+        """
+        bbs = [area.as_bounding_box(reference_frame) for area in self.areas]
+        return BoundingBoxCollection(bbs)
 
 
 @dataclass(unsafe_hash=True)

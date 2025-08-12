@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from copy import deepcopy
 from functools import lru_cache, wraps
-from typing import Any, Tuple
+from typing import Any, Tuple, Iterable
 from xml.etree import ElementTree as ET
+
+from sqlalchemy import Engine, inspect, text, MetaData
 
 
 class IDGenerator:
@@ -104,3 +107,17 @@ def copy_lru_cache(maxsize=None, typed=False):
         return wrapper
 
     return decorator
+
+def bpy_installed() -> bool:
+    try:
+        import bpy
+        return True
+    except ImportError:
+        return False
+
+def rclpy_installed() -> bool:
+    try:
+        import rclpy
+        return True
+    except ImportError:
+        return False
