@@ -6,11 +6,11 @@ from .world_views_mcrdr_defs import *
 
 
 attribute_name = 'views'
-conclusion_type = (Countertop, Table, Cooktop, Oven, Drawer, Container, Root, Sofa, Windows, Hotplates, Armchair, list, Fridge, Sides, Sink, Cabinet, Leg, Surface, Door, DetailedCooktop, Handle, set, Wall, DetailedTable,)
+conclusion_type = (Countertop, Table, Cooktop, Oven, Drawer, Container, Root, Sofa, Window, Hotplate, Armchair, list, Fridge, Sides, Sink, Cabinet, Leg, Surface, Door, Handle, set, Wall,)
 mutually_exclusive = False
 
 
-def classify(case: World, **kwargs) -> Set[Union[Countertop, Table, Cooktop, Oven, Drawer, Container, Root, Sofa, Windows, Hotplates, Armchair, Fridge, Sides, Sink, Cabinet, Leg, Surface, Door, DetailedCooktop, Handle, Wall, DetailedTable]]:
+def classify(case: World, **kwargs) -> Set[Union[Countertop, Table, Cooktop, Oven, Drawer, Container, Root, Sofa, Window, Hotplate, Armchair, Fridge, Sides, Sink, Cabinet, Leg, Surface, Door, Handle, Wall]]:
     if not isinstance(case, Case):
         case = create_case(case, max_recursion_idx=3)
     conclusions = set()
@@ -51,9 +51,6 @@ def classify(case: World, **kwargs) -> Set[Union[Countertop, Table, Cooktop, Ove
     if conditions_76734351718414165115161689080544922137(case):
         conclusions.update(make_set(conclusion_76734351718414165115161689080544922137(case)))
 
-    if conditions_8779700588076492791914944718923983853(case):
-        conclusions.update(make_set(conclusion_8779700588076492791914944718923983853(case)))
-
     if conditions_276870538550900219151385672580612993791(case):
         conclusions.update(make_set(conclusion_276870538550900219151385672580612993791(case)))
 
@@ -74,9 +71,6 @@ def classify(case: World, **kwargs) -> Set[Union[Countertop, Table, Cooktop, Ove
 
     if conditions_49636263552498546597487129028109645395(case):
         conclusions.update(make_set(conclusion_49636263552498546597487129028109645395(case)))
-
-    if conditions_335129869970075176340711076346427700506(case):
-        conclusions.update(make_set(conclusion_335129869970075176340711076346427700506(case)))
 
     if conditions_180013694937072261831339544475640316362(case):
         conclusions.update(make_set(conclusion_180013694937072261831339544475640316362(case)))

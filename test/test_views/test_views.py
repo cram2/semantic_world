@@ -165,8 +165,8 @@ class ViewTestCase(unittest.TestCase):
     def test_table_view(self):
         self.fit_rules_for_a_view_in_apartment(Table, scenario=self.test_table_view)
 
-    def test_windows_view(self):
-        self.fit_rules_for_a_view_in_apartment(Windows, scenario=self.test_windows_view)
+    def test_window_view(self):
+        self.fit_rules_for_a_view_in_apartment(Window, scenario=self.test_window_view)
 
     def test_wall_view(self):
         self.fit_rules_for_a_view_in_apartment(Wall, scenario=self.test_wall_view)
@@ -177,34 +177,13 @@ class ViewTestCase(unittest.TestCase):
     def test_surface_view(self):
         self.fit_rules_for_a_view_in_table(Surface, scenario=self.test_surface_view)
 
-    def test_DetailedTable_view(self):
-        self.fit_rules_for_a_view_in_table(DetailedTable,
-                                           scenario=self.test_DetailedTable_view)
 
     def test_Armchair_view(self):
         self.fit_rules_for_a_view_in_apartment(Armchair, scenario=self.test_Armchair_view)
 
-    '''
-    def test_ArmRest_view(self):
-        self.fit_rules_for_a_view_in_apartment(ArmRest, scenario=self.test_ArmRest_view)
-
-    def test_base_view(self):
-        self.fit_rules_for_a_view_in_apartment(Base, scenario=self.test_base_view)
-
-    def test_DetailedArmchair_view(self):
-        self.fit_rules_for_a_view_in_apartment(DetailedArmchair, scenario=self.test_DetailedArmchair_view)
-    '''
 
     def test_sofa_view(self):
         self.fit_rules_for_a_view_in_apartment(Sofa, scenario=self.test_sofa_view)
-
-    '''
-    def test_DetailedSofa_view(self):
-        self.fit_rules_for_a_view_in_apartment(DetailedSofa, scenario=self.test_DetailedSofa_view)
-
-    def test_cushion_view(self):
-        self.fit_rules_for_a_view_in_apartment(Cushion, scenario=self.test_cushion_view)
-    '''
 
     def test_oven_view(self):
         self.fit_rules_for_a_view_in_apartment(Oven, scenario=self.test_oven_view)
@@ -219,10 +198,7 @@ class ViewTestCase(unittest.TestCase):
         self.fit_rules_for_a_view_in_apartment(Cooktop, scenario=self.test_cooktop_view)
 
     def test_hotplate_view(self):
-        self.fit_rules_for_a_view_in_apartment(Hotplates, scenario=self.test_hotplate_view)
-
-    def test_DetailedCooktop_view(self):
-        self.fit_rules_for_a_view_in_apartment(DetailedCooktop, scenario=self.test_DetailedCooktop_view)
+        self.fit_rules_for_a_view_in_apartment(Hotplate, scenario=self.test_hotplate_view)
 
     def test_sink_view(self):
         self.fit_rules_for_a_view_in_apartment(Sink, scenario=self.test_sink_view)
@@ -234,6 +210,7 @@ class ViewTestCase(unittest.TestCase):
     @pytest.mark.skipif(world_rdr is None, reason="requires world_rdr")
     def test_generated_views(self):
         found_views = world_rdr.classify(self.kitchen_world)["views"]
+        print(found_views)
 
         drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
         self.assertTrue(len(drawer_container_names) == 14)

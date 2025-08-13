@@ -30,7 +30,7 @@ corner_case_298893002154434174914882697804321727044 = CaseFactoryMetaData(factor
 corner_case_95749960275749164559369305418046530921 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_table_view')
 
 
-corner_case_56044667384119005486660532922350093576 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_windows_view')
+corner_case_56044667384119005486660532922350093576 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_window_view')
 
 
 corner_case_192414996332569377000417356221731692718 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_wall_view')
@@ -41,8 +41,6 @@ corner_case_295145914874381034058732290061016216922 = CaseFactoryMetaData(factor
 
 corner_case_76734351718414165115161689080544922137 = CaseFactoryMetaData(factory_method='ViewTestCase.get_table_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_leg_view')
 
-
-corner_case_8779700588076492791914944718923983853 = CaseFactoryMetaData(factory_method='ViewTestCase.get_table_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_DetailedTable_view')
 
 
 corner_case_276870538550900219151385672580612993791 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_Armchair_view')
@@ -65,8 +63,6 @@ corner_case_304562387165012343799590402190050617477 = CaseFactoryMetaData(factor
 
 corner_case_49636263552498546597487129028109645395 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_cooktop_view')
 
-
-corner_case_335129869970075176340711076346427700506 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_DetailedCooktop_view')
 
 
 corner_case_180013694937072261831339544475640316362 = CaseFactoryMetaData(factory_method='ViewTestCase.get_apartment_world', factory_idx=None, case_conf=None, scenario='ViewTestCase.test_sink_view')

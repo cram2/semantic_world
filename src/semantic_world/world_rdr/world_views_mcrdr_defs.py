@@ -1,6 +1,6 @@
 from typing_extensions import List, Set, Union
 from ..world import World
-from ..views import Armchair, Cabinet, Container, Cooktop, Countertop, DetailedCooktop, DetailedTable, Door, Drawer, Fridge, Handle, Hotplates, Leg, Oven, Root, Sides, Sink, Sofa, Surface, Table, Wall, Windows
+from ..views import Armchair, Cabinet, Container, Cooktop, Countertop, Door, Drawer, Fridge, Handle, Hotplate, Leg, Oven, Root, Sides, Sink, Sofa, Surface, Table, Wall, Window
 from ..connections import FixedConnection, PrismaticConnection, RevoluteConnection
 
 
@@ -186,15 +186,15 @@ def conclusion_95749960275749164559369305418046530921(case) -> List[Table]:
 
 
 def conditions_56044667384119005486660532922350093576(case) -> bool:
-    def conditions_for_world_views_of_type_windows(case: World) -> bool:
-        """Get conditions on whether it's possible to conclude a value for World.views  of type Windows."""
+    def conditions_for_world_views_of_type_window(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Window."""
         return len([r for r in case.views if isinstance(r, Root)]) > 0
-    return conditions_for_world_views_of_type_windows(case)
+    return conditions_for_world_views_of_type_window(case)
 
 
-def conclusion_56044667384119005486660532922350093576(case) -> List[Windows]:
-    def world_views_of_type_windows(case: World) -> List[Windows]:
-        """Get possible value(s) for World.views  of type Windows."""
+def conclusion_56044667384119005486660532922350093576(case) -> List[Window]:
+    def world_views_of_type_window(case: World) -> List[Window]:
+        """Get possible value(s) for World.views  of type Window."""
         all_root = [r for r in case.views if isinstance(r, Root)]
         root_bodies = [r.body for r in all_root]
         conections_with_root = [
@@ -202,8 +202,8 @@ def conclusion_56044667384119005486660532922350093576(case) -> List[Windows]:
             if isinstance(c, FixedConnection)
                and c.parent in root_bodies
         ]
-        return [Windows(b.child) for b in conections_with_root if "windows" in b.child.name.name.lower()]
-    return world_views_of_type_windows(case)
+        return [Window(b.child) for b in conections_with_root if "window" in b.child.name.name.lower()]
+    return world_views_of_type_window(case)
 
 
 def conditions_192414996332569377000417356221731692718(case) -> bool:
@@ -263,34 +263,6 @@ def conclusion_76734351718414165115161689080544922137(case) -> List[Leg]:
     return world_views_of_type_leg(case)
 
 
-def conditions_8779700588076492791914944718923983853(case) -> bool:
-    def conditions_for_world_views_of_type_detailed_table(case: World) -> bool:
-        """Get conditions on whether it's possible to conclude a value for World.views  of type DetailedTable."""
-        return True
-    return conditions_for_world_views_of_type_detailed_table(case)
-
-
-def conclusion_8779700588076492791914944718923983853(case) -> List[DetailedTable]:
-    def world_views_of_type_detailed_table(case: World) -> List[DetailedTable]:
-        """Get possible value(s) for World.views  of type DetailedTable."""
-        all_surfaces = [Surface(b) for b in case.bodies if "surface" in b.name.name.lower()]
-    
-        # Find all legs that are connected with a Surfave with a FicedConnection.
-        detailed_tables = []
-        for surface in all_surfaces:
-            connected_legs = [
-                Leg(c.child)
-                for c in case.connections
-                if isinstance(c, FixedConnection)
-                   and c.parent == surface.body
-                   and "leg" in c.child.name.name.lower()
-            ]
-            if connected_legs:
-                detailed_tables.append(DetailedTable(surface, tuple(connected_legs)))
-    
-        return detailed_tables
-    return world_views_of_type_detailed_table(case)
-
 
 def conditions_276870538550900219151385672580612993791(case) -> bool:
     def conditions_for_world_views_of_type_armchair(case: World) -> bool:
@@ -349,17 +321,17 @@ def conclusion_125114902106458283648997265474531641579(case) -> List[Oven]:
 
 
 def conditions_39216173054479960152579027281679377283(case) -> bool:
-    def conditions_for_world_views_of_type_hotplates(case: World) -> bool:
-        """Get conditions on whether it's possible to conclude a value for World.views  of type Hotplates."""
+    def conditions_for_world_views_of_type_hotplate(case: World) -> bool:
+        """Get conditions on whether it's possible to conclude a value for World.views  of type Hotplate."""
         return True
-    return conditions_for_world_views_of_type_hotplates(case)
+    return conditions_for_world_views_of_type_hotplate(case)
 
 
-def conclusion_39216173054479960152579027281679377283(case) -> List[Hotplates]:
-    def world_views_of_type_hotplates(case: World) -> List[Hotplates]:
-        """Get possible value(s) for World.views  of type Hotplates."""
-        return [Hotplates(b) for b in case.bodies if "hotplate" in b.name.name.lower()]
-    return world_views_of_type_hotplates(case)
+def conclusion_39216173054479960152579027281679377283(case) -> List[Hotplate]:
+    def world_views_of_type_hotplate(case: World) -> List[Hotplate]:
+        """Get possible value(s) for World.views  of type Hotplate."""
+        return [Hotplate(b) for b in case.bodies if "hotplate" in b.name.name.lower()]
+    return world_views_of_type_hotplate(case)
 
 
 def conditions_56932022228577464889761478858979829689(case) -> bool:
@@ -426,39 +398,6 @@ def conclusion_49636263552498546597487129028109645395(case) -> List[Cooktop]:
     
         return [Cooktop(b.child) for b in conections_with_counters if "cooktop" in b.child.name.name.lower()]
     return world_views_of_type_cooktop(case)
-
-
-def conditions_335129869970075176340711076346427700506(case) -> bool:
-    def conditions_for_world_views_of_type_detailed_cooktop(case: World) -> bool:
-        """Get conditions on whether it's possible to conclude a value for World.views  of type DetailedCooktop."""
-        return len([r for r in case.views if isinstance(r, Root)]) > 0
-    return conditions_for_world_views_of_type_detailed_cooktop(case)
-
-
-def conclusion_335129869970075176340711076346427700506(case) -> List[DetailedCooktop]:
-    def world_views_of_type_detailed_cooktop(case: World) -> List[DetailedCooktop]:
-        """Get possible value(s) for World.views  of type DetailedCooktop."""
-        result = []
-        cooktops = [c for c in case.views if isinstance(c, Cooktop)]
-    
-        for cooktop in cooktops:
-            cooktop_body = cooktop.body
-            connected_hotplates = [
-                h for h in case.views
-                if isinstance(h, Hotplates)
-                   and any(
-                    isinstance(conn, FixedConnection)
-                    and conn.parent == cooktop_body
-                    and conn.child == h.body
-                    for conn in case.connections
-                )
-            ]
-    
-            if connected_hotplates:
-                detailed = DetailedCooktop(cooktop=cooktop, hotplates=connected_hotplates)
-                result.append(detailed)
-        return result
-    return world_views_of_type_detailed_cooktop(case)
 
 
 def conditions_180013694937072261831339544475640316362(case) -> bool:

@@ -9,13 +9,11 @@ from semantic_world.spatial_types import Point3
 from semantic_world.variables import SpatialVariables
 from semantic_world.world import View, Body
 
-#from __future__ import annotations
-
 
 @dataclass(unsafe_hash=True)
 class Root(View):
     """
-    Represents root-level components
+    Represents root-level Components
     """
     body: Body
 
@@ -25,7 +23,7 @@ class Root(View):
 @dataclass(unsafe_hash=True)
 class Wall(View):
     """
-    Represents wall components or surrounding partitions.
+    Represents wall Components or surrounding partitions.
     """
     body: Body
 
@@ -33,9 +31,9 @@ class Wall(View):
         self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Windows(View):
+class Window(View):
     """
-    Represents window components in the world.
+    Represents window Components in the world.
     """
     body: Body
 
@@ -54,7 +52,7 @@ class Container(View):
 # === GROUP DEFINITIONS
 # =======================
 @dataclass(unsafe_hash=True)
-class Components(View):
+class Components(View):                                                   #################################
     """
     Represents structural or functional parts of furniture or appliances.
     """
@@ -76,7 +74,7 @@ class Cupboard(View):
     ...
 
 @dataclass(unsafe_hash=True)
-class Appliances(View):
+class Appliance(View):
     """
     Represents a collection of home appliances.
     """
@@ -173,7 +171,7 @@ class Surface(Components):
 @dataclass(unsafe_hash=True)
 class Leg(Components):
     """
-    A vertical support component of furniture.
+    A vertical support Components of furniture.
     """
     body: Body
 
@@ -210,7 +208,7 @@ class Cushion(Components):
         self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Sides(Components):
+class Sides(Components):                                                   #################################
     """
     Represents the Sides of a structure
     """
@@ -236,7 +234,7 @@ class Cupboard(Furniture):
     ...
 
 @dataclass(unsafe_hash=True)
-class Hotplates(Components):
+class Hotplate(Components):
     """
     A heating element typically placed on top of a cooktop.
     """
@@ -250,7 +248,7 @@ class Hotplates(Components):
 @dataclass(unsafe_hash=True)
 class Sink(Components):
     """
-    A sink component typically used in kitchen or bathroom setups.
+    A sink Components typically used in kitchen or bathroom setups.
     """
     body: Body
 
@@ -270,31 +268,11 @@ class Table(Furniture):
     def __post_init__(self):
         self.name = self.body.name
 
-@dataclass(unsafe_hash=True)
-class DetailedTable(View):
-    """
-    A detailed table view with a surface and legs.
-    """
-    surface: Surface
-    legs: tuple[Leg, ...]   ##legs: List[Leg] = field(default_factory=list)
-
-    def __post_init__(self):
-        self.name = self.surface.name
 
 @dataclass(unsafe_hash=True)
 class Armchair(Furniture):
     """
     A generic armchair.
-    """
-    body: Body
-
-    def __post_init__(self):
-        self.name = self.body.name
-
-@dataclass(unsafe_hash=True)
-class DetailedArmchair(Furniture):
-    """
-    A comfortable chair with armrests and backrest.
     """
     base: Base
     armrest: List[ArmRest] = field(default_factory=list, hash=False)
@@ -307,16 +285,6 @@ class DetailedArmchair(Furniture):
 class Sofa(Furniture):
     """
     A generic sofa.
-    """
-    body: Body
-
-    def __post_init__(self):
-        self.name = self.body.name
-
-@dataclass(unsafe_hash=True)
-class DetailedSofa(Furniture):
-    """
-    A detailed sofa view with base, armrests, legs, and cushions.
     """
     base: Base
     armrest: List[ArmRest] = field(default_factory=list, hash=False)
@@ -358,7 +326,7 @@ class Wardrobe(Cupboard):
 # === APPLIANCE SUBCLASSES
 # =============================
 @dataclass(unsafe_hash=True)
-class Fridge(Appliances):
+class Fridge(Appliance):
     """
     A fridge appliance with a body and door.
     """
@@ -369,7 +337,7 @@ class Fridge(Appliances):
         self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Oven(Appliances):
+class Oven(Appliance):
     """
     An oven appliance with a body
     """
@@ -379,22 +347,12 @@ class Oven(Appliances):
         self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Cooktop(Appliances):
+class Cooktop(Appliance):
     """
-    A cooking surface appliance, usually with one or more hotplates.
+    A cooking surface appliance, usually with one or more hotplate.
     """
     body: Body
+    hotplate: list[Hotplate] = field(default_factory=list, hash=False)
 
     def __post_init__(self):
         self.name = self.body.name
-
-@dataclass(unsafe_hash=True)
-class DetailedCooktop(Appliances):
-    """
-    A cooktop view that includes its connected hotplates.
-    """
-    cooktop: Cooktop
-    hotplates: list[Hotplates] = field(default_factory=list, hash=False)
-
-    def __post_init__(self):
-        self.name = self.cooktop.name
