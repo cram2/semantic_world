@@ -108,8 +108,19 @@ class Body(WorldEntity):
     def __eq__(self, other):
         return self.name == other.name and self._world is other._world
 
-    def has_collision(self) -> bool:
-        return len(self.collision) > 0
+    def has_collision(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
+        """
+        Check if collision geometry is mesh or simple shape with volume/surface bigger than thresholds.
+
+        :param volume_threshold: Ignore simple geometry shapes with a volume less than this (in m^3)
+        :param surface_threshold: Ignore simple geometry shapes with a surface area less than this (in m^2)
+        :return: True if collision geometry is mesh or simple shape exceeding thresholds
+        """
+        for collision in self.collision:
+            geo = collision
+            if geo.is_bigger(volume_threshold=volume_threshold, surface_threshold=surface_threshold):
+                return True
+        return False
 
     def compute_closest_points_multi(self, others: list[Body], sample_size=25) -> Tuple[
         np.ndarray, np.ndarray, np.ndarray]:
@@ -229,12 +240,12 @@ class Body(WorldEntity):
         return BoundingBoxCollection(world_bboxes)
 
     @property
-    def global_pose(self) -> NpMatrix4x4:
+    def global_pose(self) -> cas.TransformationMatrix:
         """
         Computes the pose of the body in the world frame.
         :return: 4x4 transformation matrix.
         """
-        return self._world.compute_forward_kinematics_np(self._world.root, self)
+        return self._world.compute_forward_kinematics(self._world.root, self)
 
     @property
     def parent_connection(self) -> Connection:
@@ -316,8 +327,15 @@ class RootedView(View):
     """
     Represents a view that is rooted in a specific body.
     """
-    root: Body = field(default_factory=Body)
+    root: Body
 
+    @property
+    def connections(self) -> List[Connection]:
+        return self._world.get_connections_of_branch(self.root)
+
+    @property
+    def bodies(self) -> List[Body]:
+        return self._world.get_bodies_of_branch(self.root)
 
 @dataclass(unsafe_hash=True)
 class EnvironmentView(RootedView):

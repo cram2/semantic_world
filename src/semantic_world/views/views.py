@@ -4,7 +4,7 @@ import numpy as np
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from typing_extensions import List
 
-from semantic_world.geometry import BoundingBox, BoundingBoxCollection
+from semantic_world.geometry import BoundingBoxCollection
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types import Point3
 from semantic_world.variables import SpatialVariables
@@ -38,6 +38,7 @@ class Door(View):  # Door has a Footprint
     def __post_init__(self):
         self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
+
 @dataclass(unsafe_hash=True)
 class Fridge(View):
     body: Body
@@ -45,6 +46,7 @@ class Fridge(View):
 
     def __post_init__(self):
         self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
 
 @dataclass(unsafe_hash=True)
 class Table(View):
@@ -75,6 +77,7 @@ class Table(View):
 
     def __post_init__(self):
         self.name = self.top.name
+
 
 ################################
 

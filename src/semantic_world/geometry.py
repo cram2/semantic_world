@@ -13,11 +13,13 @@ from random_events.interval import SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
 
 from .spatial_types import TransformationMatrix, Point3
+from .spatial_types.math import cube_volume, cube_surface, cylinder_volume, cylinder_surface, sphere_volume
 from .spatial_types.spatial_types import Expression
 from .utils import IDGenerator
 from .variables import SpatialVariables
 
 id_generator = IDGenerator()
+
 
 @dataclass
 class Color:
@@ -26,25 +28,35 @@ class Color:
     The values are stored as floats between 0 and 1.
     The default rgba_color is white.
     """
-    R: float = 1
+    R: float = 1.
     """
     Red value of the color.
     """
 
-    G: float = 1
+    G: float = 1.
     """
     Green value of the color.
     """
 
-    B: float = 1
+    B: float = 1.
     """
     Blue value of the color.
     """
 
-    A: float = 1
+    A: float = 1.
     """
     Opacity of the color.
     """
+
+    def __post_init__(self):
+        """
+        Make sure the color values are floats, because ros2 sucks.
+        """
+        self.R = float(self.R)
+        self.G = float(self.G)
+        self.B = float(self.B)
+        self.A = float(self.A)
+
 
 @dataclass
 class Scale:
@@ -66,6 +78,15 @@ class Scale:
     """
     The scale in the z direction.
     """
+
+    def __post_init__(self):
+        """
+        Make sure the scale values are floats, because ros2 sucks.
+        """
+        self.x = float(self.x)
+        self.y = float(self.y)
+        self.z = float(self.z)
+
 
 @dataclass
 class Shape(ABC):
@@ -89,6 +110,18 @@ class Shape(ABC):
         """
         raise NotImplementedError("Subclasses must implement the mesh property.")
 
+    def is_bigger(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
+        return False
+
+
+@dataclass
+class Primitive(Shape):
+    """
+    A primitive shape.
+    """
+    color: Color = field(default_factory=Color)
+
+
 @dataclass
 class Mesh(Shape):
     """
@@ -105,6 +138,11 @@ class Mesh(Shape):
     Scale of the mesh.
     """
 
+    color: Color = field(default_factory=Color)
+    """
+    Color of the mesh.
+    """
+
     @cached_property
     def mesh(self) -> trimesh.Trimesh:
         """
@@ -118,15 +156,8 @@ class Mesh(Shape):
         """
         return BoundingBox.from_mesh(self.mesh)
 
-
-
-
-@dataclass
-class Primitive(Shape):
-    """
-    A primitive shape.
-    """
-    color: Color = field(default_factory=Color)
+    def is_bigger(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
+        return True
 
 
 @dataclass
@@ -154,6 +185,9 @@ class Sphere(Primitive):
         return BoundingBox(-self.radius, -self.radius, -self.radius,
                            self.radius, self.radius, self.radius)
 
+    def is_bigger(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
+        return sphere_volume(self.radius) > volume_threshold
+
 
 @dataclass
 class Cylinder(Primitive):
@@ -170,8 +204,6 @@ class Cylinder(Primitive):
         """
         return trimesh.creation.cylinder(radius=self.width / 2, height=self.height, sections=16)
 
-
-
     def as_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the cylinder.
@@ -181,6 +213,10 @@ class Cylinder(Primitive):
         half_height = self.height / 2
         return BoundingBox(-half_width, -half_width, -half_height,
                            half_width, half_width, half_height)
+
+    def is_bigger(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
+        return (cylinder_volume(self.width/2, self.height) > volume_threshold or
+                cylinder_surface(self.width/2, self.height) > surface_threshold)
 
 
 @dataclass
@@ -204,6 +240,10 @@ class Box(Primitive):
         """
         return BoundingBox(-self.scale.x / 2, -self.scale.y / 2, -self.scale.z / 2,
                            self.scale.x / 2, self.scale.y / 2, self.scale.z / 2)
+
+    def is_bigger(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
+        return (cube_volume(self.scale.x, self.scale.y, self.scale.z) > volume_threshold or
+                cube_surface(self.scale.x, self.scale.y, self.scale.z) > surface_threshold)
 
 
 @dataclass
@@ -300,7 +340,9 @@ class BoundingBox:
         """
         Check if the bounding box contains a point.
         """
-        x, y, z = (point.x.to_np(), point.y.to_np(), point.z.to_np()) if isinstance(point.z, Expression) else (point.x, point.y, point.z)
+        x, y, z = (point.x.to_np(), point.y.to_np(), point.z.to_np()) if isinstance(point.z, Expression) else (point.x,
+                                                                                                               point.y,
+                                                                                                               point.z)
 
         return self.simple_event.contains((x, y, z))
 
@@ -397,7 +439,6 @@ class BoundingBox:
         :param max_point: The maximum point
         """
         return cls(*min_point.to_np()[:3], *max_point.to_np()[:3])
-
 
 
 @dataclass

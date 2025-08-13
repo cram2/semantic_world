@@ -6,18 +6,21 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import wraps, lru_cache
-from typing import Dict, Tuple, OrderedDict, Union, Optional
+from typing import Dict, Tuple, OrderedDict, Union, Optional, Type
+from typing import TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
 import rustworkx as rx
 import rustworkx.visit
 import rustworkx.visualization
-from typing_extensions import List, Type
+from typing_extensions import List
 
+from .connections import ActiveConnection, PassiveConnection
 from .connections import HasUpdateState, Has1DOFState, Connection6DoF
 from .degree_of_freedom import DegreeOfFreedom
-from .exceptions import DuplicateViewError, AddingAnExistingViewError, ViewNotFoundError
+from .exceptions import DuplicateViewError, AddingAnExistingViewError
+from .exceptions import ViewNotFoundError
 from .ik_solver import InverseKinematicsSolver
 from .prefixed_name import PrefixedName
 from .spatial_types import spatial_types as cas
@@ -31,6 +34,8 @@ from .world_state import WorldState
 logger = logging.getLogger(__name__)
 
 id_generator = IDGenerator()
+
+ConnectionTypeVar = TypeVar('ConnectionTypeVar', bound=Connection)
 
 
 class PlotAlignment(IntEnum):
@@ -282,6 +287,22 @@ class World:
     def __hash__(self):
         return hash(id(self))
 
+    @property
+    def active_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
+        dofs = []
+        for connection in self.connections:
+            if isinstance(connection, ActiveConnection):
+                dofs.extend(connection.active_dofs)
+        return dofs
+
+    @property
+    def passive_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
+        dofs = []
+        for connection in self.connections:
+            if isinstance(connection, PassiveConnection):
+                dofs.extend(connection.passive_dofs)
+        return dofs
+
     def validate(self) -> bool:
         """
         Validate the world.
@@ -435,6 +456,53 @@ class World:
             view._world = self
             self.views.append(view)
 
+    def get_connections_of_branch(self, root: Body) -> List[Connection]:
+        """
+        Collect all connections that are below root in the tree.
+
+        :param root: The root body of the branch
+        :return: List of all connections in the subtree rooted at the given body
+        """
+
+        # Create a custom visitor to collect connections
+        class ConnectionCollector(rustworkx.visit.DFSVisitor):
+            def __init__(self, world: 'World'):
+                self.world = world
+                self.connections = []
+
+            def tree_edge(self, edge: Tuple[int, int, Connection]):
+                """Called for each tree edge during DFS traversal"""
+                self.connections.append(edge[2])  # edge[2] is the connection
+
+        visitor = ConnectionCollector(self)
+        rx.dfs_search(self.kinematic_structure, [root.index], visitor)
+
+        return visitor.connections
+
+    def get_bodies_of_branch(self, root: Body) -> List[Body]:
+        """
+        Collect all bodies that are below root in the tree.
+
+        :param root: The root body of the branch
+        :return: List of all bodies in the subtree rooted at the given body (including the root)
+        """
+
+        # Create a custom visitor to collect bodies
+        class BodyCollector(rustworkx.visit.DFSVisitor):
+            def __init__(self, world: World):
+                self.world = world
+                self.bodies = []
+
+            def discover_vertex(self, node_index: int, time: int) -> None:
+                """Called when a vertex is first discovered during DFS traversal"""
+                body = self.world.kinematic_structure[node_index]
+                self.bodies.append(body)
+
+        visitor = BodyCollector(self)
+        rx.dfs_search(self.kinematic_structure, [root.index], visitor)
+
+        return visitor.bodies
+
     def get_view_by_name(self, name: Union[str, PrefixedName]) -> Optional[View]:
         """
         Retrieves a View from the list of view based on its name.
@@ -445,6 +513,8 @@ class World:
 
         :param name: The name of the view to search for. Can be a string or a `PrefixedName` object.
         :return: The `View` object that matches the given name.
+        :raises ValueError: If multiple or no views with the specified name are found.
+        :raises KeyError: If no view is found.
         """
         if isinstance(name, PrefixedName):
             if name.prefix is not None:
@@ -458,6 +528,23 @@ class World:
         if matches:
             return matches[0]
         raise ViewNotFoundError(name)
+
+    def get_world_state_symbols(self) -> List[cas.Symbol]:
+        """
+        Constructs and returns a list of symbols representing the state of the system. The state
+        is defined in terms of positions, velocities, accelerations, and jerks for each degree
+        of freedom specified in the current state.
+
+        :raises KeyError: If a degree of freedom defined in the state does not exist in
+            the `degrees_of_freedom`.
+        :returns: A combined list of symbols corresponding to the positions, velocities,
+            accelerations, and jerks for each degree of freedom in the state.
+        """
+        positions = [self.get_degree_of_freedom_by_name(v_name).symbols.position for v_name in self.state]
+        velocities = [self.get_degree_of_freedom_by_name(v_name).symbols.velocity for v_name in self.state]
+        accelerations = [self.get_degree_of_freedom_by_name(v_name).symbols.acceleration for v_name in self.state]
+        jerks = [self.get_degree_of_freedom_by_name(v_name).symbols.jerk for v_name in self.state]
+        return positions + velocities + accelerations + jerks
 
     @modifies_world
     def remove_body(self, body: Body) -> None:
@@ -517,6 +604,26 @@ class World:
 
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
+
+    def search_for_connections_of_type(self, connection_type: Union[Type[Connection], Tuple[Type[Connection], ...]]) \
+            -> List[Connection]:
+        return [c for c in self.connections if isinstance(c, connection_type)]
+
+    def search_for_views_of_type(self, view_type: Union[Type[View], Tuple[Type[View], ...]]) \
+            -> List[View]:
+        return [v for v in self.views if isinstance(v, view_type)]
+
+    @modifies_world
+    def clear(self):
+        """
+        Clears all stored data and resets the state of the instance.
+        """
+        for body in list(self.bodies):
+            self.remove_body(body)
+
+        self.views.clear()
+        self.degrees_of_freedom.clear()
+        self.state = WorldState()
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """

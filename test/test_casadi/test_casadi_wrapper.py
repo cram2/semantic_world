@@ -3346,3 +3346,8 @@ class TestCASWrapper:
         e = cas.if_eq(a, 0, a, b)
         assert cas.to_str(e) == [['(((a==0)?a:0)+((!(a==0))?b:0))']]
         assert cas.to_str(e) == e.pretty_str()
+
+    def test_leq_on_array(self):
+        a = cas.Expression(np.array([1,2,3,4]))
+        b = cas.Expression(np.array([2,2,2,2]))
+        assert not cas.logic_all(cas.less_equal(a, b)).to_np()

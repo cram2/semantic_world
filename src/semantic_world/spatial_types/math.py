@@ -326,3 +326,57 @@ def quaternion_slerp(q1, q2, t):
         return 0.5 * q1 + 0.5 * q2
     return ratio_a * q1 + ratio_b * q2
 
+
+
+def sphere_volume(radius):
+    """
+    :type radius: float
+    :rtype: float
+    """
+    return (4 / 3.) * np.pi * radius ** 3
+
+
+def sphere_surface(radius):
+    """
+    :type radius: float
+    :rtype: float
+    """
+    return 4 * np.pi * radius ** 2
+
+
+def cube_volume(length, width, height):
+    """
+    :type length: float
+    :type width: float
+    :type height: float
+    :rtype: float
+    """
+    return length * width * height
+
+
+def cube_surface(length, width, height):
+    """
+    :type length: float
+    :type width: float
+    :type height: float
+    :rtype: float
+    """
+    return 2 * (length * width + length * height + width * height)
+
+
+def cylinder_volume(r, h):
+    """
+    :type r: float
+    :type h: float
+    :rtype: float
+    """
+    return np.pi * r ** 2 * h
+
+
+def cylinder_surface(r, h):
+    """
+    :type r: float
+    :type h: float
+    :rtype: float
+    """
+    return 2 * np.pi * r * (h + r)

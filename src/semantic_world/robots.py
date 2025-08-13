@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import logging
+import os
 from abc import abstractmethod, ABC
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Tuple, Iterable, Set
+from functools import lru_cache, cached_property
+from itertools import combinations_with_replacement
+from typing import Tuple, Iterable, Set, Dict, Union
 
+from lxml import etree
+import rustworkx as rx
 from typing_extensions import Optional, List, Self
 
+from .connections import ActiveConnection, FixedConnection, OmniDrive
 from .prefixed_name import PrefixedName
 from .spatial_types.spatial_types import Vector3
 from .world import World
-from .world_entity import Body, RootedView, Connection
+from .world_entity import Body, RootedView, Connection, View
 
 
 @dataclass
@@ -272,6 +279,199 @@ class Torso(KinematicChain):
 
 
 @dataclass
+class CollisionAvoidanceThreshold:
+    hard_threshold: float = 0.0
+    """
+    MUST stay at least this distance away from other bodies.
+    """
+
+    soft_threshold: float = 0.0
+    """
+    SHOULD stay at most this distance away from other bodies.
+    """
+
+    number_of_repeller: int = 1
+    """
+    From how many bodies can this body be repelled from at the same time.
+    """
+
+    def __post_init__(self):
+        assert self.soft_threshold >= self.hard_threshold
+
+
+@dataclass
+class CollisionConfig(View):
+    """
+    Robot-specific collision configuration
+    """
+
+    _robot: AbstractRobot
+    """
+    The robot this collision configuration belongs to.
+    """
+
+    default_external_threshold: CollisionAvoidanceThreshold = field(default_factory=CollisionAvoidanceThreshold)
+    """
+    Default thresholds that are used for collision checking, if no matches in external_avoidance_threshold found.
+    """
+    external_avoidance_threshold: Dict[Body, CollisionAvoidanceThreshold] = field(default_factory=dict)
+    """
+    Thresholds used for collision avoidance between bodies of the robot and bodies which don't belong to the robot.
+    """
+
+    default_self_threshold: CollisionAvoidanceThreshold = field(default_factory=CollisionAvoidanceThreshold)
+    """
+    Default thresholds that are used for collision checking, if no matches in self_avoidance_threshold found.
+    """
+    self_avoidance_threshold: Dict[Body, CollisionAvoidanceThreshold] = field(default_factory=dict)
+    """
+    Thresholds used for collision avoidance between bodies belonging the robot.
+    """
+
+    disabled_bodies: Set[Body] = field(default_factory=set)
+    """
+    Bodies for which collisions should never be checked with anything.
+    """
+
+    disabled_pairs: Set[Tuple[Body, Body]] = field(default_factory=set)
+    """
+    Pairs for bodies for which collisions should never be checked.
+    """
+
+    frozen_connections: Set[Connection] = field(default_factory=set)
+    """
+    Connections that should be treated as fixed for collision avoidance.
+    Common example are gripper joints, you generally don't want to avoid collisions by closing the fingers, 
+    but by moving the whole hand away.
+    """
+
+    SRDF_DISABLE_ALL_COLLISIONS: str = 'disable_all_collisions'
+    SRDF_DISABLE_SELF_COLLISION: str = 'disable_self_collision'
+    SRDF_MOVEIT_DISABLE_COLLISIONS: str = 'disable_collisions'
+    """
+    Constants for SRDF tags top help with parsing.
+    """
+
+    def __post_init__(self):
+        self.name = PrefixedName(f'{self._robot.name} collision config')
+        disabled_pairs = self.compute_uncontrolled_body_pairs()
+        self.disabled_pairs.update(disabled_pairs)
+        super().__post_init__()
+        external_avoidance_threshold = defaultdict(lambda: self.default_external_threshold)
+        external_avoidance_threshold.update(self.external_avoidance_threshold)
+        self.external_avoidance_threshold = external_avoidance_threshold
+
+        self_avoidance_threshold = defaultdict(lambda: self.default_self_threshold)
+        self_avoidance_threshold.update(self.self_avoidance_threshold)
+        self.self_avoidance_threshold = self_avoidance_threshold
+
+    @staticmethod
+    def sort_bodies(body_a: Body, body_b: Body) -> Tuple[Body, Body]:
+        """
+        Sort two bodies by their names to ensure consistent ordering and avoid duplicates in sets.
+        
+        :param body_a: First body to compare
+        :param body_b: Second body to compare
+        :return: Tuple of (body_a, body_b) sorted by their names
+        """
+        if body_a.name > body_b.name:
+            return body_b, body_a
+        return body_a, body_b
+
+    def set_external_threshold_for_connection(self, connection: Connection, threshold: CollisionAvoidanceThreshold):
+        bodies = self._robot.get_directly_child_bodies_with_collision(connection)
+        for body in bodies:
+            self.external_avoidance_threshold[body] = threshold
+
+    def compute_uncontrolled_body_pairs(self) -> Set[Tuple[Body, Body]]:
+        """
+        Computes pairs of bodies that should not be collision checked because they have no controlled connections between them.
+
+        When all connections between two bodies are not controlled, these bodies cannot move relative to each
+        other, so collision checking between them is unnecessary.
+        
+        :return: Set of body pairs that should have collisions disabled
+        """
+        body_combinations = set(combinations_with_replacement(self._robot.bodies_with_collisions, 2))
+        body_combinations = {self.sort_bodies(*x) for x in body_combinations}
+        disabled_pairs = set()
+        for body_a, body_b in list(body_combinations):
+            body_a, body_b = self.sort_bodies(body_a, body_b)
+            if body_a == body_b:
+                continue
+            if self._robot.is_controlled_connection_in_chain(body_a, body_b):
+                continue
+            disabled_pairs.add((body_a, body_b))
+        return disabled_pairs
+
+    @classmethod
+    def from_srdf(cls, file_path: str, world: World, robot: AbstractRobot) -> CollisionConfig:
+        """
+        Creates a CollisionConfig instance from an SRDF file.
+
+        Parse an SRDF file to configure disabled collision pairs or bodies for a given world.
+        Process SRDF elements like `disable_collisions`, `disable_self_collision`,
+        or `disable_all_collisions` to update collision configuration
+        by referencing bodies in the provided `world`.
+
+        :param file_path: The path to the SRDF file used for collision configuration.
+        :param world: The World instance containing all the bodies and their
+                      collision properties.
+        :param robot: The AbstractRobot instance this collision configuration belongs to.
+        :return: An instance of CollisionConfig with disabled collision pairs and
+                 bodies updated based on the SRDF file.
+        """
+        disabled_pairs = set()
+        disabled_bodies = set()
+
+        if not os.path.exists(file_path):
+            raise ValueError(f'file {file_path} does not exist')
+        srdf = etree.parse(file_path)
+        srdf_root = srdf.getroot()
+        for child in srdf_root:
+            if hasattr(child, 'tag'):
+                if child.tag in {cls.SRDF_MOVEIT_DISABLE_COLLISIONS, cls.SRDF_DISABLE_SELF_COLLISION}:
+                    body_a_srdf_name: str = child.attrib['link1']
+                    body_b_srdf_name: str = child.attrib['link2']
+                    body_a = world.get_body_by_name(body_a_srdf_name)
+                    body_b = world.get_body_by_name(body_b_srdf_name)
+                    if body_a not in world.bodies_with_collisions:
+                        continue
+                    if body_b not in world.bodies_with_collisions:
+                        continue
+                    body_a, body_b = cls.sort_bodies(body_a, body_b)
+                    disabled_pairs.add((body_a, body_b))
+                elif child.tag == cls.SRDF_DISABLE_ALL_COLLISIONS:
+                    body = world.get_body_by_name(child.attrib['link'])
+                    disabled_bodies.add(body)
+        return cls(_world=world,
+                   _robot=robot,
+                   disabled_bodies=disabled_bodies,
+                   disabled_pairs=disabled_pairs)
+
+    def save_to_file(self, file_path: str):
+        # Create the root element
+        root = etree.Element('robot')
+        root.append('name', self._robot.name)
+
+        # %% disabled bodies
+        for body in sorted(self.disabled_bodies, key=lambda body: body.name):
+            child = etree.SubElement(root, self.SRDF_DISABLE_ALL_COLLISIONS)
+            child.append('link', body.name.name)
+
+        # %% disabled body pairs
+        for (body_a, body_b), reason in sorted(self.disabled_pairs):
+            child = etree.SubElement(root, self.SRDF_DISABLE_SELF_COLLISION)
+            child.append('link1', body_a.name.name)
+            child.append('link2', body_b.name.name)
+            child.append('reason', reason.name)
+
+        # Create the XML tree
+        tree = etree.ElementTree(root)
+        tree.write(file_path, pretty_print=True, xml_declaration=True, encoding=tree.docinfo.encoding)
+
+
+@dataclass
 class AbstractRobot(RootedView, ABC):
     """
     Specification of an abstract robot. A robot consists of:
@@ -285,6 +485,11 @@ class AbstractRobot(RootedView, ABC):
     odom: Body = field(default_factory=Body)
     """
     The odometry body of the robot, which is usually the base footprint.
+    """
+
+    drive: Optional[OmniDrive] = None
+    """
+    The connection which the robot uses for driving.
     """
 
     torso: Optional[Torso] = None
@@ -311,6 +516,19 @@ class AbstractRobot(RootedView, ABC):
     """
     A collection of all kinematic chains containing a sensor, such as a camera.
     """
+
+    controlled_connections: Set[ActiveConnection] = field(default_factory=set)
+    """
+    A subset of the robot's connections that are controlled by a controller.
+    """
+
+    collision_config: Optional[CollisionConfig] = None
+    """
+    Robot-specific collision configuration.
+    """
+
+    def load_collision_config(self, file_path: str):
+        self.collision_config = CollisionConfig.from_srdf(file_path=file_path, world=self._world, robot=self)
 
     @classmethod
     @abstractmethod
@@ -368,6 +586,97 @@ class AbstractRobot(RootedView, ABC):
         self._views.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
 
+    @lru_cache(maxsize=None)
+    def is_controlled_connection_in_chain(self, root: Body, tip: Body) -> bool:
+        root_part, tip_part = self._world.compute_split_chain_of_connections(root, tip)
+        connections = root_part + tip_part
+        for c in connections:
+            if c in self.controlled_connections:
+                return True
+        return False
+
+    @cached_property
+    def unmovable_bodies_with_collision(self) -> Set[Body]:
+        result = set()
+        for body in self.bodies_with_collisions:
+            if not self.is_controlled_connection_in_chain(self._world.root, body):
+                result.add(body)
+        return result
+
+
+    @lru_cache(maxsize=None)
+    def get_controlled_parent_connection(self, body: Body) -> Connection:
+        if body == self.root:
+            raise ValueError(f"Cannot get controlled parent connection for root body {self.root.name}.")
+        if body.parent_connection in self.controlled_connections:
+            return body.parent_connection
+        return self.get_controlled_parent_connection(body.parent_body)
+
+    @cached_property
+    def bodies_with_collisions(self) -> List[Body]:
+        return [x for x in self.bodies if x.has_collision()]
+
+    def compute_chain_reduced_to_controlled_joints(self, root: Body, tip: Body) -> Tuple[Body, Body]:
+        """
+        Removes root and tip links until they are both connected with a controlled connection.
+        Useful for implementing collision avoidance.
+
+        1. Compute the kinematic chain of bodies between root and tip.
+        2. Remove all entries from link_a downward until one is connected with a connection from this view.
+        2. Remove all entries from link_b upward until one is connected with a connection from this view.
+
+        :param root: start of the chain
+        :param tip: end of the chain
+        :return: start and end link of the reduced chain
+        """
+        downward_chain, upward_chain = self._world.compute_split_chain_of_connections(root=root, tip=tip)
+        chain = downward_chain + upward_chain
+        for i, connection in enumerate(chain):
+            if connection in self.connections:
+                new_root = connection
+                break
+        else:
+            raise KeyError(f'no controlled connection in chain between {root} and {tip}')
+        for i, connection in enumerate(reversed(chain)):
+            if connection in self.connections:
+                new_tip = connection
+                break
+        else:
+            raise KeyError(f'no controlled connection in chain between {root} and {tip}')
+
+        if new_root in upward_chain:
+            new_root_body = new_root.parent
+        else:  # if new_root is in the downward chain, we need to "flip" it by returning its child
+            new_root_body = new_root.child
+        if new_tip in upward_chain:
+            new_tip_body = new_tip.child
+        else:  # if new_root is in the downward chain, we need to "flip" it by returning its parent
+            new_tip_body = new_tip.parent
+        return new_root_body, new_tip_body
+
+    def get_directly_child_bodies_with_collision(self, connection: Connection) -> Set[Body]:
+        class BodyCollector(rx.visit.DFSVisitor):
+            def __init__(self, world: World, frozen_connections: Set[Connection]):
+                self.world = world
+                self.bodies = set()
+                self.frozen_connections = frozen_connections
+
+            def discover_vertex(self, node_index: int, time: int) -> None:
+                body = self.world.kinematic_structure[node_index]
+                if body.has_collision():
+                    self.bodies.add(body)
+
+            def tree_edge(self, e):
+                if e in self.frozen_connections:
+                    return
+                if isinstance(e, ActiveConnection):
+                    raise rx.visit.PruneSearch()
+
+        visitor = BodyCollector(self._world, self.collision_config.frozen_connections)
+        rx.dfs_search(self._world.kinematic_structure, [connection.child.index], visitor)
+
+        return visitor.bodies
+
 
 @dataclass
 class PR2(AbstractRobot):
@@ -375,9 +684,12 @@ class PR2(AbstractRobot):
     Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
     The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
     """
-    neck: Neck = field(default_factory=Neck)
-    left_arm: KinematicChain = field(default_factory=KinematicChain)
-    right_arm: KinematicChain = field(default_factory=KinematicChain)
+    neck: Neck = field(init=False)
+    left_arm: KinematicChain = field(init=False)
+    right_arm: KinematicChain = field(init=False)
+
+    def __hash__(self):
+        return hash(self.name)
 
     def _add_arm(self, arm: KinematicChain, arm_side: str):
         """
@@ -442,6 +754,8 @@ class PR2(AbstractRobot):
             _world=world,
         )
 
+        robot.drive = robot.odom.parent_connection
+
         # Create left arm
         left_gripper_thumb = Finger(name=PrefixedName('left_gripper_thumb', prefix=robot.name.name),
                                     root=world.get_body_by_name("l_gripper_l_finger_link"),
@@ -491,6 +805,7 @@ class PR2(AbstractRobot):
 
         # Create camera and neck
         camera = Camera(name=PrefixedName('wide_stereo_optical_frame', prefix=robot.name.name),
+                        root=world.get_body_by_name('wide_stereo_optical_frame'),
                         forward_facing_axis=Vector3(0, 0, 1),
                         field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
                         minimal_height=1.27,

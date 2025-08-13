@@ -102,7 +102,7 @@ def pr2_world():
         localization_body = Body(name=PrefixedName('odom_combined'))
         world.add_body(localization_body)
 
-        pr2_parser = URDFParser(pr2)
+        pr2_parser = URDFParser(file_path=pr2)
         world_with_pr2 = pr2_parser.parse()
         # world_with_pr2.plot_kinematic_structure()
         pr2_root = world_with_pr2.root

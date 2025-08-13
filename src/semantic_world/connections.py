@@ -87,6 +87,9 @@ class FixedConnection(Connection):
     Has 0 degrees of freedom.
     """
 
+    def __hash__(self):
+        return hash((self.parent, self.child))
+
 
 @dataclass
 class ActiveConnection(Connection):
@@ -266,6 +269,9 @@ class Connection6DoF(PassiveConnection):
     Rotation of child body with respect to parent body represented as a quaternion.
     """
 
+    def __hash__(self):
+        return hash(self.name)
+
     def __post_init__(self):
         super().__post_init__()
         self._post_init_world_part()
@@ -422,3 +428,6 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
 
     def get_free_variable_names(self) -> List[PrefixedName]:
         return [self.x.name, self.y.name, self.yaw.name]
+
+    def __hash__(self):
+        return hash(self.name)

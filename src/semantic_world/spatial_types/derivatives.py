@@ -48,6 +48,9 @@ class DerivativeMap(Generic[T]):
     Order corresponds to the order of the Derivatives enum.
     """
 
+    def __hash__(self):
+        return hash(tuple(self.data))
+
     @property
     def position(self) -> T:
         return self.data[Derivatives.position]
