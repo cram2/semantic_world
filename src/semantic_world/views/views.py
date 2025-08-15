@@ -66,13 +66,6 @@ class Furniture(View):
     """
     ...
 
-@dataclass
-class Cupboard(View):
-    """
-    A closed storage furniture piece with doors.
-    """
-    ...
-
 @dataclass(unsafe_hash=True)
 class Appliance(View):
     """
