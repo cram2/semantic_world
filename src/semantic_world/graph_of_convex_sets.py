@@ -198,7 +198,7 @@ class GraphOfConvexSets:
             x_target = intersection.x_interval.center()
             y_target = intersection.y_interval.center()
             z_target = intersection.z_interval.center()
-            result.append(Point3.from_xyz(x_target, y_target, z_target))
+            result.append(Point3(x_target, y_target, z_target))
 
         result.append(goal)
         return result

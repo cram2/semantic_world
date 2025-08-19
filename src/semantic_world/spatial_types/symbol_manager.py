@@ -71,7 +71,7 @@ class SymbolManager(metaclass=SingletonMeta):
         sx = self.register_symbol_provider(f'{name}.x', lambda: provider()[0])
         sy = self.register_symbol_provider(f'{name}.y', lambda: provider()[1])
         sz = self.register_symbol_provider(f'{name}.z', lambda: provider()[2])
-        p = cas.Point3([sx, sy, sz])
+        p = cas.Point3(sx, sy, sz)
         return p
 
     def register_vector3(self, name: str, provider: Callable[[], Tuple[float, float, float]]) -> cas.Vector3:
@@ -83,7 +83,7 @@ class SymbolManager(metaclass=SingletonMeta):
         sx = self.register_symbol_provider(f'{name}.x', lambda: provider()[0])
         sy = self.register_symbol_provider(f'{name}.y', lambda: provider()[1])
         sz = self.register_symbol_provider(f'{name}.z', lambda: provider()[2])
-        v = cas.Vector3([sx, sy, sz])
+        v = cas.Vector3(sx, sy, sz)
         return v
 
     def register_quaternion(self, name: str, provider: Callable[[], Tuple[float, float, float, float]]) \
@@ -97,7 +97,7 @@ class SymbolManager(metaclass=SingletonMeta):
         sy = self.register_symbol_provider(f'{name}.y', lambda: provider()[1])
         sz = self.register_symbol_provider(f'{name}.z', lambda: provider()[2])
         sw = self.register_symbol_provider(f'{name}.w', lambda: provider()[3])
-        q = cas.Quaternion((sx, sy, sz, sw))
+        q = cas.Quaternion(sx, sy, sz, sw)
         return q
 
     def register_transformation_matrix(self, name: str,

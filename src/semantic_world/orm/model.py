@@ -36,14 +36,14 @@ class WorldMapping(AlternativeMapping[World]):
             for view in self.views:
                 result.add_view(view)
             for dof in self.degrees_of_freedom:
-                result.create_degree_of_freedom(name=dof.name, lower_limits=dof.lower_limits, upper_limits=dof.upper_limits)
+                result.create_degree_of_freedom(name=dof.name, lower_limits=dof.lower_limits,
+                                                upper_limits=dof.upper_limits)
 
         return result
 
 
 @dataclass
 class Vector3Mapping(AlternativeMapping[Vector3]):
-
     x: float
     y: float
     z: float
@@ -55,15 +55,15 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
         x, y, z, _ = symbol_manager.evaluate_expr(obj).tolist()
         result = cls(x=x, y=y, z=z)
         result.reference_frame = obj.reference_frame
-        return
+        return result
 
     def create_from_dao(self) -> Vector3:
-        return Vector3.from_xyz(x=self.x, y=self.y, z=self.z, reference_frame=None)
+        return Vector3(x=self.x, y=self.y, z=self.z, reference_frame=None)
+
 
 
 @dataclass
 class Point3Mapping(AlternativeMapping[Point3]):
-
     x: float
     y: float
     z: float
@@ -78,7 +78,8 @@ class Point3Mapping(AlternativeMapping[Point3]):
         return result
 
     def create_from_dao(self) -> Point3:
-        return Point3.from_xyz(x=self.x, y=self.y, z=self.z, reference_frame=None)
+        return Point3(x=self.x, y=self.y, z=self.z, reference_frame=None)
+
 
 @dataclass
 class QuaternionMapping(AlternativeMapping[Quaternion]):
@@ -97,7 +98,8 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
         return result
 
     def create_from_dao(self) -> Quaternion:
-        return Quaternion.from_xyzw(x=self.x, y=self.y, z=self.z, w=self.w, reference_frame=None)
+        return Quaternion(x=self.x, y=self.y, z=self.z, w=self.w, reference_frame=None)
+
 
 @dataclass
 class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
@@ -114,6 +116,7 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
         result = RotationMatrix.from_quaternion(self.rotation)
         result.reference_frame = None
         return result
+
 
 @dataclass
 class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
@@ -137,7 +140,8 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
         return TransformationMatrix.from_point_rotation_matrix(
             point=self.position,
             rotation_matrix=RotationMatrix.from_quaternion(self.rotation), reference_frame=None,
-            child_frame=self.child_frame,)
+            child_frame=self.child_frame, )
+
 
 @dataclass
 class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):

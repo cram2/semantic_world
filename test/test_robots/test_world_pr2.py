@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 import numpy as np
 import pytest
@@ -8,11 +9,12 @@ from semantic_world.adapters.urdf import URDFParser
 from semantic_world.connections import OmniDrive
 from semantic_world.ik_solver import MaxIterationsException, UnreachableException
 from semantic_world.prefixed_name import PrefixedName
-from semantic_world.robots import PR2
+from semantic_world.robots import PR2, KinematicChain
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.world import World, Body
 from semantic_world.testing import pr2_world
+from semantic_world.world_entity import RootedView
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world):
@@ -188,4 +190,11 @@ def test_pr2_view(pr2_world):
     assert pr2.torso.name.name == 'torso'
     assert len(pr2.torso.sensors) == 0
     assert list(pr2.sensor_chains)[0].sensors == pr2.sensors
-    assert pr2.odom.name.name == 'odom_combined'
+
+
+def test_kinematic_chains(pr2_world):
+    pr2 = PR2.from_world(pr2_world)
+    kinematic_chain_views: List[KinematicChain] = pr2_world.get_views_by_type(KinematicChain)
+    for chain in kinematic_chain_views:
+        assert chain.root
+        assert chain.tip

@@ -90,8 +90,8 @@ Let's use graph theory to find a path!
 ```{code-cell} ipython2
 from semantic_world.spatial_types import Point3
 
-start = Point3.from_xyz(-0.75, 0, 0.15)
-goal = Point3.from_xyz(0.75, 0, 0.15)
+start = Point3(-0.75, 0, 0.15)
+goal = Point3(0.75, 0, 0.15)
 path = gcs.path_from_to(start, goal)
 print("A potential path is", [(point.x, point.y) for point in path])
 ```
@@ -145,8 +145,8 @@ This allows the accessing of locations using a sequence of local problems put to
 Finally, let's find a way from here to there:
 
 ```{code-cell} ipython2
-start = Point3.from_xyz(-0.75, 0, 0.15)
-goal = Point3.from_xyz(0.75, 0, 0.15)
+start = Point3(-0.75, 0, 0.15)
+goal = Point3(0.75, 0, 0.15)
 path = gcs.path_from_to(start, goal)
 print("A potential path is", [(point.x, point.y, point.z) for point in path])
 ```

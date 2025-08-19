@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import itertools
+import tempfile
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, List, Iterator
 
+from trimesh import Trimesh
 from typing_extensions import Self
 
 import trimesh
@@ -113,6 +115,33 @@ class Mesh(Shape):
         return trimesh.load_mesh(self.filename)
 
     def as_bounding_box(self) -> BoundingBox:
+        """
+        Returns the bounding box of the mesh.
+        """
+        return BoundingBox.from_mesh(self.mesh)
+
+
+@dataclass
+class TriangleMesh(Shape):
+
+    mesh: Optional[Trimesh] = None
+    """
+    The loaded mesh object.
+    """
+
+    scale: Scale = field(default_factory=Scale)
+    """
+    Scale of the mesh.
+    """
+
+    @cached_property
+    def file(self):
+        f = tempfile.NamedTemporaryFile(delete=False)
+        with open(f.name, "w") as fd:
+            fd.write(trimesh.exchange.stl.export_stl_ascii(self.mesh))
+        return f
+
+    def _local_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the mesh.
         """
@@ -383,7 +412,7 @@ class BoundingBox:
 
         :return: A list of Point3 objects representing the corners of the bounding box.
         """
-        return [Point3.from_xyz(x, y, z)
+        return [Point3(x, y, z)
                 for x in (self.min_x, self.max_x)
                 for y in (self.min_y, self.max_y)
                 for z in (self.min_z, self.max_z)]

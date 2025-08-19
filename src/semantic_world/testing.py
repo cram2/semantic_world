@@ -4,11 +4,12 @@ from typing import Tuple
 import pytest
 
 from .adapters.urdf import URDFParser
-from .connections import Connection6DoF, PrismaticConnection, RevoluteConnection, FixedConnection, OmniDrive, UnitVector
+from .connections import Connection6DoF, PrismaticConnection, RevoluteConnection, FixedConnection, OmniDrive
 from .geometry import Box, Scale, Sphere
 from .prefixed_name import PrefixedName
 from .spatial_types import TransformationMatrix
 from .spatial_types.derivatives import Derivatives, DerivativeMap
+from .spatial_types.spatial_types import Vector3
 from .world import World
 from .world_entity import Body
 
@@ -31,8 +32,8 @@ def world_setup() -> Tuple[World, Body, Body, Body, Body, Body]:
         dof = world.create_degree_of_freedom(name=PrefixedName('dof'), lower_limits=lower_limits,
                                              upper_limits=upper_limits)
 
-        c_l1_l2 = PrismaticConnection(parent=l1, child=l2, dof=dof, axis=UnitVector(1, 0, 0))
-        c_r1_r2 = RevoluteConnection(parent=r1, child=r2, dof=dof, axis=UnitVector(0, 0, 1))
+        c_l1_l2 = PrismaticConnection(parent=l1, child=l2, dof=dof, axis=Vector3.X(reference_frame=l1))
+        c_r1_r2 = RevoluteConnection(parent=r1, child=r2, dof=dof, axis=Vector3.Z(reference_frame=r1))
         bf_root_l1 = FixedConnection(parent=bf, child=l1)
         bf_root_r1 = FixedConnection(parent=bf, child=r1)
         world.add_connection(c_l1_l2)

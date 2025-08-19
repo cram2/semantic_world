@@ -161,7 +161,12 @@ class Symbol_:
     def free_symbols(self):
         return free_symbols(self.s)
 
+    def is_constant(self):
+        return len(self.free_symbols()) == 0
+
     def to_np(self):
+        if not self.is_constant():
+            raise ValueError('Only expressions with no free symbols can be converted to numpy arrays.')
         if not hasattr(self, 'np_data'):
             if self.shape[0] == self.shape[1] == 0:
                 self.np_data = np.eye(0)
@@ -200,9 +205,9 @@ class Symbol(Symbol_):
             if isinstance(other, (Symbol, Expression)):
                 return Expression(sum_)
             elif isinstance(other, Vector3):
-                return Vector3(sum_)
+                return Vector3.from_iterable(sum_)
             elif isinstance(other, Point3):
-                return Point3(sum_)
+                return Point3.from_iterable(sum_)
         raise _operation_type_error(self, '+', other)
 
     def __radd__(self, other):
@@ -218,9 +223,9 @@ class Symbol(Symbol_):
             if isinstance(other, (Symbol, Expression)):
                 return Expression(result)
             elif isinstance(other, Vector3):
-                return Vector3(result)
+                return Vector3.from_iterable(result)
             elif isinstance(other, Point3):
-                return Point3(result)
+                return Point3.from_iterable(result)
         raise _operation_type_error(self, '-', other)
 
     def __rsub__(self, other):
@@ -236,9 +241,9 @@ class Symbol(Symbol_):
             if isinstance(other, (Symbol, Expression)):
                 return Expression(result)
             elif isinstance(other, Vector3):
-                return Vector3(result)
+                return Vector3.from_iterable(result)
             elif isinstance(other, Point3):
-                return Point3(result)
+                return Point3.from_iterable(result)
         raise _operation_type_error(self, '*', other)
 
     def __rmul__(self, other):
@@ -254,9 +259,9 @@ class Symbol(Symbol_):
             if isinstance(other, (Symbol, Expression)):
                 return Expression(result)
             elif isinstance(other, Vector3):
-                return Vector3(result)
+                return Vector3.from_iterable(result)
             elif isinstance(other, Point3):
-                return Point3(result)
+                return Point3.from_iterable(result)
         raise _operation_type_error(self, '/', other)
 
     def __rtruediv__(self, other):
@@ -328,9 +333,9 @@ class Symbol(Symbol_):
             if isinstance(other, (Symbol, Expression)):
                 return Expression(result)
             elif isinstance(other, Vector3):
-                return Vector3(result)
+                return Vector3.from_iterable(result)
             elif isinstance(other, Point3):
-                return Point3(result)
+                return Point3.from_iterable(result)
         raise _operation_type_error(self, '**', other)
 
     def __rpow__(self, other):
@@ -388,9 +393,9 @@ class Expression(Symbol_):
         if isinstance(other, (int, float)):
             return Expression(self.s.__add__(other))
         if isinstance(other, Point3):
-            return Point3(self.s.__add__(other.s))
+            return Point3.from_iterable(self.s.__add__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s.__add__(other.s))
+            return Vector3.from_iterable(self.s.__add__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__add__(other.s))
         raise _operation_type_error(self, '+', other)
@@ -404,9 +409,9 @@ class Expression(Symbol_):
         if isinstance(other, (int, float)):
             return Expression(self.s.__sub__(other))
         if isinstance(other, Point3):
-            return Point3(self.s.__sub__(other.s))
+            return Point3.from_iterable(self.s.__sub__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s.__sub__(other.s))
+            return Vector3.from_iterable(self.s.__sub__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__sub__(other.s))
         raise _operation_type_error(self, '-', other)
@@ -420,9 +425,9 @@ class Expression(Symbol_):
         if isinstance(other, (int, float)):
             return Expression(self.s.__truediv__(other))
         if isinstance(other, Point3):
-            return Point3(self.s.__truediv__(other.s))
+            return Point3.from_iterable(self.s.__truediv__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s.__truediv__(other.s))
+            return Vector3.from_iterable(self.s.__truediv__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__truediv__(other.s))
         raise _operation_type_error(self, '/', other)
@@ -475,9 +480,9 @@ class Expression(Symbol_):
         if isinstance(other, (int, float)):
             return Expression(self.s.__mul__(other))
         if isinstance(other, Point3):
-            return Point3(self.s.__mul__(other.s))
+            return Point3.from_iterable(self.s.__mul__(other.s))
         if isinstance(other, Vector3):
-            return Vector3(self.s.__mul__(other.s))
+            return Vector3.from_iterable(self.s.__mul__(other.s))
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__mul__(other.s))
         raise _operation_type_error(self, '*', other)
@@ -499,9 +504,9 @@ class Expression(Symbol_):
         if isinstance(other, (Expression, Symbol)):
             return Expression(self.s.__pow__(other.s))
         if isinstance(other, (Vector3)):
-            return Vector3(self.s.__pow__(other.s))
+            return Vector3.from_iterable(self.s.__pow__(other.s))
         if isinstance(other, (Point3)):
-            return Point3(self.s.__pow__(other.s))
+            return Point3.from_iterable(self.s.__pow__(other.s))
         raise _operation_type_error(self, '**', other)
 
     def __rpow__(self, other):
@@ -559,7 +564,7 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
         elif isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, (Expression, RotationMatrix, TransformationMatrix)):
-            self.s = data.s
+            self.s = copy(data.s)
             if isinstance(data, RotationMatrix):
                 self.reference_frame = self.reference_frame or data.reference_frame
             if isinstance(data, TransformationMatrix):
@@ -614,10 +619,10 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransformationMatrix)):
             result = ca.mtimes(self.s, other.s)
             if isinstance(other, Vector3):
-                result = Vector3(result, reference_frame=self.reference_frame)
+                result = Vector3.from_iterable(result, reference_frame=self.reference_frame)
                 return result
             if isinstance(other, Point3):
-                result = Point3(result, reference_frame=self.reference_frame)
+                result = Point3.from_iterable(result, reference_frame=self.reference_frame)
                 return result
             if isinstance(other, RotationMatrix):
                 result = RotationMatrix(result, reference_frame=self.reference_frame, sanity_check=False)
@@ -632,9 +637,6 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
     def __matmul__(self, other):
         return self.dot(other)
 
-    def __rmatmul__(self, other):
-        return other.dot(self)
-
     def inverse(self):
         inv = TransformationMatrix(child_frame=self.reference_frame, reference_frame=self.child_frame)
         inv[:3, :3] = self[:3, :3].T
@@ -642,21 +644,21 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
         return inv
 
     @classmethod
-    def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None, reference_frame=None,
+    def from_xyz_rpy(cls, x=0, y=0, z=0, roll=0, pitch=0, yaw=0, reference_frame=None,
                      child_frame=None):
-        p = Point3.from_xyz(x, y, z)
+        p = Point3(x, y, z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
         return cls.from_point_rotation_matrix(p, r, reference_frame=reference_frame, child_frame=child_frame)
 
     @classmethod
     def from_xyz_quat(cls, pos_x=None, pos_y=None, pos_z=None, quat_w=None, quat_x=None, quat_y=None, quat_z=None,
                       reference_frame=None, child_frame=None):
-        p = Point3.from_xyz(pos_x, pos_y, pos_z)
-        r = RotationMatrix.from_quaternion(q=Quaternion.from_xyzw(w=quat_w, x=quat_x, y=quat_y, z=quat_z))
+        p = Point3(pos_x, pos_y, pos_z)
+        r = RotationMatrix.from_quaternion(q=Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z))
         return cls.from_point_rotation_matrix(p, r, reference_frame=reference_frame, child_frame=child_frame)
 
     def to_position(self):
-        result = Point3(self[:4, 3:], reference_frame=self.reference_frame)
+        result = Point3.from_iterable(self[:4, 3:], reference_frame=self.reference_frame)
         return result
 
     def to_translation(self):
@@ -724,11 +726,8 @@ class RotationMatrix(Symbol_, ReferenceFrameMixin):
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
         """
         # use casadi to prevent a bunch of Expression.__init__.py calls
-        axis = axis.s
-        try:
-            angle = angle.s
-        except AttributeError:
-            pass
+        axis = _to_sx(axis)
+        angle = _to_sx(angle)
         ct = ca.cos(angle)
         st = ca.sin(angle)
         vt = 1 - ct
@@ -774,21 +773,19 @@ class RotationMatrix(Symbol_, ReferenceFrameMixin):
         return cls.__quaternion_to_rotation_matrix(q)
 
     def x_vector(self):
-        return Vector3(self[:4, 3:], reference_frame=self.reference_frame)
+        return Vector3(x=self[0, 0], y=self[1, 0], z=self[2, 0], reference_frame=self.reference_frame)
 
     def y_vector(self):
-        return Vector3(self[:4, 3:], reference_frame=self.reference_frame)
+        return Vector3(x=self[0, 1], y=self[1, 1], z=self[2, 1], reference_frame=self.reference_frame)
 
     def z_vector(self):
-        return Vector3(self[:4, 3:], reference_frame=self.reference_frame)
+        return Vector3(x=self[0, 2], y=self[1, 2], z=self[2, 2], reference_frame=self.reference_frame)
 
     def dot(self, other):
-        if isinstance(other, (Vector3, Point3, RotationMatrix, TransformationMatrix)):
+        if isinstance(other, (Vector3, RotationMatrix, TransformationMatrix)):
             result = ca.mtimes(self.s, other.s)
             if isinstance(other, Vector3):
-                result = Vector3(result)
-            elif isinstance(other, Point3):
-                result = Point3(result)
+                result = Vector3.from_iterable(result)
             elif isinstance(other, RotationMatrix):
                 result = RotationMatrix(result, sanity_check=False)
             elif isinstance(other, TransformationMatrix):
@@ -799,9 +796,6 @@ class RotationMatrix(Symbol_, ReferenceFrameMixin):
 
     def __matmul__(self, other):
         return self.dot(other)
-
-    def __rmatmul__(self, other):
-        return other.dot(self)
 
     def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()
@@ -822,29 +816,20 @@ class RotationMatrix(Symbol_, ReferenceFrameMixin):
 
     @classmethod
     def from_vectors(cls, x=None, y=None, z=None, reference_frame=None):
-        if x is not None:
-            x.scale(1)
-        if y is not None:
-            y.scale(1)
-        if z is not None:
-            z.scale(1)
         if x is not None and y is not None and z is None:
-            z = cross(x, y)
-            z.scale(1)
+            z = x.cross(y)
         elif x is not None and y is None and z is not None:
-            y = cross(z, x)
-            y.scale(1)
+            y = z.cross(x)
         elif x is None and y is not None and z is not None:
-            x = cross(y, z)
-            x.scale(1)
-        # else:
-        #     raise AttributeError(f'only one vector can be None')
+            x = y.cross(z)
+        x.scale(1)
+        y.scale(1)
+        z.scale(1)
         R = cls([[x[0], y[0], z[0], 0],
                  [x[1], y[1], z[1], 0],
                  [x[2], y[2], z[2], 0],
                  [0, 0, 0, 1]],
                 reference_frame=reference_frame)
-        R.normalize()
         return R
 
     @classmethod
@@ -922,29 +907,23 @@ class RotationMatrix(Symbol_, ReferenceFrameMixin):
 
 class Point3(Symbol_, ReferenceFrameMixin):
 
-    def __init__(self, data=None, reference_frame=None):
+    def __init__(self, x=0, y=0, z=0, reference_frame=None):
         self.reference_frame = reference_frame
-        if data is None:
-            self.s = ca.SX([0, 0, 0, 1])
-            return
-        if isinstance(data, (Point3, Vector3)):
-            self.reference_frame = self.reference_frame or data.reference_frame
-            self.s = ca.SX([0, 0, 0, 1])
-            self.s[0] = data.x.s
-            self.s[1] = data.y.s
-            self.s[2] = data.z.s
-        else:
-            self.s = ca.SX([0, 0, 0, 1])
-            self[0] = data[0]
-            self[1] = data[1]
-            self[2] = data[2]
+        # casadi can't be initialized with an array that mixes int/float and SX
+        self.s = ca.SX([0, 0, 0, 1])
+        self[0] = x
+        self[1] = y
+        self[2] = z
 
     @classmethod
-    def from_xyz(cls, x=None, y=None, z=None, reference_frame=None):
-        x = 0 if x is None else x
-        y = 0 if y is None else y
-        z = 0 if z is None else z
-        return cls((x, y, z), reference_frame=reference_frame)
+    def from_iterable(cls, data=None, reference_frame=None):
+        if isinstance(data, (Quaternion, RotationMatrix, TransformationMatrix)):
+            raise TypeError(f'Can\'t create a Point3 form {type(data)}')
+        if hasattr(data, 'shape') and len(data.shape) > 1 and data.shape[1] != 1:
+            raise ValueError('The iterable must be a 1d list, tuple or array')
+        if hasattr(data, 'reference_frame') and reference_frame is None:
+            reference_frame = data.reference_frame
+        return cls(data[0], data[1], data[2], reference_frame=reference_frame)
 
     def norm(self):
         return norm(self)
@@ -973,11 +952,14 @@ class Point3(Symbol_, ReferenceFrameMixin):
     def z(self, value):
         self[2] = value
 
+    def __matmul__(self, other):
+        return self.dot(other)
+
     def __add__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__add__(other))
+            result = Point3.from_iterable(self.s.__add__(other))
         elif isinstance(other, (Vector3, Expression, Symbol)):
-            result = Point3(self.s.__add__(other.s))
+            result = Point3.from_iterable(self.s.__add__(other.s))
         else:
             raise _operation_type_error(self, '+', other)
         result.reference_frame = self.reference_frame
@@ -985,7 +967,7 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __radd__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__add__(other))
+            result = Point3.from_iterable(self.s.__add__(other))
         else:
             raise _operation_type_error(other, '+', self)
         result.reference_frame = self.reference_frame
@@ -993,11 +975,11 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __sub__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__sub__(other))
+            result = Point3.from_iterable(self.s.__sub__(other))
         elif isinstance(other, Point3):
-            result = Vector3(self.s.__sub__(other.s))
+            result = Vector3.from_iterable(self.s.__sub__(other.s))
         elif isinstance(other, (Symbol, Expression, Vector3)):
-            result = Point3(self.s.__sub__(other.s))
+            result = Point3.from_iterable(self.s.__sub__(other.s))
         else:
             raise _operation_type_error(self, '-', other)
         result.reference_frame = self.reference_frame
@@ -1005,7 +987,7 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __rsub__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__rsub__(other))
+            result = Point3.from_iterable(self.s.__rsub__(other))
         else:
             raise _operation_type_error(other, '-', self)
         result.reference_frame = self.reference_frame
@@ -1013,9 +995,9 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __mul__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__mul__(other))
+            result = Point3.from_iterable(self.s.__mul__(other))
         elif isinstance(other, (Symbol, Expression)):
-            result = Point3(self.s.__mul__(other.s))
+            result = Point3.from_iterable(self.s.__mul__(other.s))
         else:
             raise _operation_type_error(self, '*', other)
         result.reference_frame = self.reference_frame
@@ -1023,7 +1005,7 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __rmul__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__mul__(other))
+            result = Point3.from_iterable(self.s.__mul__(other))
         else:
             raise _operation_type_error(other, '*', self)
         result.reference_frame = self.reference_frame
@@ -1031,9 +1013,9 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __truediv__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__truediv__(other))
+            result = Point3.from_iterable(self.s.__truediv__(other))
         elif isinstance(other, (Symbol, Expression)):
-            result = Point3(self.s.__truediv__(other.s))
+            result = Point3.from_iterable(self.s.__truediv__(other.s))
         else:
             raise _operation_type_error(self, '/', other)
         result.reference_frame = self.reference_frame
@@ -1041,22 +1023,22 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __rtruediv__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__rtruediv__(other))
+            result = Point3.from_iterable(self.s.__rtruediv__(other))
         else:
             raise _operation_type_error(other, '/', self)
         result.reference_frame = self.reference_frame
         return result
 
     def __neg__(self) -> Point3:
-        result = Point3(self.s.__neg__())
+        result = Point3.from_iterable(self.s.__neg__())
         result.reference_frame = self.reference_frame
         return result
 
     def __pow__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__pow__(other))
+            result = Point3.from_iterable(self.s.__pow__(other))
         elif isinstance(other, (Symbol, Expression)):
-            result = Point3(self.s.__pow__(other.s))
+            result = Point3.from_iterable(self.s.__pow__(other.s))
         else:
             raise _operation_type_error(self, '**', other)
         result.reference_frame = self.reference_frame
@@ -1064,7 +1046,7 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
     def __rpow__(self, other):
         if isinstance(other, (int, float)):
-            result = Point3(self.s.__rpow__(other))
+            result = Point3.from_iterable(self.s.__rpow__(other))
         else:
             raise _operation_type_error(other, '**', self)
         result.reference_frame = self.reference_frame
@@ -1078,19 +1060,43 @@ class Point3(Symbol_, ReferenceFrameMixin):
 
 class Vector3(Symbol_, ReferenceFrameMixin):
 
-    def __init__(self, data=None, reference_frame=None):
-        point = Point3(data, reference_frame=reference_frame)
+    def __init__(self, x=0, y=0, z=0, reference_frame=None):
+        point = Point3(x, y, z, reference_frame=reference_frame)
         self.s = point.s
         self.reference_frame = point.reference_frame
         self.vis_frame = self.reference_frame
         self[3] = 0
 
     @classmethod
-    def from_xyz(cls, x=None, y=None, z=None, reference_frame=None):
-        x = 0 if x is None else x
-        y = 0 if y is None else y
-        z = 0 if z is None else z
-        return cls((x, y, z), reference_frame=reference_frame)
+    def from_iterable(cls, data=None, reference_frame=None):
+        if isinstance(data, (Quaternion, RotationMatrix, TransformationMatrix)):
+            raise TypeError(f'Can\'t create a Vector3 form {type(data)}')
+        if hasattr(data, 'shape') and len(data.shape) > 1 and data.shape[1] != 1:
+            raise ValueError('The iterable must be a 1d list, tuple or array')
+        if hasattr(data, 'reference_frame') and reference_frame is None:
+            reference_frame = data.reference_frame
+        result = cls(data[0], data[1], data[2], reference_frame=reference_frame)
+        if hasattr(data, 'vis_frame'):
+            result.vis_frame = data.vis_frame
+        return result
+
+    @classmethod
+    def X(cls, reference_frame=None):
+        return cls(x=1, y=0, z=0, reference_frame=reference_frame)
+
+    @classmethod
+    def Y(cls, reference_frame=None):
+        return cls(x=0, y=1, z=0, reference_frame=reference_frame)
+
+    @classmethod
+    def Z(cls, reference_frame=None):
+        return cls(x=0, y=0, z=1, reference_frame=reference_frame)
+
+    @classmethod
+    def unit_vector(cls, x=0, y=0, z=0, reference_frame=None):
+        v = cls(x, y, z, reference_frame=reference_frame)
+        v.scale(1, unsafe=True)
+        return v
 
     @property
     def x(self):
@@ -1116,13 +1122,16 @@ class Vector3(Symbol_, ReferenceFrameMixin):
     def z(self, value):
         self[2] = value
 
+    def __matmul__(self, other):
+        return self.dot(other)
+
     def __add__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__add__(other))
+            result = Vector3.from_iterable(self.s.__add__(other))
         elif isinstance(other, Point3):
-            result = Point3(self.s.__add__(other.s))
+            result = Point3.from_iterable(self.s.__add__(other.s))
         elif isinstance(other, (Vector3, Expression, Symbol)):
-            result = Vector3(self.s.__add__(other.s))
+            result = Vector3.from_iterable(self.s.__add__(other.s))
         else:
             raise _operation_type_error(self, '+', other)
         result.reference_frame = self.reference_frame
@@ -1130,7 +1139,7 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __radd__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__add__(other))
+            result = Vector3.from_iterable(self.s.__add__(other))
         else:
             raise _operation_type_error(other, '+', self)
         result.reference_frame = self.reference_frame
@@ -1138,11 +1147,11 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __sub__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__sub__(other))
+            result = Vector3.from_iterable(self.s.__sub__(other))
         elif isinstance(other, Point3):
-            result = Point3(self.s.__sub__(other.s))
+            result = Point3.from_iterable(self.s.__sub__(other.s))
         elif isinstance(other, (Symbol, Expression, Vector3)):
-            result = Vector3(self.s.__sub__(other.s))
+            result = Vector3.from_iterable(self.s.__sub__(other.s))
         else:
             raise _operation_type_error(self, '-', other)
         result.reference_frame = self.reference_frame
@@ -1150,7 +1159,7 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __rsub__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__rsub__(other))
+            result = Vector3.from_iterable(self.s.__rsub__(other))
         else:
             raise _operation_type_error(other, '-', self)
         result.reference_frame = self.reference_frame
@@ -1158,9 +1167,9 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __mul__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__mul__(other))
+            result = Vector3.from_iterable(self.s.__mul__(other))
         elif isinstance(other, (Symbol, Expression)):
-            result = Vector3(self.s.__mul__(other.s))
+            result = Vector3.from_iterable(self.s.__mul__(other.s))
         else:
             raise _operation_type_error(self, '*', other)
         result.reference_frame = self.reference_frame
@@ -1168,7 +1177,7 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __rmul__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__mul__(other))
+            result = Vector3.from_iterable(self.s.__mul__(other))
         else:
             raise _operation_type_error(other, '*', self)
         result.reference_frame = self.reference_frame
@@ -1176,9 +1185,9 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __pow__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__pow__(other))
+            result = Vector3.from_iterable(self.s.__pow__(other))
         elif isinstance(other, (Symbol, Expression)):
-            result = Vector3(self.s.__pow__(other.s))
+            result = Vector3.from_iterable(self.s.__pow__(other.s))
         else:
             raise _operation_type_error(self, '**', other)
         result.reference_frame = self.reference_frame
@@ -1186,7 +1195,7 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __rpow__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__rpow__(other))
+            result = Vector3.from_iterable(self.s.__rpow__(other))
         else:
             raise _operation_type_error(other, '**', self)
         result.reference_frame = self.reference_frame
@@ -1194,9 +1203,9 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __truediv__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__truediv__(other))
+            result = Vector3.from_iterable(self.s.__truediv__(other))
         elif isinstance(other, (Symbol, Expression)):
-            result = Vector3(self.s.__truediv__(other.s))
+            result = Vector3.from_iterable(self.s.__truediv__(other.s))
         else:
             raise _operation_type_error(self, '/', other)
         result.reference_frame = self.reference_frame
@@ -1204,14 +1213,14 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def __rtruediv__(self, other):
         if isinstance(other, (int, float)):
-            result = Vector3(self.s.__rtruediv__(other))
+            result = Vector3.from_iterable(self.s.__rtruediv__(other))
         else:
             raise _operation_type_error(other, '/', self)
         result.reference_frame = self.reference_frame
         return result
 
     def __neg__(self):
-        result = Vector3(self.s.__neg__())
+        result = Vector3.from_iterable(self.s.__neg__())
         result.reference_frame = self.reference_frame
         return result
 
@@ -1222,31 +1231,40 @@ class Vector3(Symbol_, ReferenceFrameMixin):
 
     def cross(self, other):
         result = ca.cross(self.s[:3], other.s[:3])
-        result = Vector3(result)
+        result = self.__class__.from_iterable(result)
         result.reference_frame = self.reference_frame
         return result
 
     def norm(self):
         return norm(self)
 
-    def scale(self, a):
-        self.s = (save_division(self, self.norm()) * a).s
+    def scale(self, a, unsafe=False):
+        if unsafe:
+            self.s = ((self / self.norm()) * a).s
+        else:
+            self.s = (save_division(self, self.norm()) * a).s
 
 
 class Quaternion(Symbol_, ReferenceFrameMixin):
-    def __init__(self, data=None, reference_frame=None):
+    def __init__(self, x=0.0, y=0.0, z=0.0, w=1.0, reference_frame=None):
+        if hasattr(x, 'shape') and x.shape not in (tuple(), (1, 1)):
+            raise ValueError('x, y, z, w must be scalars')
         self.reference_frame = reference_frame
-        if data is None:
-            data = (0, 0, 0, 1)
         self.s = ca.SX(4, 1)
-        self[0], self[1], self[2], self[3] = data[0], data[1], data[2], data[3]
+        self[0], self[1], self[2], self[3] = x, y, z, w
 
     def __neg__(self):
-        return Quaternion(self.s.__neg__())
+        return Quaternion.from_iterable(self.s.__neg__())
 
     @classmethod
-    def from_xyzw(cls, x, y, z, w, reference_frame=None):
-        return cls((x, y, z, w), reference_frame=reference_frame)
+    def from_iterable(cls, data=None, reference_frame=None):
+        if isinstance(data, (Point3, Vector3, RotationMatrix, TransformationMatrix)):
+            raise TypeError(f'Can\'t create a Quaternion form {type(data)}')
+        if hasattr(data, 'shape') and len(data.shape) > 1 and data.shape[1] != 1:
+            raise ValueError('The iterable must be a 1d list, tuple or array')
+        if hasattr(data, 'reference_frame') and reference_frame is None:
+            reference_frame = data.reference_frame
+        return cls(data[0], data[1], data[2], data[3], reference_frame=reference_frame)
 
     @property
     def x(self):
@@ -1283,10 +1301,10 @@ class Quaternion(Symbol_, ReferenceFrameMixin):
     @classmethod
     def from_axis_angle(cls, axis, angle, reference_frame=None):
         half_angle = angle / 2
-        return cls((axis[0] * sin(half_angle),
-                    axis[1] * sin(half_angle),
-                    axis[2] * sin(half_angle),
-                    cos(half_angle)),
+        return cls(axis[0] * sin(half_angle),
+                   axis[1] * sin(half_angle),
+                   axis[2] * sin(half_angle),
+                   cos(half_angle),
                    reference_frame=reference_frame)
 
     @classmethod
@@ -1315,7 +1333,7 @@ class Quaternion(Symbol_, ReferenceFrameMixin):
         z = c_pitch * cs - s_pitch * sc
         w = c_pitch * cc + s_pitch * ss
 
-        return cls((x, y, z, w), reference_frame=reference_frame)
+        return cls(x, y, z, w, reference_frame=reference_frame)
 
     @classmethod
     def from_rotation_matrix(cls, r):
@@ -1365,16 +1383,16 @@ class Quaternion(Symbol_, ReferenceFrameMixin):
         q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
 
         q *= 0.5 / sqrt(t * r[3, 3])
-        return cls(q, reference_frame=r.reference_frame)
+        return cls.from_iterable(q, reference_frame=r.reference_frame)
 
     def conjugate(self):
-        return Quaternion((-self[0], -self[1], -self[2], self[3]))
+        return Quaternion(x=-self[0], y=-self[1], z=-self[2], w=self[3], reference_frame=self.reference_frame)
 
     def multiply(self, q):
-        return Quaternion((self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
-                           -self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
-                           self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
-                           -self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w),
+        return Quaternion(x=self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
+                          y=-self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
+                          z=self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
+                          w=-self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w,
                           reference_frame=self.reference_frame)
 
     def diff(self, q):
@@ -1401,7 +1419,7 @@ class Quaternion(Symbol_, ReferenceFrameMixin):
         x = if_eq_zero(w2, 0, self.x / m)
         y = if_eq_zero(w2, 0, self.y / m)
         z = if_eq_zero(w2, 1, self.z / m)
-        return Vector3((x, y, z), reference_frame=self.reference_frame), angle
+        return Vector3(x, y, z, reference_frame=self.reference_frame), angle
 
     def to_rotation_matrix(self):
         return RotationMatrix.from_quaternion(self)
@@ -1585,6 +1603,8 @@ def if_else(condition, if_result, else_result):
         return_type = Expression
     if_result = Expression(if_result).s
     else_result = Expression(else_result).s
+    if return_type in (Point3, Vector3, Quaternion):
+        return return_type.from_iterable(ca.if_else(condition, if_result, else_result))
     return return_type(ca.if_else(condition, if_result, else_result))
 
 
@@ -1865,8 +1885,8 @@ def _to_sx(thing):
 
 
 def cross(u, v):
-    u = Vector3(u)
-    v = Vector3(v)
+    u = Vector3.from_iterable(u)
+    v = Vector3.from_iterable(v)
     return u.cross(v)
 
 
@@ -2043,11 +2063,11 @@ def quaternion_slerp(q1, q2, t):
 
     ratio_a = save_division(sin((1.0 - t) * half_theta), sin_half_theta)
     ratio_b = save_division(sin(t * half_theta), sin_half_theta)
-    return Quaternion(if_greater_eq_zero(if1,
-                                         q1,
-                                         if_greater_zero(if2,
-                                                         0.5 * q1 + 0.5 * q2,
-                                                         ratio_a * q1 + ratio_b * q2)))
+    return Quaternion.from_iterable(if_greater_eq_zero(if1,
+                                                       q1,
+                                                       if_greater_zero(if2,
+                                                                       0.5 * q1 + 0.5 * q2,
+                                                                       ratio_a * q1 + ratio_b * q2)))
 
 
 def slerp(v1, v2, t):
@@ -2072,8 +2092,12 @@ def save_division(nominator, denominator, if_nan=None):
             if_nan = Vector3
         else:
             if_nan = 0
-    save_denominator = if_eq_zero(denominator, 1, denominator)
-    return nominator * if_eq_zero(denominator, if_nan, 1. / save_denominator)
+    save_denominator = if_eq_zero(condition=denominator,
+                                  if_result=1,
+                                  else_result=denominator)
+    return if_eq_zero(denominator,
+                      if_result=if_nan,
+                      else_result=nominator / save_denominator)
 
 
 def save_acos(angle):
@@ -2141,9 +2165,9 @@ def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_
     :param frame_P_line_end: end of the approached line
     :return: distance to line, the nearest point on the line
     """
-    frame_P_current = Point3(frame_P_current)
-    frame_P_line_start = Point3(frame_P_line_start)
-    frame_P_line_end = Point3(frame_P_line_end)
+    frame_P_current = Point3.from_iterable(frame_P_current)
+    frame_P_line_start = Point3.from_iterable(frame_P_line_start)
+    frame_P_line_end = Point3.from_iterable(frame_P_line_end)
     line_vec = frame_P_line_end - frame_P_line_start
     pnt_vec = frame_P_current - frame_P_line_start
     line_len = norm(line_vec)
@@ -2154,7 +2178,7 @@ def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
     nearest = nearest + frame_P_line_start
-    return dist, Point3(nearest)
+    return dist, Point3.from_iterable(nearest)
 
 
 def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direction):
@@ -2316,19 +2340,19 @@ def total_derivative2(expr, symbols, symbols_dot, symbols_ddot):
 
 
 def quaternion_multiply(q1, q2):
-    q1 = Quaternion(q1)
-    q2 = Quaternion(q2)
+    q1 = Quaternion.from_iterable(q1)
+    q2 = Quaternion.from_iterable(q2)
     return q1.multiply(q2)
 
 
 def quaternion_conjugate(q):
-    q1 = Quaternion(q)
+    q1 = Quaternion.from_iterable(q)
     return q1.conjugate()
 
 
 def quaternion_diff(q1, q2):
-    q1 = Quaternion(q1)
-    q2 = Quaternion(q2)
+    q1 = Quaternion.from_iterable(q1)
+    q2 = Quaternion.from_iterable(q2)
     return q1.diff(q2)
 
 
@@ -2552,3 +2576,6 @@ def is_inf(expr):
         if is_inf(cas_expr.dep(arg)):
             return True
     return False
+
+
+SpatialType = TypeVar('SpatialType', Point3, TransformationMatrix, Vector3, Quaternion, RotationMatrix)

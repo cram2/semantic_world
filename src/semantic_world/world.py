@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import wraps, lru_cache
-from typing import Dict, Tuple, OrderedDict, Union, Optional, Type
+from typing import Dict, Tuple, OrderedDict, Union, Optional, Generic, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,13 +17,12 @@ from typing_extensions import List, Type
 
 from .connections import HasUpdateState, Has1DOFState, Connection6DoF
 from .degree_of_freedom import DegreeOfFreedom
-from .exceptions import AddingAnExistingViewError, DuplicateViewError
+from .exceptions import DuplicateViewError, AddingAnExistingViewError, ViewNotFoundError
 from .ik_solver import InverseKinematicsSolver
 from .prefixed_name import PrefixedName
 from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives, DerivativeMap
 from .spatial_types.math import inverse_frame
-from .spatial_types.spatial_types import TransformationMatrix
 from .types import NpMatrix4x4
 from .utils import IDGenerator, copy_lru_cache
 from .world_entity import Body, Connection, View
@@ -32,6 +31,8 @@ from .world_state import WorldState
 logger = logging.getLogger(__name__)
 
 id_generator = IDGenerator()
+
+T = TypeVar("T")
 
 
 class PlotAlignment(IntEnum):
@@ -428,14 +429,15 @@ class World:
 
         :raises AddingAnExistingViewError: If exists_ok is False and a view with the same name and type already exists.
         """
-        if self.get_view_by_name_and_type(view.name, type(view)):
+        try:
+            self.get_view_by_name(view.name)
             if not exists_ok:
                 raise AddingAnExistingViewError(view)
-        else:
+        except ViewNotFoundError:
             view._world = self
             self.views.append(view)
 
-    def get_view_by_name_and_type(self, name: Union[str, PrefixedName], view_type: Type[View]) -> Optional[View]:
+    def get_view_by_name(self, name: Union[str, PrefixedName]) -> Optional[View]:
         """
         Retrieves a View from the list of view based on its name.
         If the input is of type `PrefixedName`, it checks whether the prefix is specified and looks for an
@@ -444,21 +446,29 @@ class World:
         If no matching body is found, a `ValueError` is raised.
 
         :param name: The name of the view to search for. Can be a string or a `PrefixedName` object.
-        :param view_type: The class (type) of the view to search for.
         :return: The `View` object that matches the given name.
         """
         if isinstance(name, PrefixedName):
             if name.prefix is not None:
-                matches = [view for view in self.views if view.name == name and type(view) == view_type]
+                matches = [view for view in self.views if view.name == name]
             else:
-                matches = [view for view in self.views if view.name.name == name.name and type(view) == view_type]
+                matches = [view for view in self.views if view.name.name == name.name]
         else:
-            matches = [view for view in self.views if view.name.name == name and type(view) == view_type]
+            matches = [view for view in self.views if view.name.name == name]
         if len(matches) > 1:
             raise DuplicateViewError(matches)
         if matches:
             return matches[0]
-        return None
+        raise ViewNotFoundError(name)
+
+    def get_views_by_type(self, view_type: Type[Generic[T]]) -> List[T]:
+        """
+        Retrieves all views of a specific type from the world.
+
+        :param view_type: The class (type) of the views to search for.
+        :return: A list of `View` objects that match the given type.
+        """
+        return [view for view in self.views if isinstance(view, view_type)]
 
 
     @modifies_world
@@ -469,7 +479,6 @@ class World:
             body.index = None
         else:
             logger.debug("Trying to remove a body that is not part of this world.")
-
 
     @modifies_world
     def merge_world(self, other: World, root_connection: Connection = None) -> None:
@@ -498,12 +507,17 @@ class World:
             other.remove_body(connection.parent)
             other.remove_body(connection.child)
             self.add_connection(connection)
+
+        for body in other.bodies:
+            other.remove_body(body)
+            self.add_body(body)
         other.world_is_being_modified = False
+
 
         connection = root_connection or Connection6DoF(parent=self_root, child=other_root, _world=self)
         self.add_connection(connection)
 
-    def merge_world_at_pose(self, other: World, pose: NpMatrix4x4) -> None:
+    def merge_world_at_pose(self, other: World, pose: cas.TransformationMatrix) -> None:
         """
         Merge another world into the existing one, creates a 6DoF connection between the root of this world and the root
         of the other world.
@@ -518,10 +532,8 @@ class World:
     def __str__(self):
         return f"{self.__class__.__name__} with {len(self.bodies)} bodies."
 
-
     def get_connection(self, parent: Body, child: Body) -> Connection:
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
-
 
     def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """
@@ -573,7 +585,6 @@ class World:
             return matches[0]
         raise KeyError(f'DegreeOfFreedom with name {name} not found')
 
-
     def get_connection_by_name(self, name: Union[str, PrefixedName]) -> Connection:
         """
         Retrieve a connection by its name.
@@ -605,7 +616,6 @@ class World:
             return matches[0]
         raise KeyError(f'Connection with name {name} not found')
 
-
     @lru_cache(maxsize=None)
     def compute_child_bodies(self, body: Body) -> List[Body]:
         """
@@ -626,7 +636,6 @@ class World:
             children.extend(self.compute_child_bodies_recursive(child))
         return children
 
-
     @lru_cache(maxsize=None)
     def compute_parent_body(self, body: Body) -> Body:
         """
@@ -636,7 +645,6 @@ class World:
         """
         return next(iter(self.kinematic_structure.predecessors(body.index)))
 
-
     @lru_cache(maxsize=None)
     def compute_parent_connection(self, body: Body) -> Connection:
         """
@@ -645,7 +653,6 @@ class World:
         :return: The parent connection of the given body.
         """
         return self.kinematic_structure.get_edge_data(self.compute_parent_body(body).index, body.index)
-
 
     @lru_cache(maxsize=None)
     def compute_chain_of_bodies(self, root: Body, tip: Body) -> List[Body]:
@@ -658,12 +665,10 @@ class World:
 
         return [self.kinematic_structure[index] for index in shortest_paths[0]]
 
-
     @lru_cache(maxsize=None)
     def compute_chain_of_connections(self, root: Body, tip: Body) -> List[Connection]:
         body_chain = self.compute_chain_of_bodies(root, tip)
         return [self.get_connection(body_chain[i], body_chain[i + 1]) for i in range(len(body_chain) - 1)]
-
 
     @lru_cache(maxsize=None)
     def compute_split_chain_of_bodies(self, root: Body, tip: Body) -> Tuple[List[Body], List[Body], List[Body]]:
@@ -694,7 +699,6 @@ class World:
         tip_chain = tip_chain[1:]
         return root_chain, [common_ancestor], tip_chain
 
-
     @lru_cache(maxsize=None)
     def compute_split_chain_of_connections(self, root: Body, tip: Body) -> Tuple[List[Connection], List[Connection]]:
         """
@@ -720,11 +724,9 @@ class World:
             tip_connections.append(self.get_connection(tip_chain[i], tip_chain[i + 1]))
         return root_connections, tip_connections
 
-
     @property
     def layers(self) -> List[List[Body]]:
         return rx.layers(self.kinematic_structure, [self.root.index], index_output=False)
-
 
     def bfs_layout(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> Dict[int, np.array]:
         """
@@ -762,7 +764,6 @@ class World:
         pos = dict(zip([node.index for node in nodes], pos))
         return pos
 
-
     def plot_kinematic_structure(self, scale: float = 1., align: PlotAlignment = PlotAlignment.VERTICAL) -> None:
         """
         Plots the kinematic structure of the world.
@@ -781,7 +782,6 @@ class World:
         plt.axis('off')  # Hide axes
         plt.show()
 
-
     def _travel_branch(self, body: Body, visitor: rustworkx.visit.DFSVisitor) -> None:
         """
         Apply a DFS Visitor to a subtree of the kinematic structure.
@@ -790,7 +790,6 @@ class World:
         :param visitor: This visitor to apply.
         """
         rx.dfs_search(self.kinematic_structure, [body.index], visitor)
-
 
     def compile_forward_kinematics_expressions(self) -> None:
         """
@@ -801,10 +800,8 @@ class World:
         new_fks.compile_forward_kinematics()
         self._fk_computer = new_fks
 
-
     def _recompute_forward_kinematics(self) -> None:
         self._fk_computer.recompute()
-
 
     @copy_lru_cache()
     def compose_forward_kinematics_expression(self, root: Body, tip: Body) -> cas.TransformationMatrix:
@@ -828,12 +825,24 @@ class World:
         fk.child_frame = tip
         return fk
 
+    def compute_forward_kinematics(self, root: Body, tip: Body) -> cas.TransformationMatrix:
+        """
+        Compute the forward kinematics from the root body to the tip body.
+
+        Calculate the transformation matrix representing the pose of the
+        tip body relative to the root body.
+
+        :param root: Root body for which the kinematics are computed.
+        :param tip: Tip body to which the kinematics are computed.
+        :return: Transformation matrix representing the relative pose of the tip body with respect to the root body.
+        """
+        return cas.TransformationMatrix(self.compute_forward_kinematics_np(root, tip))
 
     def compute_forward_kinematics_np(self, root: Body, tip: Body) -> NpMatrix4x4:
         """
-        Computes the forward kinematics from the root body to the tip body, root_T_tip.
+        Compute the forward kinematics from the root body to the tip body, root_T_tip and return it as a 4x4 numpy ndarray.
 
-        This method computes the transformation matrix representing the pose of the
+        Calculate the transformation matrix representing the pose of the
         tip body relative to the root body, expressed as a numpy ndarray.
 
         :param root: Root body for which the kinematics are computed.
@@ -842,18 +851,33 @@ class World:
         """
         return self._fk_computer.compute_forward_kinematics_np(root, tip).copy()
 
-
-    def compute_relative_pose(self, pose: NpMatrix4x4, target_body: Body, pose_body: Body) -> NpMatrix4x4:
+    def transform(self, spatial_object: cas.SpatialType, target_frame: Body) -> cas.SpatialType:
         """
-        Computes the relative pose to a body given another body as reference.
-        :param pose: The pose to be transformed
-        :param target_body: The body to which the pose should be transformed
-        :param pose_body: The body which should be used as reference frame for the pose
-        :return: The pose relative to the target body.
-        """
-        target_T_pose = self.compute_forward_kinematics_np(target_body, pose_body)
-        return target_T_pose @ pose
+        Transform a given spatial object from its reference frame to a target frame.
 
+        Calculate the transformation from the reference frame of the provided
+        spatial object to the specified target frame. Apply the transformation
+        differently depending on the type of the spatial object:
+
+        - If the object is a Quaternion, compute its rotation matrix, transform it, and
+          convert back to a Quaternion.
+        - For other types, apply the transformation matrix directly.
+
+        :param spatial_object: The spatial object to be transformed.
+        :param target_frame: The target body frame to which the spatial object should
+            be transformed.
+        :return: The spatial object transformed to the target frame. If the input object
+            is a Quaternion, the returned object is a Quaternion. Otherwise, it is the
+            transformed spatial object.
+        """
+        target_frame_T_reference_frame = self.compute_forward_kinematics(root=target_frame,
+                                                                         tip=spatial_object.reference_frame)
+        if isinstance(spatial_object, cas.Quaternion):
+            reference_frame_R = spatial_object.to_rotation_matrix()
+            target_frame_R = target_frame_T_reference_frame @ reference_frame_R
+            return target_frame_R.to_quaternion()
+        else:
+            return target_frame_T_reference_frame @ spatial_object
 
     def find_dofs_for_position_symbols(self, symbols: List[cas.Symbol]) -> List[DegreeOfFreedom]:
         result = []
@@ -863,8 +887,7 @@ class World:
                     result.append(dof)
         return result
 
-
-    def compute_inverse_kinematics(self, root: Body, tip: Body, target: NpMatrix4x4,
+    def compute_inverse_kinematics(self, root: Body, tip: Body, target: cas.TransformationMatrix,
                                    dt: float = 0.05, max_iterations: int = 200,
                                    translation_velocity: float = 0.2, rotation_velocity: float = 0.2) \
             -> Dict[DegreeOfFreedom, float]:
@@ -882,7 +905,6 @@ class World:
         """
         ik_solver = InverseKinematicsSolver(self)
         return ik_solver.solve(root, tip, target, dt, max_iterations, translation_velocity, rotation_velocity)
-
 
     def apply_control_commands(self, commands: np.ndarray, dt: float, derivative: Derivatives) -> None:
         """
@@ -909,7 +931,6 @@ class World:
             if isinstance(connection, HasUpdateState):
                 connection.update_state(dt)
         self.notify_state_change()
-
 
     def set_positions_1DOF_connection(self, new_state: Dict[Has1DOFState, float]) -> None:
         for connection, value in new_state.items():

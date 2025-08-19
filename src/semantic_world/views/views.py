@@ -5,6 +5,7 @@ from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_
 from typing_extensions import List
 
 from semantic_world.geometry import BoundingBox, BoundingBoxCollection
+from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types import Point3
 from semantic_world.variables import SpatialVariables
 from semantic_world.world import View, Body
@@ -28,7 +29,7 @@ class Wall(View):
     body: Body
 
     def __post_init__(self):
-        self.name = self.body.name
+        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 @dataclass(unsafe_hash=True)
 class Window(View):
@@ -46,7 +47,7 @@ class Container(View):
     body: Body
 
     def __post_init__(self):
-        self.name = self.body.name
+        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 # =======================
 # === GROUP DEFINITIONS
@@ -82,7 +83,7 @@ class Handle(Components):
     body: Body
 
     def __post_init__(self):
-        self.name = self.body.name
+        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 
 @dataclass(unsafe_hash=True)
@@ -120,6 +121,9 @@ class Drawer(Components):
         self.name = self.container.name
 
 
+    def __post_init__(self):
+        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
 @dataclass(unsafe_hash=True)
 class Table(View):
     """
@@ -145,7 +149,7 @@ class Table(View):
         samples = p.sample(amount)
         z_coordinate = np.full((amount, 1), max([b.max_z for b in area_of_table]) + 0.01)
         samples = np.concatenate((samples, z_coordinate), axis=1)
-        return [Point3.from_xyz(*s, reference_frame=self.top) for s in samples]
+        return [Point3(*s, reference_frame=self.top) for s in samples]
 
     def __post_init__(self):
         self.name = self.top.name
@@ -179,7 +183,7 @@ class ArmRest(Components):
     body: Body
 
     def __post_init__(self):
-        self.name = self.body.name
+        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 @dataclass(unsafe_hash=True)
 class Base(Components):

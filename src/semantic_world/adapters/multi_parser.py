@@ -9,7 +9,7 @@ from multiverse_parser import (InertiaSource,
                                JointBuilder, JointType)
 from pxr import UsdUrdf
 
-from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection, UnitVector
+from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection
 from ..spatial_types.derivatives import DerivativeMap
 from ..prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
@@ -115,11 +115,11 @@ class MultiParser:
             transform = body_builder.xform.GetLocalTransformation()
             pos = transform.ExtractTranslation()
             quat = transform.ExtractRotationQuat()
-            point_expr = cas.Point3((pos[0], pos[1], pos[2]))
-            quaternion_expr = cas.Quaternion((quat.GetImaginary()[0],
+            point_expr = cas.Point3(pos[0], pos[1], pos[2])
+            quaternion_expr = cas.Quaternion(quat.GetImaginary()[0],
                                               quat.GetImaginary()[1],
                                               quat.GetImaginary()[2],
-                                              quat.GetReal()))
+                                              quat.GetReal())
             origin = cas.TransformationMatrix.from_point_rotation_matrix(point=point_expr,
                                                                          rotation_matrix=quaternion_expr.to_rotation_matrix())
             connection = FixedConnection(parent=parent_body, child=child_body, origin_expression=origin)
@@ -132,11 +132,11 @@ class MultiParser:
         joint_name = joint_prim.GetName()
         joint_pos = joint_builder.pos
         joint_quat = joint_builder.quat
-        point_expr = cas.Point3((joint_pos[0], joint_pos[1], joint_pos[2]))
-        quaternion_expr = cas.Quaternion((joint_quat.GetImaginary()[0],
+        point_expr = cas.Point3(joint_pos[0], joint_pos[1], joint_pos[2])
+        quaternion_expr = cas.Quaternion(joint_quat.GetImaginary()[0],
                                           joint_quat.GetImaginary()[1],
                                           joint_quat.GetImaginary()[2],
-                                          joint_quat.GetReal()))
+                                          joint_quat.GetReal())
         origin = cas.TransformationMatrix.from_point_rotation_matrix(point=point_expr,
                                                                      rotation_matrix=quaternion_expr.to_rotation_matrix())
         free_variable_name = PrefixedName(joint_name)
@@ -153,9 +153,10 @@ class MultiParser:
         elif joint_builder.type == JointType.FIXED:
             return FixedConnection(parent=parent_body, child=child_body, origin_expression=origin)
         elif joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS, JointType.PRISMATIC]:
-            axis = UnitVector(float(joint_builder.axis.to_array()[0]),
-                              float(joint_builder.axis.to_array()[1]),
-                              float(joint_builder.axis.to_array()[2]))
+            axis = cas.Vector3(float(joint_builder.axis.to_array()[0]),
+                                   float(joint_builder.axis.to_array()[1]),
+                                   float(joint_builder.axis.to_array()[2]),
+                                   reference_frame=parent_body)
             try:
                 dof = world.get_degree_of_freedom_by_name(free_variable_name)
             except KeyError:

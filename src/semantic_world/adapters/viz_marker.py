@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
-from ..geometry import Mesh, Box, Sphere, Cylinder, Primitive
+from ..geometry import Mesh, Box, Sphere, Cylinder, Primitive, TriangleMesh
 from ..world import World
 
 class VizMarkerPublisher:
@@ -75,6 +75,13 @@ class VizMarkerPublisher:
                     msg.type = Marker.MESH_RESOURCE
                     msg.mesh_resource = "file://" + collision.filename
                     msg.scale = Vector3(x=float(collision.scale.x), y=float(collision.scale.y), z=float(collision.scale.z))
+                    msg.mesh_use_embedded_materials = True
+                elif isinstance(collision, TriangleMesh):
+                    f = collision.file
+                    msg.type = Marker.MESH_RESOURCE
+                    msg.mesh_resource = "file://" + f.name
+                    msg.scale = Vector3(x=float(collision.scale.x), y=float(collision.scale.y),
+                                        z=float(collision.scale.z))
                     msg.mesh_use_embedded_materials = True
                 elif isinstance(collision, Cylinder):
                     msg.type = Marker.CYLINDER

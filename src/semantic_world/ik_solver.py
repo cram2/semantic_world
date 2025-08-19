@@ -11,8 +11,6 @@ import numpy as np
 from .connections import ActiveConnection, PassiveConnection
 from .degree_of_freedom import DegreeOfFreedom
 from .spatial_types import spatial_types as cas
-from .spatial_types.derivatives import Derivatives
-from .types import NpMatrix4x4
 
 if TYPE_CHECKING:
     from .world import World
@@ -137,7 +135,7 @@ class InverseKinematicsSolver:
     Unit is m for the position target or rad for the orientation target.
     """
 
-    def solve(self, root: Body, tip: Body, target: NpMatrix4x4,
+    def solve(self, root: Body, tip: Body, target: cas.TransformationMatrix,
               dt: float = 0.05, max_iterations: int = 200,
               translation_velocity: float = 0.2, rotation_velocity: float = 0.2) -> Dict[DegreeOfFreedom, float]:
         """
@@ -257,7 +255,7 @@ class QPProblem:
     Tip body of the kinematic chain.
     """
 
-    target: NpMatrix4x4
+    target: cas.TransformationMatrix
     """
     Desired tip pose relative to the root body.
     """
@@ -373,7 +371,7 @@ class ConstraintBuilder:
     Tip body of the kinematic chain.
     """
 
-    target: NpMatrix4x4
+    target: cas.TransformationMatrix
     """
     Desired tip pose relative to the root body.
     """
@@ -461,7 +459,7 @@ class ConstraintBuilder:
         """
         rotation_cap = self.max_rotation_velocity * self.dt
 
-        hack = cas.RotationMatrix.from_axis_angle(cas.Vector3((0, 0, 1)), -0.0001)
+        hack = cas.RotationMatrix.from_axis_angle(cas.Vector3.Z(), -0.0001)
         root_R_tip = root_T_tip.to_rotation().dot(hack)
         q_actual = cas.TransformationMatrix(self.target).to_quaternion()
         q_goal = root_R_tip.to_quaternion()
