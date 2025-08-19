@@ -251,22 +251,13 @@ class Sink(Components):
 # ============================
 # === FURNITURE SUBCLASSES
 # ============================
-@dataclass(unsafe_hash=True)
-class Table(Furniture):
-    """
-    A generic table furniture item.
-    """
-    body: Body
-
-    def __post_init__(self):
-        self.name = self.body.name
-
 
 @dataclass(unsafe_hash=True)
 class Armchair(Furniture):
     """
     A generic armchair.
     """
+
     base: Base
     armrest: List[ArmRest] = field(default_factory=list, hash=False)
     legs: List[Leg] = field(default_factory=list, hash=False)
