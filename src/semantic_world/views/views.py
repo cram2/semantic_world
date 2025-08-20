@@ -53,7 +53,7 @@ class Container(View):
 # === GROUP DEFINITIONS
 # =======================
 @dataclass(unsafe_hash=True)
-class Components(View):                                                   #################################
+class Components(View):
     """
     Represents structural or functional parts of furniture or appliances.
     """
@@ -121,8 +121,8 @@ class Drawer(Components):
         self.name = self.container.name
 
 
-    def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+    #def __post_init__(self):
+    #    self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 @dataclass(unsafe_hash=True)
 class Table(View):
@@ -205,7 +205,7 @@ class Cushion(Components):
         self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Sides(Components):                                                   #################################
+class Sides(Components):
     """
     Represents the Sides of a structure
     """
