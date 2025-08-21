@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 from ormatic.dao import to_dao
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.orm.ormatic_interface import *
-from semantic_world.views import Table
+from semantic_world.views.views import Table
 
 # setup ros 2
 rclpy.init()

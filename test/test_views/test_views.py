@@ -19,7 +19,7 @@ except ImportError as e:
 from typing_extensions import Type, Optional, Callable
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.views import *
+from semantic_world.views.views import *
 
 try:
     from semantic_world.world_rdr import world_rdr

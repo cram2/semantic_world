@@ -24,8 +24,8 @@ The way to use the reasoner is like the following example:
 from semantic_world.reasoner import WorldReasoner
 from semantic_world.adapters.urdf import URDFParser
 
-def create_kitchen_world(kitchen_path: str = 'kitchen-small.urdf'):
-    return URDFParser(kitchen_path)
+def create_kitchen_world(kitchen_path: str = '<PATH TO THE URDF FOLDER>/kitchen-small.urdf'):
+    return URDFParser(kitchen_path).parse()
 
 kitchen_world = create_kitchen_world()
 reasoner = WorldReasoner(kitchen_world)
@@ -55,8 +55,8 @@ from semantic_world.reasoner import WorldReasoner
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views.views import Drawer
 
-def create_kitchen_world(kitchen_path: str = 'kitchen-small.urdf'):
-    return URDFParser(kitchen_path)
+def create_kitchen_world(kitchen_path: str = '<PATH TO THE URDF FOLDER>/kitchen-small.urdf'):
+    return URDFParser(kitchen_path).parse()
 
 kitchen_world = create_kitchen_world()
 reasoner = WorldReasoner(kitchen_world)
@@ -147,7 +147,7 @@ set the `update_existing_views` to `True` like this:
 ```
 then run the test from the terminal using `pytest` as follows:
 ```bash
-cd semantic_world/test/test_views && pytest -k "test_drawer_view"
+cd semantic_world/test/test_views && pytest -s -k "test_drawer_view"
 ```
 Then answer the prompt with the rule as described before. Now the rules for the Drawer view has been updated, Nice Work!
 

@@ -34,8 +34,11 @@ jobs:
       run: |
         sudo apt-get update
         cd /opt/ros/overlay_ws/src/semantic_world
+        git submodule init
+        git submodule update
         source ../semantic_world-venv/bin/activate    
         pip install -U pip && pip install -r requirements.txt && pip install -e . && pip install pytest
+        pip install -e ./src/ripple_down_rules_meta
         echo "PATH=/opt/ros/overlay_ws/src/Multiverse-Parser/ext/blender:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/src" >> $GITHUB_ENV
 

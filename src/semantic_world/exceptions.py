@@ -33,6 +33,13 @@ class DuplicateViewError(UsageError):
         super().__init__(msg)
 
 
+class ParsingError(Exception):
+    """
+    An error that happens during parsing of files.
+    """
+    ...
+
+
 class ViewNotFoundError(UsageError):
     def __init__(self, name: PrefixedName):
         msg = f'View with name {name} not found'

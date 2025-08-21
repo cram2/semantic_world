@@ -4,11 +4,12 @@ import numpy as np
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from typing_extensions import List
 
+from semantic_world import PrefixedName
 from semantic_world.geometry import BoundingBox, BoundingBoxCollection
-from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types import Point3
 from semantic_world.variables import SpatialVariables
 from semantic_world.world import View, Body
+from semantic_world.world_entity import EnvironmentView
 
 
 @dataclass(unsafe_hash=True)
@@ -90,15 +91,33 @@ class Furniture(View):
 
 
 #################### subclasses von Components
-
-
 @dataclass(unsafe_hash=True)
 class Door(Components):
     body: Body
     handle: Handle
 
     def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class Fridge(View):
+    body: Body
+    door: Door
+
+    def __post_init__(self):
         self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Kitchen(EnvironmentView):
+    """
+    Represents a view of a kitchen.
+    """
+    fridges: List[Fridge] = field(default_factory=list)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName('kitchen', prefix='environment')
 
 
 @dataclass(unsafe_hash=True)

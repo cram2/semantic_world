@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+from abc import abstractmethod
+import os
 from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -8,6 +10,7 @@ from dataclasses import fields
 from functools import lru_cache
 from functools import reduce
 from typing import Deque
+from os.path import dirname
 from typing import List, Optional, TYPE_CHECKING, Tuple
 from typing import Set
 
@@ -16,6 +19,7 @@ from numpy import ndarray
 from scipy.stats import geom
 from trimesh.proximity import closest_point, nearby_faces
 from trimesh.sample import sample_surface
+from typing_extensions import ClassVar
 
 from .geometry import BoundingBox, BoundingBoxCollection
 from .geometry import Shape

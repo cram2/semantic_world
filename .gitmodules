@@ -1,0 +1,3 @@
+[submodule "src/ripple_down_rules_meta"]
+	path = src/ripple_down_rules_meta
+	url = https://github.com/code-iai/ripple_down_rules_meta.git
