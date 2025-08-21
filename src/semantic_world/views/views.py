@@ -12,11 +12,34 @@ from semantic_world.world import View, Body
 
 
 @dataclass(unsafe_hash=True)
-class Handle(View):
+class Root(View):
+    """
+    Represents root-level Components
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class Wall(View):
+    """
+    Represents wall Components or surrounding partitions.
+    """
     body: Body
 
     def __post_init__(self):
         self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+@dataclass(unsafe_hash=True)
+class Window(View):
+    """
+    Represents window Components in the world.
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
 
 
 @dataclass(unsafe_hash=True)
@@ -26,25 +49,80 @@ class Container(View):
     def __post_init__(self):
         self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
+# =======================
+# === GROUP DEFINITIONS
+# =======================
+@dataclass(unsafe_hash=True)
+class Components(View):
+    """
+    Represents structural or functional parts of furniture or appliances.
+    """
+    ...
+
 
 @dataclass(unsafe_hash=True)
-class Door(View):  # Door has a Footprint
+class Furniture(View):
     """
-    Door in a body that has a Handle and can open towards or away from the user.
+    Base class for all types of furniture.
     """
+    ...
+
+@dataclass(unsafe_hash=True)
+class Appliance(View):
+    """
+    Represents a collection of home appliances.
+    """
+    ...
+
+
+@dataclass(unsafe_hash=True)
+class Handle(Components):
+    """
+    A body that is usually attached to a door or drawer
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Container(Components):
+    """
+    A body that can contain other bodies
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+
+@dataclass(unsafe_hash=True)
+class Door(Components):
+    """
+    A hinged or sliding barrier for opening/closing access to a compartment or appliance.
+    """
+    body: Body
     handle: Handle
-    body: Body
 
     def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+        self.name = self.body.name
+
 
 @dataclass(unsafe_hash=True)
-class Fridge(View):
-    body: Body
-    door: Door
+class Drawer(Components):
+    """
+    A sliding container housed in furniture, with a handle and container body.
+    """
+    container: Container
+    handle: Handle
 
     def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+        self.name = self.container.name
+
+
+    #def __post_init__(self):
+    #    self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 @dataclass(unsafe_hash=True)
 class Table(View):
@@ -76,38 +154,75 @@ class Table(View):
     def __post_init__(self):
         self.name = self.top.name
 
-################################
-
-
-@dataclass(unsafe_hash=True)
-class Components(View):
-    ...
-
-
-@dataclass(unsafe_hash=True)
-class Furniture(View):
-    ...
-
-
 #################### subclasses von Components
+@dataclass(unsafe_hash=True)
+class Surface(Components):
+    """
+    Represents a flat surface (e.g., tabletop).
+    """
+    body: Body
 
+    def __post_init__(self):
+        self.name = self.body.name
 
 @dataclass(unsafe_hash=True)
-class Door(Components):
+class Leg(Components):
+    """
+    A vertical support Components of furniture.
+    """
     body: Body
-    handle: Handle
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class ArmRest(Components):
+    """
+    A comfortable chair with armrests and backrest.
+    """
+    body: Body
 
     def __post_init__(self):
         self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
-
 @dataclass(unsafe_hash=True)
-class Drawer(Components):
-    container: Container
-    handle: Handle
+class Base(Components):
+    """
+    The sitting area of a chair or sofa.
+    """
+    body: Body
 
     def __post_init__(self):
-        self.name = self.container.name
+        self.name = self.body.name
+
+class Cushion(Components):
+    """
+    Cushions are primarily used for comfort, support, and decoration, often found on sofas, chairs, or beds.
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class Sides(Components):
+    """
+    Represents the Sides of a structure
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class Countertop(Components):
+    """
+    A flat working surface in a kitchen or workspace.
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
 
 
 ############################### subclasses to Furniture
@@ -115,10 +230,66 @@ class Drawer(Components):
 class Cupboard(Furniture):
     ...
 
+@dataclass(unsafe_hash=True)
+class Hotplate(Components):
+    """
+    A heating element typically placed on top of a cooktop.
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
 
 ############################### subclasses to Cupboard
+
+@dataclass(unsafe_hash=True)
+class Sink(Components):
+    """
+    A sink Components typically used in kitchen or bathroom setups.
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+# ============================
+# === FURNITURE SUBCLASSES
+# ============================
+
+@dataclass(unsafe_hash=True)
+class Armchair(Furniture):
+    """
+    A generic armchair.
+    """
+
+    base: Base
+    armrest: List[ArmRest] = field(default_factory=list, hash=False)
+    legs: List[Leg] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        self.name = self.base.name
+
+@dataclass(unsafe_hash=True)
+class Sofa(Furniture):
+    """
+    A generic sofa.
+    """
+    base: Base
+    armrest: List[ArmRest] = field(default_factory=list, hash=False)
+    legs: List[Leg] = field(default_factory=list, hash=False)
+    cushion: List[Cushion] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        self.name = self.base.name
+
+# =============================
+# === CUPBOARD SUBCLASSES
+# =============================
 @dataclass(unsafe_hash=True)
 class Cabinet(Cupboard):
+    """
+    A cupboard with a container and optional drawers.
+    """
     container: Container
     drawers: list[Drawer] = field(default_factory=list, hash=False)
 
@@ -126,6 +297,50 @@ class Cabinet(Cupboard):
         self.name = self.container.name
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Wardrobe(Cupboard):
+    """
+    A cupboard consisting of one or more doors.
+    """
+    body: Body
     doors: List[Door] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+
+
+# =============================
+# === APPLIANCE SUBCLASSES
+# =============================
+@dataclass(unsafe_hash=True)
+class Fridge(Appliance):
+    """
+    A fridge appliance with a body and door.
+    """
+    body: Body
+    door: Door
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class Oven(Appliance):
+    """
+    An oven appliance with a body
+    """
+    body: Body
+
+    def __post_init__(self):
+        self.name = self.body.name
+
+@dataclass(unsafe_hash=True)
+class Cooktop(Appliance):
+    """
+    A cooking surface appliance, usually with one or more hotplate.
+    """
+    body: Body
+    hotplate: list[Hotplate] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        self.name = self.body.name
