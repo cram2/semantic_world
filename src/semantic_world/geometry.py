@@ -1,29 +1,24 @@
 from __future__ import annotations
 
 import itertools
-import logging
 import tempfile
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Optional, List, Iterator, TYPE_CHECKING
 
 import numpy as np
-from numpy import ndarray
+import trimesh
+import trimesh.exchange.stl
+from random_events.interval import SimpleInterval, Bound
+from random_events.product_algebra import SimpleEvent, Event
 from trimesh import Trimesh
 from typing_extensions import Self
 
-import trimesh
-from random_events.interval import SimpleInterval, Bound
-from random_events.product_algebra import SimpleEvent, Event
-
-from .prefixed_name import PrefixedName
 from .spatial_types import TransformationMatrix, Point3
 from .spatial_types.spatial_types import Expression
-from .types import NpMatrix4x4
 from .utils import IDGenerator
 from .variables import SpatialVariables
-import trimesh.exchange.stl
 
 if TYPE_CHECKING:
     from .world_entity import Body
@@ -85,61 +80,22 @@ class Shape(ABC):
     """
     origin: TransformationMatrix = field(default_factory=TransformationMatrix)
 
-    def as_bounding_box(self, reference_frame: Optional[Body]) -> BoundingBox:
-        """
-        Returns the bounding box of the box.
-        """
-
-        origin_frame = self.origin.reference_frame
-        origin_T_self = self.origin
-
-        if not reference_frame:
-            reference_frame = self.origin.reference_frame
-
-        reference_frame_world = reference_frame._world or origin_frame._world
-
-        if reference_frame_world is not None:
-            reference_T_origin: TransformationMatrix = reference_frame_world.compute_forward_kinematics(reference_frame,
-                                                                                                        origin_frame)
-        else:
-            reference_T_origin: TransformationMatrix = TransformationMatrix()
-
-        reference_T_self: TransformationMatrix = reference_T_origin @ origin_T_self
-
-        # Get all 8 corners of the BB in link-local space
-        list_self_T_corner = [
-            TransformationMatrix.from_point_rotation_matrix(self_P_corner)
-            for self_P_corner
-            in self._local_bounding_box().get_points()
-        ] # shape (8, 3)
-
-        list_reference_T_corner = [reference_T_self @ self_T_corner for self_T_corner in list_self_T_corner]
-
-        list_reference_P_corner = [reference_T_corner.to_position().to_np()[:3] for reference_T_corner in list_reference_T_corner]
-
-        # Compute world-space bounding box from transformed corners
-        min_corner = np.min(list_reference_P_corner, axis=0)
-        max_corner = np.max(list_reference_P_corner, axis=0)
-
-        world_bb = BoundingBox.from_min_max(Point3.from_iterable(min_corner), Point3.from_iterable(max_corner))
-
-        return world_bb
-
+    @property
     @abstractmethod
-    def _local_bounding_box(self) -> BoundingBox:
+    def local_frame_bounding_box(self) -> BoundingBox:
         """
-        Returns the local bounding box of the shape.
-        This method should be implemented by subclasses.
+        Returns the bounding box of the shape
         """
         ...
 
     @property
+    @abstractmethod
     def mesh(self) -> trimesh.Trimesh:
         """
         The mesh object of the shape.
         This should be implemented by subclasses.
         """
-        raise NotImplementedError("Subclasses must implement the mesh property.")
+        ...
 
 @dataclass
 class Mesh(Shape):
@@ -165,12 +121,13 @@ class Mesh(Shape):
         mesh = trimesh.load_mesh(self.filename)
         return mesh
 
-    def _local_bounding_box(self) -> BoundingBox:
+    @property
+    def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the local bounding box of the mesh.
         The bounding box is axis-aligned and centered at the origin.
         """
-        return BoundingBox.from_mesh(self.mesh)
+        return BoundingBox.from_mesh(self.mesh, self.origin.reference_frame)
 
 @dataclass
 class TriangleMesh(Shape):
@@ -192,11 +149,12 @@ class TriangleMesh(Shape):
             fd.write(trimesh.exchange.stl.export_stl_ascii(self.mesh))
         return f
 
-    def _local_bounding_box(self) -> BoundingBox:
+    @property
+    def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the mesh.
         """
-        return BoundingBox.from_mesh(self.mesh)
+        return BoundingBox.from_mesh(self.mesh, self.origin.reference_frame)
 
 
 @dataclass
@@ -225,12 +183,13 @@ class Sphere(Primitive):
         """
         return trimesh.creation.icosphere(subdivisions=2, radius=self.radius)
 
-    def _local_bounding_box(self) -> BoundingBox:
+    @property
+    def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the sphere.
         """
         return BoundingBox(-self.radius, -self.radius, -self.radius,
-                           self.radius, self.radius, self.radius)
+                           self.radius, self.radius, self.radius, self.origin.reference_frame)
 
 
 @dataclass
@@ -248,7 +207,8 @@ class Cylinder(Primitive):
         """
         return trimesh.creation.cylinder(radius=self.width / 2, height=self.height, sections=16)
 
-    def _local_bounding_box(self) -> BoundingBox:
+    @property
+    def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the cylinder.
         The bounding box is axis-aligned and centered at the origin.
@@ -256,7 +216,7 @@ class Cylinder(Primitive):
         half_width = self.width / 2
         half_height = self.height / 2
         return BoundingBox(-half_width, -half_width, -half_height,
-                           half_width, half_width, half_height)
+                           half_width, half_width, half_height, self.origin.reference_frame)
 
 
 @dataclass
@@ -274,7 +234,8 @@ class Box(Primitive):
         """
         return trimesh.creation.box(extents=(self.scale.x, self.scale.y, self.scale.z))
 
-    def _local_bounding_box(self) -> BoundingBox:
+    @property
+    def local_frame_bounding_box(self) -> BoundingBox:
         """
         Returns the local bounding box of the box.
         The bounding box is axis-aligned and centered at the origin.
@@ -282,8 +243,15 @@ class Box(Primitive):
         half_x = self.scale.x / 2
         half_y = self.scale.y / 2
         half_z = self.scale.z / 2
-        return BoundingBox(-half_x, -half_y, -half_z,
-                           half_x, half_y, half_z)
+        return BoundingBox(
+            -half_x,
+            -half_y,
+            -half_z,
+            half_x,
+            half_y,
+            half_z,
+            self.origin.reference_frame,
+        )
 
 
 @dataclass
@@ -316,6 +284,11 @@ class BoundingBox:
     max_z: float
     """
     The maximum z-coordinate of the bounding box.
+    """
+
+    reference_frame: Body
+    """
+    The reference frame of the bounding box.
     """
 
     def __hash__(self):
@@ -380,8 +353,15 @@ class BoundingBox:
         :param z_amount: The amount to adjust minimum and maximum z-coordinates
         :return: New enlarged bounding box
         """
-        return self.__class__(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
-                              self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
+        return self.__class__(
+            self.min_x - x_amount,
+            self.min_y - y_amount,
+            self.min_z - z_amount,
+            self.max_x + x_amount,
+            self.max_y + y_amount,
+            self.max_z + z_amount,
+            self.reference_frame,
+        )
 
     def contains(self, point: Point3) -> bool:
         """
@@ -397,7 +377,7 @@ class BoundingBox:
 
         :return: The bounding box as a collection
         """
-        return BoundingBoxCollection([self])
+        return BoundingBoxCollection(self.reference_frame, [self])
 
     @classmethod
     def from_simple_event(cls, simple_event: SimpleEvent):
@@ -454,15 +434,15 @@ class BoundingBox:
                      amount, amount, amount)
 
     @classmethod
-    def from_mesh(cls, mesh: trimesh.Trimesh) -> Self:
+    def from_mesh(cls, mesh: trimesh.Trimesh, reference_frame: Body) -> Self:
         """
         Create a bounding box from a trimesh object.
         :param mesh: The trimesh object.
+        :param reference_frame: The reference frame of the bounding box.
         :return: The bounding box.
         """
         bounds = mesh.bounds
-        return cls(bounds[0][0], bounds[0][1], bounds[0][2],
-                   bounds[1][0], bounds[1][1], bounds[1][2])
+        return cls(bounds[0][0], bounds[0][1], bounds[0][2], bounds[1][0], bounds[1][1], bounds[1][2], reference_frame=reference_frame)
 
     def get_points(self) -> List[Point3]:
         """
@@ -476,24 +456,72 @@ class BoundingBox:
                 for z in (self.min_z, self.max_z)]
 
     @classmethod
-    def from_min_max(cls, min_point: Point3, max_point: Point3) -> Self:
+    def from_min_max(
+        cls, min_point: Point3, max_point: Point3
+    ) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
 
         :param min_point: The minimum point
         :param max_point: The maximum point
         """
-        return cls(*min_point.to_np()[:3], *max_point.to_np()[:3])
+        assert min_point.reference_frame is not None
+        assert min_point.reference_frame == max_point.reference_frame, "The reference frames of the minimum and maximum points must be the same."
+        return cls(
+            *min_point.to_np()[:3],
+            *max_point.to_np()[:3],
+            reference_frame=min_point.reference_frame,
+        )
 
-    def as_shape(self, reference_frame: Optional[Body] = None) -> Box:
+    def as_shape(self) -> Box:
         scale = Scale(x=self.max_x - self.min_x,
                       y=self.max_y - self.min_y,
                       z=self.max_z - self.min_z)
         x = (self.max_x + self.min_x) / 2
         y = (self.max_y + self.min_y) / 2
         z = (self.max_z + self.min_z) / 2
-        origin = TransformationMatrix.from_xyz_rpy(x, y, z, 0, 0, 0, reference_frame)
+        origin = TransformationMatrix.from_xyz_rpy(
+            x, y, z, 0, 0, 0, self.reference_frame
+        )
         return Box(origin=origin, scale=scale)
+
+    def transform_to_frame(self, reference_frame: Body):
+        """
+        Returns the bounding box of the box.
+        """
+
+        world = self.reference_frame._world
+        origin_frame = self.reference_frame
+        reference_T_origin = world.compute_forward_kinematics(
+            reference_frame, origin_frame
+        )
+
+        # Get all 8 corners of the BB in link-local space
+        list_origin_T_corner = [
+            TransformationMatrix.from_point_rotation_matrix(origin_P_corner)
+            for origin_P_corner in self.get_points()
+        ]  # shape (8, 3)
+
+        list_reference_T_corner = [
+            reference_T_origin @ origin_T_corner
+            for origin_T_corner in list_origin_T_corner
+        ]
+
+        list_reference_P_corner = [
+            reference_T_corner.to_position().to_np()[:3]
+            for reference_T_corner in list_reference_T_corner
+        ]
+
+        # Compute world-space bounding box from transformed corners
+        min_corner = np.min(list_reference_P_corner, axis=0)
+        max_corner = np.max(list_reference_P_corner, axis=0)
+
+        world_bb = BoundingBox.from_min_max(
+            Point3.from_iterable(min_corner, reference_frame=reference_frame),
+            Point3.from_iterable(max_corner, reference_frame=reference_frame)
+        )
+
+        return world_bb
 
 
 @dataclass
@@ -502,7 +530,19 @@ class BoundingBoxCollection:
     Dataclass for storing a collection of bounding boxes.
     """
 
+    reference_frame: Body
+    """
+    The reference frame of the bounding boxes.
+    """
+
     bounding_boxes: List[BoundingBox] = field(default_factory=list)
+    """
+    The list of bounding boxes.
+    """
+
+    def  __post_init__(self):
+        for box in self.bounding_boxes:
+            assert box.reference_frame == self.reference_frame, "All bounding boxes must have the same reference frame."
 
     def __iter__(self) -> Iterator[BoundingBox]:
         return iter(self.bounding_boxes)
@@ -521,7 +561,9 @@ class BoundingBoxCollection:
         :param other: The other bounding box collection.
         :return: The merged bounding box collection.
         """
-        return BoundingBoxCollection(self.bounding_boxes + other.bounding_boxes)
+        return BoundingBoxCollection(
+            self.reference_frame, self.bounding_boxes + other.bounding_boxes
+        )
 
     def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> BoundingBoxCollection:
         """
@@ -533,13 +575,22 @@ class BoundingBoxCollection:
 
         :return: The enlarged bounding box collection
         """
-        return BoundingBoxCollection([box.bloat(x_amount, y_amount, z_amount) for box in self.bounding_boxes])
+        return BoundingBoxCollection(
+            self.reference_frame,
+            [box.bloat(x_amount, y_amount, z_amount) for box in self.bounding_boxes],
+        )
 
     @classmethod
-    def from_simple_event(cls, simple_event: SimpleEvent, keep_surface: bool = False) -> BoundingBoxCollection:
+    def from_simple_event(
+        cls,
+        reference_frame: Body,
+        simple_event: SimpleEvent,
+        keep_surface: bool = False,
+    ) -> BoundingBoxCollection:
         """
         Create a list of bounding boxes from a simple random event.
 
+        :param reference_frame: The reference frame of the bounding boxes.
         :param simple_event: The random event.
         :param keep_surface: Whether to keep events that are infinitely thin
         :return: The list of bounding boxes.
@@ -549,21 +600,31 @@ class BoundingBoxCollection:
                                          simple_event[SpatialVariables.y.value].simple_sets,
                                          simple_event[SpatialVariables.z.value].simple_sets):
 
-            bb = BoundingBox(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper)
+            bb = BoundingBox(
+                x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, reference_frame
+            )
             if not keep_surface and (bb.depth == 0 or bb.height == 0 or bb.width == 0):
                 continue
             result.append(bb)
-        return BoundingBoxCollection(result)
+        return BoundingBoxCollection(reference_frame, result)
 
     @classmethod
-    def from_event(cls, event: Event) -> Self:
+    def from_event(cls, reference_frame: Body, event: Event) -> Self:
         """
         Create a list of bounding boxes from a random event.
 
+        :param reference_frame: The reference frame of the bounding boxes.
         :param event: The random event.
         :return: The list of bounding boxes.
         """
-        return cls([box for simple_event in event.simple_sets for box in cls.from_simple_event(simple_event)])
+        return cls(
+            reference_frame,
+            [
+                box
+                for simple_event in event.simple_sets
+                for box in cls.from_simple_event(reference_frame, simple_event)
+            ],
+        )
 
     @classmethod
     def from_shapes(cls, shapes: List[Shape]) -> Self:
@@ -576,8 +637,12 @@ class BoundingBoxCollection:
         if not shapes:
             return cls([])
         if shapes:
+            local_bbs = [shape.local_frame_bounding_box for shape in shapes]
             reference_frame = shapes[0].origin.reference_frame
-            return cls([shape.as_bounding_box(reference_frame) for shape in shapes])
+            return cls(
+                reference_frame,
+                [bb.transform_to_frame(reference_frame) for bb in local_bbs],
+            )
 
-    def as_shapes(self, reference_frame: Optional[Body] = None) -> List[Box]:
-        return [box.as_shape(reference_frame) for box in self.bounding_boxes]
+    def as_shapes(self) -> List[Box]:
+        return [box.as_shape() for box in self.bounding_boxes]

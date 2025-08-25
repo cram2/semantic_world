@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Union, List
+
+from ..degree_of_freedom import DegreeOfFreedom
 from ..spatial_types import spatial_types as cas
 from urdf_parser_py import urdf
 
@@ -152,8 +154,12 @@ class URDFParser:
         try:
             dof = world.get_degree_of_freedom_by_name(dof_name)
         except KeyError as e:
-            dof = world.create_degree_of_freedom(name=PrefixedName(joint.name),
-                                                 lower_limits=lower_limits, upper_limits=upper_limits)
+            dof = DegreeOfFreedom(
+                name=PrefixedName(joint.name),
+                lower_limits=lower_limits,
+                upper_limits=upper_limits,
+            )
+            world.add_degree_of_freedom(dof)
 
         result = connection_type(parent=parent, child=child, origin_expression=parent_T_child,
                                  multiplier=multiplier, offset=offset,

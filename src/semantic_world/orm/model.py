@@ -36,8 +36,12 @@ class WorldMapping(AlternativeMapping[World]):
             for view in self.views:
                 result.add_view(view)
             for dof in self.degrees_of_freedom:
-                result.create_degree_of_freedom(name=dof.name, lower_limits=dof.lower_limits,
-                                                upper_limits=dof.upper_limits)
+                d = DegreeOfFreedom(
+                    name=dof.name,
+                    lower_limits=dof.lower_limits,
+                    upper_limits=dof.upper_limits)
+                result.add_degree_of_freedom(d)
+            result.delete_orphaned_dofs()
 
         return result
 

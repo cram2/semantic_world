@@ -10,6 +10,7 @@ from multiverse_parser import (InertiaSource,
 from pxr import UsdUrdf
 
 from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection
+from ..degree_of_freedom import DegreeOfFreedom
 from ..spatial_types.derivatives import DerivativeMap
 from ..prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
@@ -165,11 +166,17 @@ class MultiParser:
                     lower_limits.position = joint_builder.joint.GetLowerLimitAttr().Get()
                     upper_limits = DerivativeMap()
                     upper_limits.position = joint_builder.joint.GetUpperLimitAttr().Get()
-                    dof = world.create_degree_of_freedom(name=PrefixedName(joint_name),
-                                                         lower_limits=lower_limits,
-                                                         upper_limits=upper_limits)
+                    dof = DegreeOfFreedom(
+                        name=PrefixedName(joint_name),
+                        lower_limits=lower_limits,
+                        upper_limits=upper_limits,
+                    )
+                    world.add_degree_of_freedom(dof)
                 else:
-                    dof = world.create_degree_of_freedom(name=PrefixedName(joint_name))
+                    dof = DegreeOfFreedom(
+                        name=PrefixedName(joint_name),
+                    )
+                    world.add_degree_of_freedom(dof)
             if joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS]:
                 connection = RevoluteConnection(parent=parent_body, child=child_body, origin_expression=origin,
                                                 multiplier=multiplier, offset=offset,

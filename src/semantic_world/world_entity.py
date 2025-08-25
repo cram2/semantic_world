@@ -6,7 +6,6 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import lru_cache
-from functools import reduce
 from typing import (
     Deque,
 )
@@ -14,12 +13,11 @@ from typing import List, Optional, TYPE_CHECKING, Tuple
 from typing import Set
 
 import numpy as np
-import rustworkx
 from scipy.stats import geom
 from trimesh.proximity import closest_point, nearby_faces
 from trimesh.sample import sample_surface
 
-from .geometry import BoundingBoxCollection
+from .geometry import BoundingBoxCollection, BoundingBox
 from .geometry import Shape
 from .prefixed_name import PrefixedName
 from .spatial_types import spatial_types as cas
@@ -176,42 +174,30 @@ class Body(WorldEntity):
         return self._world.compute_child_bodies(self)
 
     @property
-    def recursive_child_bodies(self) -> List[Body]:
-        """
-        Returns the recursive child bodies of this body.
-        :return: All child bodies of this body.
-        """
-        return [self._world.kinematic_structure[i] for i in rustworkx.descendants(self._world.kinematic_structure, self.index)]
-
-    @property
     def parent_body(self) -> Body:
         """
         Returns the parent body of this body.
         """
         return self._world.compute_parent_body(self)
 
-    def as_bounding_box_collection(self, reference_frame: Optional[Body] = None) -> BoundingBoxCollection:
+    def as_bounding_box_collection_in_frame(
+        self, reference_frame: Body
+    ) -> BoundingBoxCollection:
         """
-        Provides the bounding box collection for the current object based on its
-        relative transformations and collision shapes.
-
-        This property computes the forward kinematics to determine the object's
-        position and orientation in world space. Bounding boxes for each shape in the
-        collision attribute are transformed to world coordinates. The world-space bounding
-        boxes are then aggregated into a BoundingBoxCollection.
-
+        Provides the bounding box collection for this body in the given reference frame.
+        :param reference_frame: The reference frame to express the bounding boxes in.
         :returns: A collection of bounding boxes in world-space coordinates.
-        :rtype: BoundingBoxCollection
         """
         world_bboxes = []
 
         for shape in self.collision:
             if shape.origin.reference_frame is None:
                 continue
-            world_bb = shape.as_bounding_box(reference_frame)
+            local_bb: BoundingBox = shape.local_frame_bounding_box
+            world_bb = local_bb.transform_to_frame(reference_frame)
             world_bboxes.append(world_bb)
 
-        return BoundingBoxCollection(world_bboxes)
+        return BoundingBoxCollection(reference_frame, world_bboxes)
 
     @property
     def global_pose(self) -> NpMatrix4x4:
@@ -284,14 +270,25 @@ class View(WorldEntity):
         """
         return self._bodies(set())
 
-    def as_bounding_box_collection(self, reference_frame: Optional[Body] = None) -> BoundingBoxCollection:
+    def as_bounding_box_collection_in_frame(
+        self, reference_frame: Body
+    ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this view.
+        :param reference_frame: The reference frame to express the bounding boxes in.
+        :returns: A collection of bounding boxes in world-space coordinates.
         """
-        bbs = reduce(
-            lambda accumulator, bb_collection: accumulator.merge(bb_collection),
-            (body.as_bounding_box_collection(reference_frame) for body in self.bodies if body.has_collision())
+
+        collections = iter(
+            body.as_bounding_box_collection_in_frame(reference_frame)
+            for body in self.bodies
+            if body.has_collision()
         )
+        bbs = BoundingBoxCollection(reference_frame, [])
+
+        for bb_collection in collections:
+            bbs = bbs.merge(bb_collection)
+
         return bbs
 
 

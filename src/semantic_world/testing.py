@@ -5,6 +5,7 @@ import pytest
 
 from .adapters.urdf import URDFParser
 from .connections import Connection6DoF, PrismaticConnection, RevoluteConnection, FixedConnection, OmniDrive
+from .degree_of_freedom import DegreeOfFreedom
 from .geometry import Box, Scale, Sphere
 from .prefixed_name import PrefixedName
 from .spatial_types import TransformationMatrix
@@ -29,8 +30,11 @@ def world_setup() -> Tuple[World, Body, Body, Body, Body, Body]:
         lower_limits.velocity = -1
         upper_limits = DerivativeMap()
         upper_limits.velocity = 1
-        dof = world.create_degree_of_freedom(name=PrefixedName('dof'), lower_limits=lower_limits,
-                                             upper_limits=upper_limits)
+        dof = DegreeOfFreedom(
+            name=PrefixedName('dof'),
+            lower_limits=lower_limits,
+            upper_limits=upper_limits)
+        world.add_degree_of_freedom(dof)
 
         c_l1_l2 = PrismaticConnection(parent=l1, child=l2, dof=dof, axis=Vector3.X(reference_frame=l1))
         c_r1_r2 = RevoluteConnection(parent=r1, child=r2, dof=dof, axis=Vector3.Z(reference_frame=r1))

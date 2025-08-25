@@ -62,7 +62,7 @@ from semantic_world.geometry import BoundingBox
 
 search_space = BoundingBox(min_x=-1, max_x=1,
                            min_y=-1, max_y=1,
-                           min_z=0.1, max_z=0.2).as_collection()
+                           min_z=0.1, max_z=0.2, reference_frame=box_world.root).as_collection()
                            
 gcs = GraphOfConvexSets.free_space_from_world(box_world, search_space=search_space)
 ```
@@ -115,7 +115,7 @@ world = apartment_parser.parse()
 
 search_space = BoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,
-                           min_z=0., max_z=2).as_collection()
+                           min_z=0., max_z=2, reference_frame=world.root).as_collection()
 gcs = GraphOfConvexSets.free_space_from_world(world, search_space=search_space)
 ```
 

@@ -92,20 +92,20 @@ class TestFactories(unittest.TestCase):
     def test_dresser_factory(self):
         drawer_factory = DrawerFactory(
             name=PrefixedName("drawer"),
-            container_factory=ContainerFactory(name=PrefixedName("container")),
-            handle_factory=HandleFactory(name=PrefixedName("handle")),
+            container_factory=ContainerFactory(name=PrefixedName("drawer_container")),
+            handle_factory=HandleFactory(name=PrefixedName("drawer_handle")),
         )
         drawer_transform = TransformationMatrix()
 
         door_factory = DoorFactory(
             name=PrefixedName("door"),
-            handle_factory=HandleFactory(name=PrefixedName("handle")),
+            handle_factory=HandleFactory(name=PrefixedName("door_handle")),
             handle_direction=Direction.Y,
         )
 
         door_transform = TransformationMatrix()
 
-        container_factory = ContainerFactory(name=PrefixedName("container"))
+        container_factory = ContainerFactory(name=PrefixedName("dresser_container"))
 
         dresser_factory = DresserFactory(
             name=PrefixedName("dresser"),

@@ -138,7 +138,8 @@ class Door(EntryWay):
 
 @dataclass(unsafe_hash=True)
 class DoubleDoor(EntryWay):
-    doors: List[Door] = field(default_factory=list, hash=False)
+    door1 : Door
+    door2 : Door
 
     def __post_init__(self):
         if self.name is None:

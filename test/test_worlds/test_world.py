@@ -1,10 +1,6 @@
-import time
-
 import numpy as np
 import pytest
-import rclpy
 
-from semantic_world.adapters.viz_marker import VizMarkerPublisher
 from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, FixedConnection
 from semantic_world.exceptions import AddingAnExistingViewError, DuplicateViewError, ViewNotFoundError
 from semantic_world.prefixed_name import PrefixedName

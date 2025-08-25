@@ -19,15 +19,18 @@ from .connections import (
     HasUpdateState,
     Has1DOFState,
     Connection6DoF,
-    ActiveConnection,
-    PassiveConnection,
 )
 from .degree_of_freedom import DegreeOfFreedom
-from .exceptions import DuplicateViewError, AddingAnExistingViewError, ViewNotFoundError
+from .exceptions import (
+    DuplicateViewError,
+    AddingAnExistingViewError,
+    ViewNotFoundError,
+    AlreadyBelongsToAWorldError,
+)
 from .ik_solver import InverseKinematicsSolver
 from .prefixed_name import PrefixedName
 from .spatial_types import spatial_types as cas
-from .spatial_types.derivatives import Derivatives, DerivativeMap
+from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
 from .types import NpMatrix4x4
 from .utils import IDGenerator, copy_lru_cache
@@ -299,39 +302,28 @@ class World:
         """
         assert len(self.bodies) == (len(self.connections) + 1)
         assert rx.is_weakly_connected(self.kinematic_structure)
+        actual_dofs = set()
+        for connection in self.connections:
+            actual_dofs.update(connection.dofs)
+        assert actual_dofs == set(
+            self.degrees_of_freedom
+        ), "self.degrees_of_freedom does not match the actual dofs used in connections. Did you forget to call deleted_orphaned_dof()?"
         return True
 
     @modifies_world
-    def create_degree_of_freedom(
-        self,
-        name: PrefixedName,
-        lower_limits: Optional[DerivativeMap[float]] = None,
-        upper_limits: Optional[DerivativeMap[float]] = None,
-    ) -> DegreeOfFreedom:
+    def add_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
         """
-        Create a degree of freedom in the world and return it.
-        For dependent kinematics, DoFs must be created with this method and passed to the connection's conctructor.
-        :param name: Name of the DoF.
-        :param lower_limits: If the DoF is actively controlled, it must have at least velocity limits.
-        :param upper_limits: If the DoF is actively controlled, it must have at least velocity limits.
-        :return: The already registered DoF.
-        """
-        dof = DegreeOfFreedom(
-            name=name, lower_limits=lower_limits, upper_limits=upper_limits, _world=self
-        )
-        self.register_degree_of_freedom(dof)
-        return dof
-
-    @modifies_world
-    def register_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
-        """
-        Register a degree of freedom in the world.
+        Adds degree of freedom in the world.
         This is used to register DoFs that are not created by the world, but are part of the world model.
         :param dof: The degree of freedom to register.
         """
-        if dof in self.degrees_of_freedom:
-            logger.debug(f"Degree of freedom {dof.name} already registered in world {self.name}.")
+        if dof._world is self and dof in self.degrees_of_freedom:
             return
+        if dof._world is not None:
+            raise AlreadyBelongsToAWorldError("Cannot add a degree of freedom that already belongs to another world.")
+
+        dof._world = self
+
         initial_position = 0
         lower_limit = dof.lower_limits.position
         if lower_limit is not None:
@@ -341,7 +333,6 @@ class World:
             initial_position = min(upper_limit, initial_position)
         self.state[dof.name].position = initial_position
         self.degrees_of_freedom.append(dof)
-
 
     def modify_world(self) -> WorldModelUpdateContextManager:
         return WorldModelUpdateContextManager(self)
@@ -383,20 +374,17 @@ class World:
         the model version number.
         """
         if not self.world_is_being_modified:
-            # self._fix_tree_structure()
             self.reset_cache()
             self.compile_forward_kinematics_expressions()
-            self.deleted_orphaned_dof()
             self.notify_state_change()
             self._model_version += 1
             self.validate()
 
-    def deleted_orphaned_dof(self):
+    def delete_orphaned_dofs(self):
         actual_dofs = set()
         for connection in self.connections:
             actual_dofs.update(connection.dofs)
         self.degrees_of_freedom = list(actual_dofs)
-
 
     @property
     def bodies(self) -> List[Body]:
@@ -429,7 +417,7 @@ class World:
         if body._world is self and body.index is not None:
             return
         elif body._world is not None and body._world is not self:
-            raise NotImplementedError("Cannot add a body that already belongs to another world.")
+            raise AlreadyBelongsToAWorldError("Cannot add a body that already belongs to another world.")
 
         body.index = self.kinematic_structure.add_node(body)
 
@@ -468,6 +456,22 @@ class World:
             view._world = self
             self.views.append(view)
 
+    def remove_view(self, view: View) -> None:
+        """
+        Removes a view from the current list of views if it exists.
+
+        :param view: The view instance to be removed.
+        """
+        try:
+            existing_view = self.get_view_by_name(view.name)
+            if existing_view == view:
+                self.views.remove(existing_view)
+                view._world = None
+            else:
+                raise ValueError("The provided view instance does not match the existing view with the same name.")
+        except ViewNotFoundError:
+            logger.debug(f"View {view.name} not found in the world. No action taken.")
+
     def get_view_by_name(self, name: Union[str, PrefixedName]) -> Optional[View]:
         """
         Retrieves a View from the list of view based on its name.
@@ -500,7 +504,6 @@ class World:
         :return: A list of `View` objects that match the given type.
         """
         return [view for view in self.views if isinstance(view, view_type)]
-
 
     @modifies_world
     def remove_body(self, body: Body) -> None:
@@ -562,8 +565,10 @@ class World:
             if body._world is not None:
                 other.remove_body(body)
 
-        for view in other.views:
-            self.add_view(view, exists_ok=True)
+        other_views = [view for view in other.views]
+        for view in other_views:
+            other.remove_view(view)
+            self.add_view(view)
 
         other.world_is_being_modified = False
 
@@ -571,7 +576,7 @@ class World:
             parent=self_root, child=other_root, _world=self
         )
         for dof in connection.dofs:
-            self.register_degree_of_freedom(dof)
+            self.add_degree_of_freedom(dof)
         self.add_connection(connection)
 
     @modifies_world

@@ -37,3 +37,6 @@ class ViewNotFoundError(UsageError):
     def __init__(self, name: PrefixedName):
         msg = f'View with name {name} not found'
         super().__init__(msg)
+
+class AlreadyBelongsToAWorldError(UsageError):
+    ...

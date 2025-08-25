@@ -66,10 +66,18 @@ class GraphOfConvexSets:
     A mapping from bounding boxes to their indices in the graph.
     """
 
-    def __init__(self, search_space: Optional[BoundingBoxCollection] = None):
-        self.search_space = self._make_search_space(search_space)
+    world: World
+    """
+    The world that the graph is based on.
+    """
+
+    def __init__(
+        self, world: World, search_space: Optional[BoundingBoxCollection] = None
+    ):
+        self.search_space = self._make_search_space(world, search_space)
         self.graph = rx.PyGraph(multigraph=False)
         self.box_to_index_map = {}
+        self.world = world
 
     def add_node(self, box: BoundingBox):
         self.box_to_index_map[box] = self.graph.add_node(box)
@@ -89,8 +97,13 @@ class GraphOfConvexSets:
 
         def _intersection_box(a_min, a_max, b_min, b_max):
             return BoundingBox(
-                max(a_min[0], b_min[0]), max(a_min[1], b_min[1]), max(a_min[2], b_min[2]),
-                min(a_max[0], b_max[0]), min(a_max[1], b_max[1]), min(a_max[2], b_max[2]),
+                max(a_min[0], b_min[0]),
+                max(a_min[1], b_min[1]),
+                max(a_min[2], b_min[2]),
+                min(a_max[0], b_max[0]),
+                min(a_max[1], b_max[1]),
+                min(a_max[2], b_max[2]),
+                self.world.root,
             )
 
         # Build a 3-D R-tree
@@ -204,40 +217,34 @@ class GraphOfConvexSets:
         return result
 
     @classmethod
-    def _make_search_space(cls, search_space: Optional[BoundingBoxCollection] = None):
+    def _make_search_space(
+        cls, world: World, search_space: Optional[BoundingBoxCollection] = None
+    ):
         """
         Create the default search space if it is not given.
         """
         if search_space is None:
-            search_space = BoundingBox(-np.inf, -np.inf, -np.inf, np.inf, np.inf, np.inf).as_collection()
+            search_space = BoundingBox(
+                -np.inf, -np.inf, -np.inf, np.inf, np.inf, np.inf, world.root
+            ).as_collection()
         return search_space
 
     @classmethod
-    def obstacles_of_world(cls, world: World, search_space: Optional[BoundingBoxCollection] = None,
-                           bloat_obstacles: float = 0.) -> Event:
-        """
-        Get all obstacles of the world besides the robot as a random event.
-
-        :param world: The world to get the obstacles from.
-        :param search_space: The search space for the connectivity graph.
-        :param bloat_obstacles: The amount to bloat the obstacles.
-
-        :return: An event representing the obstacles in the search space.
-        """
-        world_view = EnvironmentView(root=world.root)
-        return cls.obstacles_from_views(world_view, search_space=search_space, bloat_obstacles=bloat_obstacles)
-
-
-    @classmethod
-    def obstacles_from_views(cls, obstacle_view: View, wall_view: Optional[View] = None, search_space: Optional[BoundingBoxCollection] = None,
-                             bloat_obstacles: float = 0., bloat_walls: float = 0., keep_z = True) -> Event:
-
+    def obstacles_from_views(
+        cls,
+        search_space: BoundingBoxCollection,
+        obstacle_view: View,
+        wall_view: Optional[View] = None,
+        bloat_obstacles: float = 0.0,
+        bloat_walls: float = 0.0,
+        keep_z=True,
+    ) -> Event:
         """
         Create a connectivity graph from a list of views.
 
+        :param search_space: The search space for the connectivity graph.
         :param obstacle_view: The view to create the connectivity graph from.
         :param wall_view: An optional view containing walls to be considered as obstacles.
-        :param search_space: The search space for the connectivity graph.
         :param bloat_obstacles: The amount to bloat the obstacles.
         :param bloat_walls: The amount to bloat the walls.
         :param keep_z: If True, the z-axis is kept in the resulting event. Default is True.
@@ -253,20 +260,26 @@ class GraphOfConvexSets:
             else:
                 return bb.bloat(0, bloat_walls, 0.01)
 
-        world_root = list(obstacle_view.bodies)[0]._world.root
+        world_root = search_space.reference_frame
 
-        bloated_obstacles: BoundingBoxCollection = BoundingBoxCollection([
-            bloat_obstacle(bb) for bb in obstacle_view.as_bounding_box_collection(world_root)
-        ])
+        bloated_obstacles: BoundingBoxCollection = BoundingBoxCollection(
+            world_root,
+            [
+                bloat_obstacle(bb)
+                for bb in obstacle_view.as_bounding_box_collection_in_frame(world_root)
+            ],
+        )
 
         if wall_view is not None:
-            bloated_walls: BoundingBoxCollection = BoundingBoxCollection([
-                bloat_wall(bb) for bb in wall_view.as_bounding_box_collection(world_root)
-            ])
+            bloated_walls: BoundingBoxCollection = BoundingBoxCollection(
+                world_root,
+                [
+                    bloat_wall(bb)
+                    for bb in wall_view.as_bounding_box_collection_in_frame(world_root)
+                ],
+            )
             bloated_obstacles.merge(bloated_walls)
 
-
-        search_space = cls._make_search_space(search_space)
         return cls.obstacles_from_bounding_boxes(bloated_obstacles, search_space.event, keep_z)
 
     @classmethod
@@ -303,31 +316,41 @@ class GraphOfConvexSets:
             return None
 
     @classmethod
-    def free_space_from_view(cls, obstacle_view: View, wall_view: Optional[View] = None, tolerance=.001,
-                             search_space: Optional[BoundingBoxCollection] = None, bloat_obstacles: float = 0.,
-                             bloat_walls: float = 0.) -> Self:
+    def free_space_from_view(
+        cls,
+        search_space: BoundingBoxCollection,
+        obstacle_view: View,
+        wall_view: Optional[View] = None,
+        tolerance=0.001,
+        bloat_obstacles: float = 0.0,
+        bloat_walls: float = 0.0,
+    ) -> Self:
         """
         Create a connectivity graph from the free space in the belief state of the robot.
 
+        :param search_space: The search space for the connectivity graph.
         :param obstacle_view: The view containing the obstacles.
         :param wall_view: An optional view containing walls to be considered as obstacles.
         :param tolerance: The tolerance for the intersection when calculating the connectivity.
-        :param search_space: The search space for the connectivity graph.
         :param bloat_obstacles: The amount to bloat the obstacles.
         :param bloat_walls: The amount to bloat the walls.
 
         :return: The connectivity graph. If no obstacles are found, an empty graph is returned.
         """
 
-        # create search space for calculations
-        search_space = cls._make_search_space(search_space)
-
         # get obstacles
-        obstacles = cls.obstacles_from_views(obstacle_view, wall_view, search_space, bloat_obstacles=bloat_obstacles,
-                                             bloat_walls=bloat_walls)
+        obstacles = cls.obstacles_from_views(
+            search_space,
+            obstacle_view,
+            wall_view,
+            bloat_obstacles=bloat_obstacles,
+            bloat_walls=bloat_walls,
+        )
 
         if obstacles is None or obstacles.is_empty():
-            return cls(search_space=search_space)
+            return cls(
+                search_space=search_space, world=search_space.reference_frame._world
+            )
 
         search_event = search_space.event
 
@@ -337,8 +360,13 @@ class GraphOfConvexSets:
         logger.info(f"Free space calculated in {(time.time_ns() - start_time) / 1e6} ms")
 
         # create a connectivity graph from the free space and calculate the edges
-        result = cls(search_space=search_space)
-        [result.add_node(bb) for bb in BoundingBoxCollection.from_event(free_space)]
+        result = cls(search_space=search_space, world=obstacle_view._world)
+        [
+            result.add_node(bb)
+            for bb in BoundingBoxCollection.from_event(
+                reference_frame=search_space.reference_frame, event=free_space
+            )
+        ]
 
         start_time = time.time_ns()
         result.calculate_connectivity(tolerance)
@@ -347,14 +375,19 @@ class GraphOfConvexSets:
         return result
 
     @classmethod
-    def free_space_from_world(cls, world: World, tolerance=.001, search_space: Optional[BoundingBoxCollection] = None,
-                              bloat_obstacles: float = 0.) -> Self:
+    def free_space_from_world(
+        cls,
+        world: World,
+        search_space: BoundingBoxCollection,
+        tolerance=0.001,
+        bloat_obstacles: float = 0.0,
+    ) -> Self:
         """
         Create a connectivity graph from the free space in the belief state of the robot.
 
         :param world: The belief state.
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
         :param search_space: The search space for the connectivity graph.
+        :param tolerance: The tolerance for the intersection when calculating the connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
 
         :return: The connectivity graph.
@@ -362,13 +395,23 @@ class GraphOfConvexSets:
 
         view = EnvironmentView(root=world.root, _world=world)
 
-        return cls.free_space_from_view(view, tolerance=tolerance, search_space=search_space,
-                                        bloat_obstacles=bloat_obstacles)
+        return cls.free_space_from_view(
+            search_space=search_space,
+            obstacle_view=view,
+            tolerance=tolerance,
+            bloat_obstacles=bloat_obstacles,
+        )
 
     @classmethod
-    def navigation_map_from_view(cls, obstacle_view: View, wall_view: Optional[View] = None, tolerance=.001,
-                                  search_space: Optional[BoundingBoxCollection] = None,
-                                  bloat_obstacles: float = 0., bloat_walls: float = 0.) -> Self:
+    def navigation_map_from_view(
+        cls,
+        search_space: BoundingBoxCollection,
+        obstacle_view: View,
+        wall_view: Optional[View] = None,
+        tolerance=0.001,
+        bloat_obstacles: float = 0.0,
+        bloat_walls: float = 0.0,
+    ) -> Self:
         """
         Create a GCS from the free space in the belief state of the robot for navigation.
         The resulting GCS describes the paths for navigation, meaning that changing the z-axis position is not
@@ -376,10 +419,10 @@ class GraphOfConvexSets:
         Furthermore, it is taken into account that the robot has to fit through the entire space and not just
         through the floor level obstacles.
 
+        :param search_space: The search space for the connectivity graph.
         :param obstacle_view: The view containing the obstacles.
         :param wall_view: An optional view containing walls to be considered as obstacles.
         :param tolerance: The tolerance for the intersection when calculating the connectivity.
-        :param search_space: The search space for the connectivity graph.
         :param bloat_obstacles: The amount to bloat the obstacles.
         :param bloat_walls: The amount to bloat the walls.
 
@@ -387,13 +430,19 @@ class GraphOfConvexSets:
         """
 
         # create search space for calculations
-        search_space = cls._make_search_space(search_space)
-
-        obstacles = cls.obstacles_from_views(obstacle_view, wall_view, search_space, bloat_obstacles, bloat_walls,
-                                             keep_z=False)
+        obstacles = cls.obstacles_from_views(
+            search_space,
+            obstacle_view,
+            wall_view,
+            bloat_obstacles,
+            bloat_walls,
+            keep_z=False,
+        )
 
         if obstacles is None or obstacles.is_empty():
-            return cls(search_space=search_space)
+            return cls(
+                world=search_space.reference_frame._world, search_space=search_space
+            )
 
         # remove the z axis
         og_search_event = search_space.event
@@ -410,8 +459,12 @@ class GraphOfConvexSets:
         free_space &= og_search_event
 
         # create a connectivity graph from the free space and calculate the edges
-        result = cls(search_space=search_space)
-        free_space_boxes = BoundingBoxCollection.from_event(free_space)
+        result = cls(
+            world=search_space.reference_frame._world, search_space=search_space
+        )
+        free_space_boxes = BoundingBoxCollection.from_event(
+            search_space.reference_frame, free_space
+        )
         [result.add_node(bb) for bb in free_space_boxes]
         result.calculate_connectivity(tolerance)
 
@@ -429,8 +482,8 @@ class GraphOfConvexSets:
         through the floor level obstacles.
 
         :param world: The belief state.
-        :param tolerance: The tolerance for the intersection when calculating the connectivity.
         :param search_space: The search space for the connectivity graph.
+        :param tolerance: The tolerance for the intersection when calculating the connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles.
 
         :return: The connectivity graph.
@@ -438,5 +491,6 @@ class GraphOfConvexSets:
 
         view = EnvironmentView(root=world.root, _world=world)
 
-        return cls.navigation_map_from_view(view, tolerance=tolerance, search_space=search_space,
-                                            bloat_obstacles=bloat_obstacles)
+        return cls.navigation_map_from_view(
+            search_space, view, tolerance=tolerance, bloat_obstacles=bloat_obstacles
+        )

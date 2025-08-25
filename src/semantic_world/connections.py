@@ -161,7 +161,11 @@ class PrismaticConnection(ActiveConnection, Has1DOFState):
         self.origin_expression.child_frame = self.child
 
     def _post_init_with_world(self):
-        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(str(self.name)))
+        if self.dof is None:
+            self.dof = DegreeOfFreedom(
+                name=PrefixedName(str(self.name)),
+            )
+            self._world.add_degree_of_freedom(self.dof)
 
     def _post_init_without_world(self):
         if self.dof is None:
@@ -223,7 +227,11 @@ class RevoluteConnection(ActiveConnection, Has1DOFState):
         self.origin_expression.child_frame = self.child
 
     def _post_init_with_world(self):
-        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(str(self.name)))
+        if self.dof is None:
+            self.dof = DegreeOfFreedom(
+                name=PrefixedName(str(self.name)),
+            )
+            self._world.add_degree_of_freedom(self.dof)
 
     def _post_init_without_world(self):
         if self.dof is None:
@@ -283,13 +291,20 @@ class Connection6DoF(PassiveConnection):
 
     def _post_init_with_world(self):
         if all(dof is None for dof in self.passive_dofs):
-            self.x = self._world.create_degree_of_freedom(name=PrefixedName('x', str(self.name)))
-            self.y = self._world.create_degree_of_freedom(name=PrefixedName('y', str(self.name)))
-            self.z = self._world.create_degree_of_freedom(name=PrefixedName('z', str(self.name)))
-            self.qx = self._world.create_degree_of_freedom(name=PrefixedName('qx', str(self.name)))
-            self.qy = self._world.create_degree_of_freedom(name=PrefixedName('qy', str(self.name)))
-            self.qz = self._world.create_degree_of_freedom(name=PrefixedName('qz', str(self.name)))
-            self.qw = self._world.create_degree_of_freedom(name=PrefixedName('qw', str(self.name)))
+            self.x = DegreeOfFreedom(name=PrefixedName('x', str(self.name)))
+            self._world.add_degree_of_freedom(self.x)
+            self.y = DegreeOfFreedom(name=PrefixedName('y', str(self.name)))
+            self._world.add_degree_of_freedom(self.y)
+            self.z = DegreeOfFreedom(name=PrefixedName('z', str(self.name)))
+            self._world.add_degree_of_freedom(self.z)
+            self.qx = DegreeOfFreedom(name=PrefixedName('qx', str(self.name)))
+            self._world.add_degree_of_freedom(self.qx)
+            self.qy = DegreeOfFreedom(name=PrefixedName('qy', str(self.name)))
+            self._world.add_degree_of_freedom(self.qy)
+            self.qz = DegreeOfFreedom(name=PrefixedName('qz', str(self.name)))
+            self._world.add_degree_of_freedom(self.qz)
+            self.qw = DegreeOfFreedom(name=PrefixedName('qw', str(self.name)))
+            self._world.add_degree_of_freedom(self.qw)
             self._world.state[self.qw.name].position = 1.
         elif any(dof is None for dof in self.passive_dofs):
             raise ValueError("Connection6DoF can only be created "
@@ -367,25 +382,32 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
             upper_rotation_limits = DerivativeMap()
             upper_rotation_limits.velocity = self.rotation_velocity_limits
 
-            self.x = self._world.create_degree_of_freedom(name=PrefixedName('x', stringified_name))
-            self.y = self._world.create_degree_of_freedom(name=PrefixedName('y', stringified_name))
-            self.z = self._world.create_degree_of_freedom(name=PrefixedName('z', stringified_name))
-
-            self.roll = self._world.create_degree_of_freedom(name=PrefixedName('roll', stringified_name))
-            self.pitch = self._world.create_degree_of_freedom(name=PrefixedName('pitch', stringified_name))
-            self.yaw = self._world.create_degree_of_freedom(
+            self.x = DegreeOfFreedom(name=PrefixedName('x', stringified_name))
+            self._world.add_degree_of_freedom(self.x)
+            self.y = DegreeOfFreedom(name=PrefixedName('y', stringified_name))
+            self._world.add_degree_of_freedom(self.y)
+            self.z = DegreeOfFreedom(name=PrefixedName('z', stringified_name))
+            self._world.add_degree_of_freedom(self.z)
+            self.roll = DegreeOfFreedom(name=PrefixedName('roll', stringified_name))
+            self._world.add_degree_of_freedom(self.roll)
+            self.pitch = DegreeOfFreedom(name=PrefixedName('pitch', stringified_name))
+            self._world.add_degree_of_freedom(self.pitch)
+            self.yaw = DegreeOfFreedom(
                 name=PrefixedName('yaw', stringified_name),
                 lower_limits=lower_rotation_limits,
                 upper_limits=upper_rotation_limits)
+            self._world.add_degree_of_freedom(self.yaw)
 
-            self.x_vel = self._world.create_degree_of_freedom(
+            self.x_vel = DegreeOfFreedom(
                 name=PrefixedName('x_vel', stringified_name),
                 lower_limits=lower_translation_limits,
                 upper_limits=upper_translation_limits)
-            self.y_vel = self._world.create_degree_of_freedom(
+            self._world.add_degree_of_freedom(self.x_vel)
+            self.y_vel = DegreeOfFreedom(
                 name=PrefixedName('y_vel', stringified_name),
                 lower_limits=lower_translation_limits,
                 upper_limits=upper_translation_limits)
+            self._world.add_degree_of_freedom(self.y_vel)
         elif any(dof is None for dof in self.passive_dofs):
             raise ValueError("OmniDrive can only be created "
                              "if you provide all or none of the passive degrees of freedom")
