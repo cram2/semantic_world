@@ -23,7 +23,8 @@ from semantic_world.connections import (
     FixedConnection, RevoluteConnection, PrismaticConnection, Connection6DoF
 )
 from semantic_world.degree_of_freedom import DegreeOfFreedom
-from semantic_world.geometry import Box, Cylinder, Sphere
+from semantic_world.geometry import Box, Cylinder, Sphere, Scale
+from semantic_world.spatial_types import TransformationMatrix
 ```
 
 ## Connection Type Hierarchy
@@ -75,20 +76,20 @@ with world.modify_world():
     # Create a set of test bodies for different connection examples
     base_platform = Body(
         name="base_platform",
-        visual=[Box(size=[0.8, 0.8, 0.1])],
-        collision=[Box(size=[0.8, 0.8, 0.1])]
+        visual=[Box(scale=Scale(x=0.8, y=0.8, z=0.1))],
+        collision=[Box(scale=Scale(x=0.8, y=0.8, z=0.1))]
     )
     
     rotating_arm = Body(
         name="rotating_arm", 
-        visual=[Box(size=[0.05, 0.05, 0.4])],
-        collision=[Box(size=[0.05, 0.05, 0.4])]
+        visual=[Box(scale=Scale(x=0.05, y=0.05, z=0.4))],
+        collision=[Box(scale=Scale(x=0.05, y=0.05, z=0.4))]
     )
     
     sliding_block = Body(
         name="sliding_block",
-        visual=[Box(size=[0.1, 0.1, 0.1])],
-        collision=[Box(size=[0.1, 0.1, 0.1])]
+        visual=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))],
+        collision=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]
     )
     
     floating_object = Body(
@@ -128,7 +129,7 @@ with world.modify_world():
     # Set the fixed transform (optional, defaults to identity)
     fixed_transform = np.eye(4)
     fixed_transform[:3, 3] = [0.2, 0.2, 0.1]  # Offset position
-    fixed_conn.origin = fixed_transform
+    fixed_conn.origin = TransformationMatrix(fixed_transform)
     
     print(f"Created fixed connection: {fixed_conn.parent.name} -> {fixed_conn.child.name}")
     print(f"Connection has {0} degrees of freedom")
@@ -234,7 +235,8 @@ with world.modify_world():
     # Instead, they use the full transformation matrix
     sixdof_conn = Connection6DoF(
         parent=base_platform,  # Often connected to world root
-        child=floating_object
+        child=floating_object,
+        _world=world  # Required for Connection6DoF
     )
     world.add_connection(sixdof_conn)
     

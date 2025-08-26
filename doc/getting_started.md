@@ -63,7 +63,7 @@ print(f"World contains {len(world.bodies)} bodies and {len(world.connections)} c
 Bodies represent physical objects in your world. They can have visual and collision geometry:
 
 ```python
-from semantic_world.geometry import Box, Sphere
+from semantic_world.geometry import Box, Sphere, Scale
 from semantic_world.world_entity import Body
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 
@@ -150,17 +150,17 @@ from semantic_world.world import World
 from semantic_world.world_entity import Body
 from semantic_world.connections import FixedConnection, RevoluteConnection
 from semantic_world.degree_of_freedom import DegreeOfFreedom
-from semantic_world.geometry import Box
+from semantic_world.geometry import Box, Scale
 import numpy as np
 
 # Create the world
 world = World()
 
 # Create bodies for the robot
-base = Body(name="base", visual=[Box(size=[0.2, 0.2, 0.1])])
-link1 = Body(name="link1", visual=[Box(size=[0.05, 0.05, 0.3])])  
-link2 = Body(name="link2", visual=[Box(size=[0.05, 0.05, 0.25])])
-end_effector = Body(name="end_effector", visual=[Box(size=[0.1, 0.05, 0.02])])
+base = Body(name="base", visual=[Box(scale=Scale(x=0.2, y=0.2, z=0.1))])
+link1 = Body(name="link1", visual=[Box(scale=Scale(x=0.05, y=0.05, z=0.3))])  
+link2 = Body(name="link2", visual=[Box(scale=Scale(x=0.05, y=0.05, z=0.25))])
+end_effector = Body(name="end_effector", visual=[Box(scale=Scale(x=0.1, y=0.05, z=0.02))])
 
 # Add bodies to world
 for body in [base, link1, link2, end_effector]:

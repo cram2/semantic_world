@@ -19,7 +19,7 @@ This notebook demonstrates comprehensive body creation, configuration, and manag
 import numpy as np
 from semantic_world.world import World
 from semantic_world.world_entity import Body
-from semantic_world.geometry import Box, Sphere, Cylinder, Mesh
+from semantic_world.geometry import Box, Sphere, Cylinder, Mesh, Scale
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.prefixed_name import PrefixedName
 ```
@@ -50,7 +50,7 @@ with world.modify_world():
     # Body with single visual shape
     box_body = Body(
         name="red_box",
-        visual=[Box(size=[1.0, 0.5, 0.2])]
+        visual=[Box(scale=Scale(x=1.0, y=0.5, z=0.2))]
     )
     world.add_body(box_body)
     
@@ -58,9 +58,9 @@ with world.modify_world():
     complex_visual = Body(
         name="complex_visual",
         visual=[
-            Box(size=[0.5, 0.5, 0.1]),
+            Box(scale=Scale(x=0.5, y=0.5, z=0.1)),
             Sphere(radius=0.2),
-            Cylinder(radius=0.1, height=0.8)
+            Cylinder(width=0.2, height=0.8)
         ]
     )
     world.add_body(complex_visual)
@@ -76,7 +76,7 @@ with world.modify_world():
     # Body with separate visual and collision geometry
     detailed_body = Body(
         name="detailed_object",
-        visual=[Box(size=[1.0, 0.8, 0.3])],  # Detailed visual
+        visual=[Box(scale=Scale(x=1.0, y=0.8, z=0.3))],  # Detailed visual
         collision=[Sphere(radius=0.6)]        # Simplified collision
     )
     world.add_body(detailed_body)
@@ -85,7 +85,7 @@ with world.modify_world():
     collision_optimized = Body(
         name="collision_object",
         visual=[Mesh(filename="complex_model.obj")],  # Complex visual mesh
-        collision=[Box(size=[0.5, 0.5, 0.5])]        # Simple collision box
+        collision=[Box(scale=Scale(x=0.5, y=0.5, z=0.5))]        # Simple collision box
     )
     world.add_body(collision_optimized)
     
@@ -112,11 +112,11 @@ with world.modify_world():
     positioned_body = Body(name="positioned_geometry")
     
     # Add geometry with custom poses
-    main_box = Box(size=[0.8, 0.3, 0.2])
-    offset_cylinder = Cylinder(radius=0.1, height=0.4)
+    main_box = Box(scale=Scale(x=0.8, y=0.3, z=0.2))
+    offset_cylinder = Cylinder(width=0.2, height=0.4)
     offset_cylinder.origin = TransformationMatrix(offset_transform)
     
-    rotated_box = Box(size=[0.2, 0.6, 0.1])  
+    rotated_box = Box(scale=Scale(x=0.2, y=0.6, z=0.1))  
     rotated_box.origin = TransformationMatrix(rotation_transform)
     
     positioned_body.visual = [main_box, offset_cylinder, rotated_box]
@@ -134,8 +134,8 @@ def create_table(name_prefix="table"):
         # Table top
         table_top = Body(
             name=PrefixedName("top", prefix=name_prefix),
-            visual=[Box(size=[1.2, 0.8, 0.05])],
-            collision=[Box(size=[1.2, 0.8, 0.05])]
+            visual=[Box(scale=Scale(x=1.2, y=0.8, z=0.05))],
+            collision=[Box(scale=Scale(x=1.2, y=0.8, z=0.05))]
         )
         world.add_body(table_top)
         
@@ -204,8 +204,8 @@ with world.modify_world():
     # Valid body
     valid_body = Body(
         name="valid_test_body",
-        visual=[Box(size=[0.1, 0.1, 0.1])],
-        collision=[Box(size=[0.1, 0.1, 0.1])]
+        visual=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))],
+        collision=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]
     )
     world.add_body(valid_body)
     
