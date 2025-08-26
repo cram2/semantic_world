@@ -120,15 +120,16 @@ world = World()
 parent = Body(name="parent")
 child = Body(name="child") 
 
-world.add_body(parent)
-world.add_body(child)
+with world.modify_world():
+    world.add_body(parent)
+    world.add_body(child)
 
-# Create connection with offset
-connection = FixedConnection(parent=parent, child=child)
-transform = np.eye(4)
-transform[:3, 3] = [1, 2, 3]  # Offset position
-connection.origin_expression.matrix = transform
-world.add_connection(connection)
+    # Create connection with offset
+    connection = FixedConnection(parent=parent, child=child)
+    transform = np.eye(4)
+    transform[:3, 3] = [1, 2, 3]  # Offset position
+    connection.origin_expression.matrix = transform
+    world.add_connection(connection)
 
 # Get global poses
 parent_pose = parent.global_pose
@@ -168,16 +169,17 @@ def create_body_chain(world, names, parent=None):
     """Create a chain of bodies connected by fixed connections"""
     bodies = []
     
-    for name in names:
-        body = Body(name=name)
-        world.add_body(body)
-        bodies.append(body)
-        
-        if parent is not None:
-            connection = FixedConnection(parent=parent, child=body)
-            world.add_connection(connection)
-        
-        parent = body  # This body becomes parent of next
+    with world.modify_world():
+        for name in names:
+            body = Body(name=name)
+            world.add_body(body)
+            bodies.append(body)
+            
+            if parent is not None:
+                connection = FixedConnection(parent=parent, child=body)
+                world.add_connection(connection)
+            
+            parent = body  # This body becomes parent of next
     
     return bodies
 
@@ -313,15 +315,17 @@ table_leg4 = Body(name="table_leg4", visual=[Cylinder(radius=0.03, height=0.8)])
 
 world = World()
 table_bodies = [table_top, table_leg1, table_leg2, table_leg3, table_leg4]
-for body in table_bodies:
-    world.add_body(body)
 
-# Create table view
-table_view = Table(
-    bodies=table_bodies,
-    name="dining_table"
-)
-world.add_view(table_view)
+with world.modify_world():
+    for body in table_bodies:
+        world.add_body(body)
+
+    # Create table view
+    table_view = Table(
+        bodies=table_bodies,
+        name="dining_table"
+    )
+    world.add_view(table_view)
 
 # Bodies can be in multiple views
 print(f"Table top is in {len(table_top._views)} views")
@@ -475,10 +479,11 @@ template_body = Body(
 
 # Make copies for repeated structures
 copies = []
-for i in range(3):
-    copy = copy_body(template_body, f"copy_{i}")
-    copies.append(copy)
-    world.add_body(copy)
+with world.modify_world():
+    for i in range(3):
+        copy = copy_body(template_body, f"copy_{i}")
+        copies.append(copy)
+        world.add_body(copy)
 ```
 
 ### Body Validation
@@ -564,16 +569,17 @@ robot_links = [
 
 # Add to world and connect
 world = World()
-for link in robot_links:
-    world.add_body(link)
+with world.modify_world():
+    for link in robot_links:
+        world.add_body(link)
 
-# Connect in chain
-for i in range(1, len(robot_links)):
-    connection = FixedConnection(
-        parent=robot_links[i-1],
-        child=robot_links[i]
-    )
-    world.add_connection(connection)
+    # Connect in chain
+    for i in range(1, len(robot_links)):
+        connection = FixedConnection(
+            parent=robot_links[i-1],
+            child=robot_links[i]
+        )
+        world.add_connection(connection)
 
 print(f"Created robot with {len(robot_links)} links")
 world.validate()

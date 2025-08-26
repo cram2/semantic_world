@@ -31,13 +31,14 @@ def create_robot_manipulator():
     
     world = World()
     
-    # Create robot base
-    base = Body(
-        name="robot_base",
-        visual=[Cylinder(radius=0.2, height=0.1)],
-        collision=[Cylinder(radius=0.2, height=0.1)]
-    )
-    world.add_body(base)
+    with world.modify_world():
+        # Create robot base
+        base = Body(
+            name="robot_base",
+            visual=[Cylinder(radius=0.2, height=0.1)],
+            collision=[Cylinder(radius=0.2, height=0.1)]
+        )
+        world.add_body(base)
     
     # Define DH parameters for the robot
     # [theta, d, a, alpha] for each joint
@@ -54,47 +55,48 @@ def create_robot_manipulator():
     bodies = [base]
     joints = []
     
-    for i, (theta, d, a, alpha) in enumerate(dh_params):
-        # Create link body
-        if i < 2:  # First two links are larger
-            link_visual = Box(size=[0.1, 0.1, 0.3])
-        else:  # Smaller wrist links
-            link_visual = Box(size=[0.08, 0.08, 0.2])
+    with world.modify_world():
+        for i, (theta, d, a, alpha) in enumerate(dh_params):
+            # Create link body
+            if i < 2:  # First two links are larger
+                link_visual = Box(size=[0.1, 0.1, 0.3])
+            else:  # Smaller wrist links
+                link_visual = Box(size=[0.08, 0.08, 0.2])
+                
+            link = Body(
+                name=f"link_{i+1}",
+                visual=[link_visual],
+                collision=[link_visual]
+            )
+            world.add_body(link)
+            bodies.append(link)
             
-        link = Body(
-            name=f"link_{i+1}",
-            visual=[link_visual],
-            collision=[link_visual]
-        )
-        world.add_body(link)
-        bodies.append(link)
-        
-        # Create joint DOF
-        joint_dof = DegreeOfFreedom(
-            name=f"joint_{i+1}",
-            lower_limit=-np.pi,
-            upper_limit=np.pi,
-            velocity_limit=2.0,
-            acceleration_limit=5.0
-        )
-        
-        # Create revolute joint
-        joint = RevoluteConnection(
-            parent=bodies[i],
-            child=link,
-            dof=joint_dof,
-            axis=[0, 0, 1]  # All joints rotate around Z
-        )
-        
-        # Set joint transform based on DH parameters
-        transform = np.eye(4)
-        # Simplified DH transform (modify as needed)
-        transform[2, 3] = d  # Translation in Z
-        transform[0, 3] = a  # Translation in X
-        joint.origin_expression.matrix = transform
-        
-        world.add_connection(joint)
-        joints.append(joint)
+            # Create joint DOF
+            joint_dof = DegreeOfFreedom(
+                name=f"joint_{i+1}",
+                lower_limit=-np.pi,
+                upper_limit=np.pi,
+                velocity_limit=2.0,
+                acceleration_limit=5.0
+            )
+            
+            # Create revolute joint
+            joint = RevoluteConnection(
+                parent=bodies[i],
+                child=link,
+                dof=joint_dof,
+                axis=[0, 0, 1]  # All joints rotate around Z
+            )
+            
+            # Set joint transform based on DH parameters
+            transform = np.eye(4)
+            # Simplified DH transform (modify as needed)
+            transform[2, 3] = d  # Translation in Z
+            transform[0, 3] = a  # Translation in X
+            joint.origin_expression.matrix = transform
+            
+            world.add_connection(joint)
+            joints.append(joint)
     
     # Add gripper
     gripper_base, gripper_joints = create_parallel_gripper(world, bodies[-1])
@@ -104,17 +106,18 @@ def create_robot_manipulator():
 def create_parallel_gripper(world, parent_body):
     """Create a parallel jaw gripper"""
     
-    # Gripper base
-    gripper_base = Body(
-        name="gripper_base",
-        visual=[Box(size=[0.08, 0.06, 0.04])],
-        collision=[Box(size=[0.08, 0.06, 0.04])]
-    )
-    world.add_body(gripper_base)
-    
-    # Mount gripper to parent
-    gripper_mount = FixedConnection(parent=parent_body, child=gripper_base)
-    world.add_connection(gripper_mount)
+    with world.modify_world():
+        # Gripper base
+        gripper_base = Body(
+            name="gripper_base",
+            visual=[Box(size=[0.08, 0.06, 0.04])],
+            collision=[Box(size=[0.08, 0.06, 0.04])]
+        )
+        world.add_body(gripper_base)
+        
+        # Mount gripper to parent
+        gripper_mount = FixedConnection(parent=parent_body, child=gripper_base)
+        world.add_connection(gripper_mount)
     
     # Shared DOF for synchronized finger movement
     grip_dof = DegreeOfFreedom(
@@ -125,39 +128,39 @@ def create_parallel_gripper(world, parent_body):
         acceleration_limit=0.5
     )
     
-    # Left finger
-    left_finger = Body(
-        name="left_finger",
-        visual=[Box(size=[0.02, 0.01, 0.06])],
-        collision=[Box(size=[0.02, 0.01, 0.06])]
-    )
-    world.add_body(left_finger)
-    
-    left_joint = PrismaticConnection(
-        parent=gripper_base,
-        child=left_finger,
-        dof=grip_dof,
-        axis=[-1, 0, 0]  # Move in -X direction
-    )
-    world.add_connection(left_joint)
-    
-    # Right finger (mirror of left)
-    right_finger = Body(
-        name="right_finger", 
-        visual=[Box(size=[0.02, 0.01, 0.06])],
-        collision=[Box(size=[0.02, 0.01, 0.06])]
-    )
-    world.add_body(right_finger)
-    
-    right_joint = PrismaticConnection(
-        parent=gripper_base,
-        child=right_finger,
-        dof=grip_dof,  # Same DOF for synchronized motion
-        axis=[1, 0, 0]  # Move in +X direction
-    )
-    world.add_connection(right_joint)
-    
-    return gripper_base, [gripper_mount, left_joint, right_joint]
+        # Left finger
+        left_finger = Body(
+            name="left_finger",
+            visual=[Box(size=[0.02, 0.01, 0.06])],
+            collision=[Box(size=[0.02, 0.01, 0.06])]
+        )
+        world.add_body(left_finger)
+        
+        left_joint = PrismaticConnection(
+            parent=gripper_base,
+            child=left_finger,
+            dof=grip_dof,
+            axis=[-1, 0, 0]  # Move in -X direction
+        )
+        world.add_connection(left_joint)
+        
+        # Right finger (mirror of left)
+        right_finger = Body(
+            name="right_finger", 
+            visual=[Box(size=[0.02, 0.01, 0.06])],
+            collision=[Box(size=[0.02, 0.01, 0.06])]
+        )
+        world.add_body(right_finger)
+        
+        right_joint = PrismaticConnection(
+            parent=gripper_base,
+            child=right_finger,
+            dof=grip_dof,  # Same DOF for synchronized motion
+            axis=[1, 0, 0]  # Move in +X direction
+        )
+        world.add_connection(right_joint)
+        
+        return gripper_base, [gripper_mount, left_joint, right_joint]
 
 # Create and configure the robot
 robot_world, robot_bodies, robot_joints = create_robot_manipulator()
@@ -199,15 +202,16 @@ def create_mobile_manipulator():
     
     world = World()
     
-    # === Mobile Base ===
-    
-    # Main chassis
-    chassis = Body(
-        name="chassis",
-        visual=[Box(size=[0.6, 0.4, 0.2])],
-        collision=[Box(size=[0.6, 0.4, 0.2])]
-    )
-    world.add_body(chassis)
+    with world.modify_world():
+        # === Mobile Base ===
+        
+        # Main chassis
+        chassis = Body(
+            name="chassis",
+            visual=[Box(size=[0.6, 0.4, 0.2])],
+            collision=[Box(size=[0.6, 0.4, 0.2])]
+        )
+        world.add_body(chassis)
     
     # Create wheels
     wheel_radius = 0.1
@@ -336,8 +340,8 @@ def create_mobile_manipulator():
     world.add_connection(joint4)
     arm_joints.append(joint4)
     
-    # Add simple gripper
-    gripper, gripper_joints = create_parallel_gripper(world, link4)
+        # Add simple gripper
+        gripper, gripper_joints = create_parallel_gripper(world, link4)
     
     return world, {
         'chassis': chassis,

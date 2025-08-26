@@ -21,17 +21,18 @@ child_body = Body(name="child")
 
 ## Connection Hierarchy
 
-The semantic world supports several connection types:
+The semantic world supports several connection types. The hierarchy below is auto-generated from the actual class structure:
 
+```{eval-rst}
+.. literalinclude:: generate_connection_hierarchy.py
+   :language: python
+   :lines: 22-35
+   :dedent: 8
 ```
-Connection (base class)
-├── FixedConnection (rigid, 0 DOF)
-├── ActiveConnection (controllable DOF) 
-│   ├── RevoluteConnection (1 rotational DOF)
-│   ├── PrismaticConnection (1 translational DOF)
-│   └── Connection6DoF (up to 6 DOF)
-└── PassiveConnection (uncontrolled DOF)
-    └── Custom implementations possible
+
+```{eval-rst}
+.. program-output:: python doc/generate_connection_hierarchy.py
+   :cwd: ..
 ```
 
 ## Fixed Connections

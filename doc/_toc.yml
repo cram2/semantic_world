@@ -12,20 +12,22 @@ parts:
     - file: world_construction
     - file: body_management  
     - file: connection_types
+- caption: Examples & Tutorials
+  chapters:
     - file: examples
+    - file: notebooks/robot_manipulator
+    - file: notebooks/body_management_examples
+    - file: notebooks/connection_examples
+    - file: examples/graph_of_convex_sets
+    - file: examples/orm_querying
 - caption: Concepts
   chapters:
     - file: kinematic_world
     - file: views
     - file: world_reasoner
     - file: style_guide
-- caption: Examples
-  chapters:
-    - file: examples/graph_of_convex_sets
-    - file: examples/orm_querying
 - caption: References
   chapters:
-    - file: api_reference
+    - file: api/semantic_world/index
     - file: troubleshooting
-    - file: autoapi/index
     - file: bibliography
