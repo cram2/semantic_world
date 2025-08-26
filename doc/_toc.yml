@@ -25,5 +25,7 @@ parts:
     - file: examples/orm_querying
 - caption: References
   chapters:
+    - file: api_reference
+    - file: troubleshooting
     - file: autoapi/index
     - file: bibliography
