@@ -15,9 +15,9 @@ parts:
 - caption: Examples & Tutorials
   chapters:
     - file: examples
-    - file: notebooks/robot_manipulator
-    - file: notebooks/body_management_examples
-    - file: notebooks/connection_examples
+    - file: examples/robot_manipulator
+    - file: examples/body_management_examples
+    - file: examples/connection_examples
     - file: examples/graph_of_convex_sets
     - file: examples/orm_querying
 - caption: Concepts
