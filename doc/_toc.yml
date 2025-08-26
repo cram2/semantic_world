@@ -4,6 +4,15 @@
 format: jb-book
 root: intro
 parts:
+- caption: Getting Started
+  chapters:
+    - file: getting_started
+- caption: User Guides
+  chapters:
+    - file: world_construction
+    - file: body_management  
+    - file: connection_types
+    - file: examples
 - caption: Concepts
   chapters:
     - file: kinematic_world
