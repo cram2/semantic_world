@@ -123,7 +123,7 @@ class SymbolManager(metaclass=SingletonMeta):
             -> Union[np.ndarray, List[np.ndarray]]:
         """
         Given a list of symbols or a list of lists of symbols, returns a list of numeric values for each symbol computed using their providers.
-        Intended to be used in combination with `CompiledFunction.symbol_parameters` and `CompiledFunction.fast_call`.
+        Intended to be used in combination with `CompiledFunction.symbol_parameters` and `CompiledFunction`.
         """
         try:
             if len(symbols) == 0:
@@ -159,7 +159,7 @@ class SymbolManager(metaclass=SingletonMeta):
         f = expr.compile()
         if len(f.symbol_parameters) == 0:
             return expr.to_np()
-        result = f.fast_call(*self.resolve_symbols(f.symbol_parameters))
+        result = f(*self.resolve_symbols(f.symbol_parameters))
         if len(result) == 1:
             return result[0]
         else:

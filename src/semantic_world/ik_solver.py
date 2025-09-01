@@ -342,11 +342,11 @@ class QPProblem:
     def evaluate_at_state(self, solver_state) -> QPMatrices:
         """Evaluate QP matrices at the current solver state."""
         return QPMatrices(
-            H=np.diag(self.quadratic_weights_f.fast_call(solver_state.position, solver_state.passive_position)),
-            g=self.linear_weights_f.fast_call(solver_state.position, solver_state.passive_position),
-            A=self.A_f.fast_call(solver_state.position, solver_state.passive_position),
-            l=self.l_f.fast_call(solver_state.position, solver_state.passive_position),
-            u=self.u_f.fast_call(solver_state.position, solver_state.passive_position),
+            H=np.diag(self.quadratic_weights_f(solver_state.position, solver_state.passive_position)),
+            g=self.linear_weights_f(solver_state.position, solver_state.passive_position),
+            A=self.A_f(solver_state.position, solver_state.passive_position),
+            l=self.l_f(solver_state.position, solver_state.passive_position),
+            u=self.u_f(solver_state.position, solver_state.passive_position),
         )
 
 
@@ -460,11 +460,11 @@ class ConstraintBuilder:
         rotation_cap = self.max_rotation_velocity * self.dt
 
         hack = cas.RotationMatrix.from_axis_angle(cas.Vector3.Z(), -0.0001)
-        root_R_tip = root_T_tip.to_rotation().dot(hack)
+        root_R_tip = root_T_tip.to_rotation_matrix().dot(hack)
         q_actual = cas.TransformationMatrix(self.target).to_quaternion()
         q_goal = root_R_tip.to_quaternion()
         q_goal = cas.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
-        q_error = cas.quaternion_multiply(q_goal, cas.quaternion_conjugate(q_actual))
+        q_error = q_actual.diff(q_goal)
 
         rotation_error = -q_error
         for i in range(3):

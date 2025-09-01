@@ -169,7 +169,7 @@ def test_compute_fk_expression(world_setup):
     fk = world.compute_forward_kinematics_np(r2, l2)
     fk_expr = world.compose_forward_kinematics_expression(r2, l2)
     fk_expr_compiled = fk_expr.compile()
-    fk2 = fk_expr_compiled.fast_call(*symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
+    fk2 = fk_expr_compiled(*symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters))
     np.testing.assert_array_almost_equal(fk, fk2)
 
 

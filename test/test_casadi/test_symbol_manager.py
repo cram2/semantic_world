@@ -208,7 +208,7 @@ class TestSymbolManager:
         mock_expr = Mock()
         mock_compile = Mock()
         mock_compile.symbol_parameters = []
-        mock_compile.fast_call.return_value = [5.0]
+        mock_compile.__call__.return_value = [5.0]
         mock_expr.compile.return_value = mock_compile
         mock_expr.to_np.return_value = 5.0
 
