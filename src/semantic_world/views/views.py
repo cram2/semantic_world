@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 import numpy as np
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
-from typing_extensions import List
 
 from ..geometry import BoundingBoxCollection
 from ..prefixed_name import PrefixedName
