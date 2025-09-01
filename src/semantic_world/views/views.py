@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 
@@ -14,28 +15,71 @@ from ..world import View, Body
 
 
 @dataclass
-class ManipulationInfo:
+class ManipulationInfo(ABC):
     """
-    Stores semantic and manipulation-related information about an object.
+    Abstract base for manipulation semantics attached to Views.
 
     Attributes:
-        affordances: Possible actions the object supports (e.g., open, close, grasp).
-        manipulation_properties: Features relevant for manipulation (e.g., friction, weight, grasp types).
-        state_information: Dynamic state of the object (e.g., open/closed, on/off).
-        grasp_poses: Candidate grasp poses for the object.
-        effects: Effects that manipulating the object can produce on the environment.
-        description: Textual description of the object's purpose and characteristics.
-        joint_type: The type of joint associated with the object (e.g., revolute, prismatic).
-        joint_sim_name: Simulation name of the associated joint for physics engines.
+        affordances: Action primitives the object supports (e.g., 'open', 'pull', 'push').
+        description: Human-readable semantic summary for debugging / UI.
     """
     affordances: Optional[Dict[str, Any]] = None
-    manipulation_properties: Optional[Dict[str, Any]] = None
-    state_information: Optional[Dict[str, Any]] = None
-    grasp_poses: Optional[Any] = None
-    effects: Optional[Dict[str, Any]] = None
     description: Optional[str] = None
-    joint_type: Optional[str] = None
+
+
+@dataclass
+class HingedDoorInfo(ManipulationInfo):
+    """
+    Semantics for hinged door-like mechanisms.
+
+    Attributes:
+        joint_sim_name: Name of the hinge joint in the simulator (if available).
+        hinge_axis_body: Body name whose local axis defines the hinge axis (for reasoning).
+        state_information: Dynamic state (e.g., {'open': True, 'angle': 0.7}).
+        effects: Possible effects of actions (e.g., {'open': 'increases access'}).
+        grasp_poses: Candidate grasp poses for the handle / door edge.
+    """
     joint_sim_name: Optional[str] = None
+    hinge_axis_body: Optional[str] = None
+    state_information: Optional[Dict[str, Any]] = None
+    effects: Optional[Dict[str, Any]] = None
+    grasp_poses: Optional[Any] = None
+
+
+@dataclass
+class SlidingDrawerInfo(ManipulationInfo):
+    """
+    Semantics for sliding drawer-like mechanisms.
+
+    Attributes:
+        joint_sim_name: Name of the slide joint in the simulator (if available).
+        slide_axis_body: Body name whose local axis defines the slide direction.
+        state_information: Dynamic state (e.g., {'open': False, 'extent': 0.2}).
+        effects: Possible effects (e.g., {'open': 'exposes contents'}).
+        grasp_poses: Candidate grasp poses at the drawer handle / front.
+    """
+    joint_sim_name: Optional[str] = None
+    slide_axis_body: Optional[str] = None
+    state_information: Optional[Dict[str, Any]] = None
+    effects: Optional[Dict[str, Any]] = None
+    grasp_poses: Optional[Any] = None
+
+
+@dataclass
+class KnobControlInfo(ManipulationInfo):
+    """
+    Semantics for rotary knobs / controls.
+
+    Attributes:
+        joint_sim_name: Name of the rotary joint in the simulator (if available).
+        state_information: Current setting (e.g., {'level': 3}).
+        effects: Effects of adjustments (e.g., {'turn_right': 'increase heat'}).
+        grasp_poses: Candidate grasp poses around the knob.
+    """
+    joint_sim_name: Optional[str] = None
+    state_information: Optional[Dict[str, Any]] = None
+    effects: Optional[Dict[str, Any]] = None
+    grasp_poses: Optional[Any] = None
 
 
 @dataclass
@@ -146,7 +190,9 @@ class DoubleDoor(EntryWay):
 class Drawer(Components):
     container: Container
     handle: Handle
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [SlidingDrawerInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -173,7 +219,6 @@ class Cabinet(Cupboard):
     body: Body
     doors: List[Door] = field(default_factory=list, hash=False)
     drawers: List[Drawer] = field(default_factory=list, hash=False)
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -190,7 +235,9 @@ class Fridge(View):
     body: Body
     doors: List[Door] = field(default_factory=list, hash=False)
     drawers: List[Drawer] = field(default_factory=list, hash=False)
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [HingedDoorInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -202,7 +249,9 @@ class Microwave(View):
     body: Body
     door: Door
     handle: Handle
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [HingedDoorInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -214,7 +263,9 @@ class Oven(View):
     body: Body
     door: Door
     handle: Handle
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [HingedDoorInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -234,7 +285,9 @@ class Knob(View):
 class Stove(View):
     body: Body
     knobs: List[Knob] = field(default_factory=list, hash=False)
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [KnobControlInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -255,7 +308,9 @@ class Sink(View):
     body: Body
     faucet: Faucet
     handles: List[Handle] = field(default_factory=list, hash=False)
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [KnobControlInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -267,7 +322,9 @@ class Dishwasher(View):
     body: Body
     door: Optional[Door] = None
     handle: Optional[Handle] = None
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
+    manipulation_info: List[ManipulationInfo] = field(
+        default_factory=lambda: [HingedDoorInfo()]
+    )
 
     def __post_init__(self):
         if self.name is None:
@@ -278,7 +335,6 @@ class Dishwasher(View):
 class Counter(View):
     body: Body
     containers: List[Container] = field(default_factory=list, hash=False)
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -289,7 +345,6 @@ class Counter(View):
 class CoffeeMachine(View):
     body: Body
     handles: List[Handle] = field(default_factory=list, hash=False)
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -299,7 +354,6 @@ class CoffeeMachine(View):
 @dataclass(unsafe_hash=True)
 class Hood(View):
     body: Body
-    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
