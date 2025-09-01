@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
 
 import numpy as np
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
@@ -11,6 +12,21 @@ from ..prefixed_name import PrefixedName
 from ..spatial_types import Point3
 from ..variables import SpatialVariables
 from ..world import View, Body
+
+
+@dataclass
+class OntologyView(View):
+    """
+    Base view class with ontology properties.
+    """
+    affordances: Optional[Dict[str, Any]] = None
+    manipulation_properties: Optional[Dict[str, Any]] = None
+    state_information: Optional[Dict[str, Any]] = None
+    grasp_poses: Optional[Any] = None
+    effects: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    joint_type: Optional[str] = None
+    joint_sim_name: Optional[str] = None
 
 
 @dataclass
@@ -50,32 +66,6 @@ class Container(View):
 
 
 @dataclass(unsafe_hash=True)
-class Door(View):  # Door has a Footprint
-    """
-    Door in a body that has a Handle and can open towards or away from the user.
-    """
-
-    handle: Handle
-    body: Body
-
-    def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
-
-
-@dataclass(unsafe_hash=True)
-class Fridge(View):
-    """
-    A view representing a fridge that has a door and a body.
-    """
-    body: Body
-    door: Door
-
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
-
-
-@dataclass(unsafe_hash=True)
 class Table(View):
     """
     A view that represents a table.
@@ -108,9 +98,6 @@ class Table(View):
         self.name = self.top.name
 
 
-################################
-
-
 @dataclass(unsafe_hash=True)
 class Components(View): ...
 
@@ -118,8 +105,6 @@ class Components(View): ...
 @dataclass(unsafe_hash=True)
 class Furniture(View): ...
 
-
-#################### subclasses von Components
 
 @dataclass(unsafe_hash=True)
 class EntryWay(Components):
@@ -139,16 +124,6 @@ class Door(EntryWay):
 
 
 @dataclass(unsafe_hash=True)
-class Fridge(View):
-    body: Body
-    door: Door
-
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
-
-
-@dataclass(unsafe_hash=True)
 class DoubleDoor(EntryWay):
     left_door : Door
     right_door : Door
@@ -159,7 +134,7 @@ class DoubleDoor(EntryWay):
 
 
 @dataclass(unsafe_hash=True)
-class Drawer(Components):
+class Drawer(Components, OntologyView):
     container: Container
     handle: Handle
 
@@ -168,7 +143,6 @@ class Drawer(Components):
             self.name = self.container.name
 
 
-############################### subclasses to Furniture
 @dataclass
 class Cupboard(Furniture): ...
 
@@ -184,19 +158,132 @@ class Dresser(Furniture):
             self.name = self.container.name
 
 
-############################### subclasses to Cupboard
 @dataclass(unsafe_hash=True)
-class Cabinet(Cupboard):
-    container: Container
-    drawers: list[Drawer] = field(default_factory=list, hash=False)
+class Cabinet(Cupboard, OntologyView):
+    body: Body
+    doors: List[Door] = field(default_factory=list, hash=False)
+    drawers: List[Drawer] = field(default_factory=list, hash=False)
 
     def __post_init__(self):
-        self.name = self.container.name
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 
 @dataclass
 class Wardrobe(Cupboard):
     doors: List[Door] = field(default_factory=list)
+
+
+@dataclass(unsafe_hash=True)
+class Fridge(OntologyView):
+    body: Body
+    doors: List[Door] = field(default_factory=list, hash=False)
+    drawers: List[Drawer] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Microwave(OntologyView):
+    body: Body
+    door: Door
+    handle: Handle
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Oven(OntologyView):
+    body: Body
+    door: Door
+    handle: Handle
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Knob(View):
+    body: Body
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Stove(OntologyView):
+    body: Body
+    knobs: List[Knob] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Faucet(View):
+    body: Body
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Sink(OntologyView):
+    body: Body
+    faucet: Faucet
+    handles: List[Handle] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Dishwasher(OntologyView):
+    body: Body
+    door: Optional[Door] = None
+    handle: Optional[Handle] = None
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Counter(OntologyView):
+    body: Body
+    containers: List[Container] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class CoffeeMachine(OntologyView):
+    body: Body
+    handles: List[Handle] = field(default_factory=list, hash=False)
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
+
+@dataclass(unsafe_hash=True)
+class Hood(OntologyView):
+    body: Body
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
 
 @dataclass
