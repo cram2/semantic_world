@@ -14,9 +14,19 @@ from ..world import View, Body
 
 
 @dataclass
-class OntologyView(View):
+class ManipulationInfo:
     """
-    Base view class with ontology properties.
+    Stores semantic and manipulation-related information about an object.
+
+    Attributes:
+        affordances: Possible actions the object supports (e.g., open, close, grasp).
+        manipulation_properties: Features relevant for manipulation (e.g., friction, weight, grasp types).
+        state_information: Dynamic state of the object (e.g., open/closed, on/off).
+        grasp_poses: Candidate grasp poses for the object.
+        effects: Effects that manipulating the object can produce on the environment.
+        description: Textual description of the object's purpose and characteristics.
+        joint_type: The type of joint associated with the object (e.g., revolute, prismatic).
+        joint_sim_name: Simulation name of the associated joint for physics engines.
     """
     affordances: Optional[Dict[str, Any]] = None
     manipulation_properties: Optional[Dict[str, Any]] = None
@@ -133,9 +143,10 @@ class DoubleDoor(EntryWay):
 
 
 @dataclass(unsafe_hash=True)
-class Drawer(Components, OntologyView):
+class Drawer(Components):
     container: Container
     handle: Handle
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -158,10 +169,11 @@ class Dresser(Furniture):
 
 
 @dataclass(unsafe_hash=True)
-class Cabinet(Cupboard, OntologyView):
+class Cabinet(Cupboard):
     body: Body
     doors: List[Door] = field(default_factory=list, hash=False)
     drawers: List[Drawer] = field(default_factory=list, hash=False)
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -174,10 +186,11 @@ class Wardrobe(Cupboard):
 
 
 @dataclass(unsafe_hash=True)
-class Fridge(OntologyView):
+class Fridge(View):
     body: Body
     doors: List[Door] = field(default_factory=list, hash=False)
     drawers: List[Drawer] = field(default_factory=list, hash=False)
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -185,10 +198,11 @@ class Fridge(OntologyView):
 
 
 @dataclass(unsafe_hash=True)
-class Microwave(OntologyView):
+class Microwave(View):
     body: Body
     door: Door
     handle: Handle
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -196,10 +210,11 @@ class Microwave(OntologyView):
 
 
 @dataclass(unsafe_hash=True)
-class Oven(OntologyView):
+class Oven(View):
     body: Body
     door: Door
     handle: Handle
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -216,9 +231,10 @@ class Knob(View):
 
 
 @dataclass(unsafe_hash=True)
-class Stove(OntologyView):
+class Stove(View):
     body: Body
     knobs: List[Knob] = field(default_factory=list, hash=False)
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -235,10 +251,11 @@ class Faucet(View):
 
 
 @dataclass(unsafe_hash=True)
-class Sink(OntologyView):
+class Sink(View):
     body: Body
     faucet: Faucet
     handles: List[Handle] = field(default_factory=list, hash=False)
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -246,10 +263,11 @@ class Sink(OntologyView):
 
 
 @dataclass(unsafe_hash=True)
-class Dishwasher(OntologyView):
+class Dishwasher(View):
     body: Body
     door: Optional[Door] = None
     handle: Optional[Handle] = None
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -257,9 +275,10 @@ class Dishwasher(OntologyView):
 
 
 @dataclass(unsafe_hash=True)
-class Counter(OntologyView):
+class Counter(View):
     body: Body
     containers: List[Container] = field(default_factory=list, hash=False)
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -267,9 +286,10 @@ class Counter(OntologyView):
 
 
 @dataclass(unsafe_hash=True)
-class CoffeeMachine(OntologyView):
+class CoffeeMachine(View):
     body: Body
     handles: List[Handle] = field(default_factory=list, hash=False)
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
@@ -277,8 +297,9 @@ class CoffeeMachine(OntologyView):
 
 
 @dataclass(unsafe_hash=True)
-class Hood(OntologyView):
+class Hood(View):
     body: Body
+    manipulation_info: ManipulationInfo = field(default_factory=ManipulationInfo)
 
     def __post_init__(self):
         if self.name is None:
