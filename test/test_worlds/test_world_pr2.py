@@ -12,25 +12,7 @@ from semantic_world.robots import PR2
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.world import World, Body
-
-
-@pytest.fixture
-def pr2_world():
-    urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
-    pr2 = os.path.join(urdf_dir, "pr2_kinematic_tree.urdf")
-    world = World()
-    with world.modify_world():
-        localization_body = Body(name=PrefixedName('odom_combined'))
-        world.add_body(localization_body)
-
-        pr2_parser = URDFParser(pr2)
-        world_with_pr2 = pr2_parser.parse()
-        # world_with_pr2.plot_kinematic_structure()
-        pr2_root = world_with_pr2.root
-        world.merge_world(world_with_pr2)
-        c_root_bf = OmniDrive(parent=localization_body, child=pr2_root, _world=world)
-        world.add_connection(c_root_bf)
-    return world
+from semantic_world.testing import pr2_world
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world):
@@ -162,9 +144,9 @@ def test_compute_ik_unreachable(pr2_world):
 def test_apply_control_commands_omni_drive_pr2(pr2_world):
     omni_drive: OmniDrive = pr2_world.get_connection_by_name('odom_combined_T_base_footprint')
     cmd = np.zeros((len(pr2_world.degrees_of_freedom)), dtype=float)
-    cmd[-3] = 100
-    cmd[-2] = 100
-    cmd[-1] = 100
+    cmd[pr2_world.state._index[omni_drive.x_vel.name]] = 100
+    cmd[pr2_world.state._index[omni_drive.y_vel.name]] = 100
+    cmd[pr2_world.state._index[omni_drive.yaw.name]] = 100
     dt = 0.1
     pr2_world.apply_control_commands(cmd, dt, Derivatives.jerk)
     assert pr2_world.state[omni_drive.yaw.name].jerk == 100.

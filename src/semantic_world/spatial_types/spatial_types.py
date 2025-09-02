@@ -4,15 +4,16 @@ import builtins
 import copy
 import math
 from collections import defaultdict
-from copy import copy
+from copy import copy, deepcopy
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Union, TypeVar
+from typing import Union, TypeVar, TYPE_CHECKING, Optional
 
 import casadi as ca
 import numpy as np
 
-from ..prefixed_name import PrefixedName
+if TYPE_CHECKING:
+    from ..world_entity import Body
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -24,7 +25,7 @@ pi = ca.pi
 
 @dataclass
 class ReferenceFrameMixin:
-    reference_frame: PrefixedName
+    reference_frame: Optional[Body]
 
 
 class StackedCompiledFunction:
@@ -622,7 +623,8 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
                 result = RotationMatrix(result, reference_frame=self.reference_frame, sanity_check=False)
                 return result
             if isinstance(other, TransformationMatrix):
-                result = TransformationMatrix(result, reference_frame=self.reference_frame, child_frame=other.child_frame,
+                result = TransformationMatrix(result, reference_frame=self.reference_frame,
+                                              child_frame=other.child_frame,
                                               sanity_check=False)
                 return result
         raise _operation_type_error(self, 'dot', other)
@@ -672,6 +674,16 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
 
     def to_quaternion(self):
         return Quaternion.from_rotation_matrix(self)
+
+    def __deepcopy__(self, memo) -> TransformationMatrix:
+        """
+        Even in a deep copy, we don't want to copy the reference and child frame, just the matrix itself.
+        """
+        if id(self) in memo:
+            return memo[id(self)]
+        return TransformationMatrix(deepcopy(self.s),
+                                    reference_frame=self.reference_frame,
+                                    child_frame=self.child_frame)
 
 
 class RotationMatrix(Symbol_, ReferenceFrameMixin):
@@ -1404,10 +1416,12 @@ class Quaternion(Symbol_, ReferenceFrameMixin):
 
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, Quaternion]
-all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, float, Quaternion]
+all_expressions_float = Union[
+    Symbol, Expression, Point3, Vector3, RotationMatrix, TransformationMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float, int, IntEnum]
 symbol_expr = Union[Symbol, Expression]
-PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransformationMatrix, RotationMatrix, Quaternion, Expression)
+PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransformationMatrix, RotationMatrix, Quaternion,
+                           Expression)
 
 
 def var(variables_names: str):

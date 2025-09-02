@@ -6,6 +6,8 @@ import unittest
 import pytest
 from numpy.ma.testutils import assert_equal
 
+from semantic_world.reasoner import WorldReasoner
+
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer
     from PyQt6.QtWidgets import QApplication
@@ -16,12 +18,11 @@ except ImportError as e:
 
 from typing_extensions import Type, Optional, Callable
 
-from ripple_down_rules.datastructures.dataclasses import CaseQuery
-from ripple_down_rules.rdr import GeneralRDR
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views import *
+
 try:
-    from semantic_world.views.world_rdr import world_rdr
+    from semantic_world.world_rdr import world_rdr
 except ImportError as e:
     world_rdr = None
 from semantic_world.world import World
@@ -82,11 +83,6 @@ class ViewTestCase(unittest.TestCase):
 
         assert_equal(world_view.aggregated_bodies, set(self.kitchen_world.bodies))
 
-    def test_id(self):
-        v1 = Handle(1)
-        v2 = Handle(2)
-        self.assertTrue(v1 is not v2)
-
     def test_handle_view(self):
         self.fit_rules_for_a_view_in_apartment(Handle, scenario=self.test_handle_view)
 
@@ -118,29 +114,27 @@ class ViewTestCase(unittest.TestCase):
 
     @pytest.mark.order("second_to_last")
     def test_apartment_views(self):
-        rdr = self.fit_views_and_get_rdr(self.apartment_world, [Handle, Container, Drawer, Cabinet],
-                                         world_factory=self.get_apartment_world, scenario=self.test_apartment_views)
+        world_reasoner = WorldReasoner(self.apartment_world)
+        world_reasoner.fit_views([Handle, Container, Drawer, Cabinet],
+                                 world_factory=self.get_apartment_world, scenario=self.test_apartment_views)
 
-        found_views = rdr.classify(self.apartment_world)
+        found_views = world_reasoner.infer_views()
 
-        drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
-                                  type(v) is Container]
+        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
 
         self.assertTrue(len(drawer_container_names) == 19)
 
     @pytest.mark.order("last")
     def test_kitchen_views(self):
-        rdr = self.fit_views_and_get_rdr(self.kitchen_world, [Handle, Container, Drawer, Cabinet],
-                                         world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
+        world_reasoner = WorldReasoner(self.kitchen_world)
+        world_reasoner.fit_views([Handle, Container, Drawer, Cabinet],
+                                 world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
 
-        found_views = rdr.classify(self.kitchen_world)
+        found_views = world_reasoner.infer_views()
 
-        drawer_container_names = [v.body.name.name for values in found_views.values() for v in values if
-                                  type(v) is Container]
+        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
+
         self.assertTrue(len(drawer_container_names) == 14)
-
-
-
 
     @classmethod
     def get_kitchen_world(cls) -> World:
@@ -187,7 +181,8 @@ class ViewTestCase(unittest.TestCase):
                                              update_existing_views=update_existing_views,
                                              world_factory=self.get_apartment_world, scenario=scenario)
 
-    def fit_rules_for_a_view_and_assert(self, world: World, view_type: Type[View], update_existing_views: bool = False,
+    @staticmethod
+    def fit_rules_for_a_view_and_assert(world: World, view_type: Type[View], update_existing_views: bool = False,
                                         world_factory: Optional[Callable] = None,
                                         scenario: Optional[Callable] = None) -> None:
         """
@@ -199,61 +194,10 @@ class ViewTestCase(unittest.TestCase):
         :param world_factory: Optional callable that can be used to recreate the world object.
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
-        rdr = self.fit_views_and_get_rdr(world, [view_type], update_existing_views=update_existing_views,
-                                         world_factory=world_factory, scenario=scenario)
+        world_reasoner = WorldReasoner(world)
+        world_reasoner.fit_views([view_type], update_existing_views=update_existing_views,
+                                 world_factory=world_factory, scenario=scenario)
 
-        found_views = rdr.classify(world)['views']
+        found_views = world_reasoner.infer_views()
 
         assert any(isinstance(v, view_type) for v in found_views)
-
-    def fit_views_and_get_rdr(self, world: World, required_views: List[Type[View]],
-                              update_existing_views: bool = False, world_factory: Optional[Callable] = None,
-                              scenario: Optional[Callable] = None) -> GeneralRDR:
-        """
-        Fit rules to the specified views in the given world and return the RDR.
-
-        :param world: The world to fit the views to.
-        :param required_views: A list of view types that the RDR should be fitted to.
-        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
-        :param world_factory: Optional callable that can be used to recreate the world object.
-        :param scenario: Optional callable that represents the test method or scenario that is being executed.
-        :return: An instance of GeneralRDR fitted to the specified views.
-        """
-        rdr = self.load_or_create_rdr()
-
-        self.fit_rdr_to_views(rdr, required_views, world, update_existing_views=update_existing_views,
-                              world_factory=world_factory, scenario=scenario)
-        rdr.save(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
-
-        return rdr
-
-    def load_or_create_rdr(self) -> GeneralRDR:
-        """
-        Load an existing RDR or create a new one if it does not exist.
-
-        :return: An instance of GeneralRDR loaded from the specified directory or a new instance of GeneralRDR.
-        """
-        if not os.path.exists(os.path.join(self.views_dir, self.views_rdr_model_name)):
-            return GeneralRDR(save_dir=self.views_dir, model_name=self.views_rdr_model_name)
-        else:
-            rdr = GeneralRDR.load(self.views_dir, self.views_rdr_model_name, package_name="semantic_world")
-        return rdr
-
-    @staticmethod
-    def fit_rdr_to_views(rdr: GeneralRDR, required_views: List[Type[View]], world: World,
-                         update_existing_views: bool = False,
-                         world_factory: Optional[Callable] = None,
-                         scenario: Optional[Callable] = None) -> None:
-        """
-        Fits the given RDR to the required views in the world.
-
-        :param rdr: The RDR to fit.
-        :param required_views: A list of view types that the RDR should be fitted to.
-        :param world: The world that contains or should contain the views.
-        :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
-        :param world_factory: Optional callable that can be used to recreate the world object.
-        :param scenario: Optional callable that represents the test method or scenario that is being executed.
-        """
-        for view in required_views:
-            case_query = CaseQuery(world, "views", (view,), False, case_factory=world_factory, scenario=scenario)
-            rdr.fit_case(case_query, update_existing_rules=update_existing_views)

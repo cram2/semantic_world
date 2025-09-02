@@ -291,11 +291,11 @@ class QPProblem:
             if isinstance(connection, PassiveConnection):
                 passive_dofs_set.update(connection.passive_dofs)
 
-        active_dofs = list(sorted(active_dofs_set, key=lambda d: str(d.name)))
-        passive_dofs = list(sorted(passive_dofs_set, key=lambda d: str(d.name)))
+        active_dofs: List[DegreeOfFreedom] = list(sorted(active_dofs_set, key=lambda d: str(d.name)))
+        passive_dofs: List[DegreeOfFreedom] = list(sorted(passive_dofs_set, key=lambda d: str(d.name)))
 
-        active_symbols = [dof.position_symbol for dof in active_dofs]
-        passive_symbols = [dof.position_symbol for dof in passive_dofs]
+        active_symbols = [dof.symbols.position for dof in active_dofs]
+        passive_symbols = [dof.symbols.position for dof in passive_dofs]
 
         return active_dofs, passive_dofs, active_symbols, passive_symbols
 
@@ -324,7 +324,7 @@ class QPProblem:
 
     def _setup_weights(self):
         """Setup quadratic and linear weights for the QP problem."""
-        dof_weights = [0.001 * (1. / min(1, dof.get_upper_limit(Derivatives.velocity))) ** 2
+        dof_weights = [0.001 * (1. / min(1., dof.upper_limits.velocity)) ** 2
                        for dof in self.active_dofs]
         slack_weights = [2500 * (1. / 0.2) ** 2] * 6
 
@@ -398,12 +398,12 @@ class ConstraintBuilder:
         upper_constraints = []
 
         for dof in active_dofs:
-            ll = cas.max(-self.maximum_velocity, dof.get_lower_limit(Derivatives.velocity))
-            ul = cas.min(self.maximum_velocity, dof.get_upper_limit(Derivatives.velocity))
+            ll = cas.max(-self.maximum_velocity, dof.lower_limits.velocity)
+            ul = cas.min(self.maximum_velocity, dof.upper_limits.velocity)
 
             if dof.has_position_limits():
-                ll = cas.max(dof.get_lower_limit(Derivatives.position) - dof.position_symbol, ll)
-                ul = cas.min(dof.get_upper_limit(Derivatives.position) - dof.position_symbol, ul)
+                ll = cas.max(dof.lower_limits.position - dof.symbols.position, ll)
+                ul = cas.min(dof.upper_limits.position - dof.symbols.position, ul)
 
             lower_constraints.append(ll)
             upper_constraints.append(ul)

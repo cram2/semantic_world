@@ -6,7 +6,7 @@ from urdf_parser_py import urdf
 
 from ..connections import RevoluteConnection, PrismaticConnection, FixedConnection, UnitVector
 from ..prefixed_name import PrefixedName
-from ..spatial_types.derivatives import Derivatives
+from ..spatial_types.derivatives import Derivatives, DerivativeMap
 from ..spatial_types.spatial_types import TransformationMatrix
 from ..utils import suppress_stdout_stderr, hacky_urdf_parser_fix
 from ..world import World, Body, Connection
@@ -21,24 +21,24 @@ connection_type_map = {  # 'unknown': JointType.UNKNOWN,
     'fixed': FixedConnection}
 
 
-def urdf_joint_to_limits(urdf_joint: urdf.Joint) -> Tuple[Dict[Derivatives, float], Dict[Derivatives, float]]:
-    lower_limits = {}
-    upper_limits = {}
+def urdf_joint_to_limits(urdf_joint: urdf.Joint) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
+    lower_limits = DerivativeMap()
+    upper_limits = DerivativeMap()
     if not urdf_joint.type == 'continuous':
         try:
-            lower_limits[Derivatives.position] = max(urdf_joint.safety_controller.soft_lower_limit,
+            lower_limits.position = max(urdf_joint.safety_controller.soft_lower_limit,
                                                      urdf_joint.limit.lower)
-            upper_limits[Derivatives.position] = min(urdf_joint.safety_controller.soft_upper_limit,
+            upper_limits.position = min(urdf_joint.safety_controller.soft_upper_limit,
                                                      urdf_joint.limit.upper)
         except AttributeError:
             try:
-                lower_limits[Derivatives.position] = urdf_joint.limit.lower
-                upper_limits[Derivatives.position] = urdf_joint.limit.upper
+                lower_limits.position = urdf_joint.limit.lower
+                upper_limits.position = urdf_joint.limit.upper
             except AttributeError:
                 pass
     try:
-        lower_limits[Derivatives.velocity] = -urdf_joint.limit.velocity
-        upper_limits[Derivatives.velocity] = urdf_joint.limit.velocity
+        lower_limits.velocity = -urdf_joint.limit.velocity
+        upper_limits.velocity = urdf_joint.limit.velocity
     except AttributeError:
         pass
     if urdf_joint.mimic is not None:
@@ -51,12 +51,12 @@ def urdf_joint_to_limits(urdf_joint: urdf.Joint) -> Tuple[Dict[Derivatives, floa
         else:
             offset = 0
         for d2 in Derivatives.range(Derivatives.position, Derivatives.velocity):
-            lower_limits[d2] -= offset
-            upper_limits[d2] -= offset
+            lower_limits.data[d2] -= offset
+            upper_limits.data[d2] -= offset
             if multiplier < 0:
-                upper_limits[d2], lower_limits[d2] = lower_limits[d2], upper_limits[d2]
-            upper_limits[d2] /= multiplier
-            lower_limits[d2] /= multiplier
+                upper_limits.data[d2], lower_limits.data[d2] = lower_limits.data[d2], upper_limits.data[d2]
+            upper_limits.data[d2] /= multiplier
+            lower_limits.data[d2] /= multiplier
     return lower_limits, upper_limits
 
 
@@ -144,13 +144,13 @@ class URDFParser:
             else:
                 offset = 0
 
-            free_variable_name = PrefixedName(joint.mimic.joint)
+            dof_name = PrefixedName(joint.mimic.joint)
         else:
-            free_variable_name = PrefixedName(joint.name)
+            dof_name = PrefixedName(joint.name)
 
-        if free_variable_name in world.degrees_of_freedom:
-            dof = world.degrees_of_freedom[free_variable_name]
-        else:
+        try:
+            dof = world.get_degree_of_freedom_by_name(dof_name)
+        except KeyError as e:
             dof = world.create_degree_of_freedom(name=PrefixedName(joint.name),
                                                  lower_limits=lower_limits, upper_limits=upper_limits)
 
@@ -185,14 +185,7 @@ class URDFParser:
                                  [material.color.rgba if material.color else None for material in
                                   self.parsed.materials]))
         for i, geom in enumerate(geometry):
-            params = (*(geom.origin.xyz + geom.origin.rpy), parent_frame,
-                      PrefixedName(geom.__class__.__name__ + str(i), parent_frame.prefix)) if geom.origin else (0, 0, 0,
-                                                                                                                0, 0, 0,
-                                                                                                                parent_frame,
-                                                                                                                PrefixedName(
-                                                                                                                    geom.__class__.__name__ + str(
-                                                                                                                        i),
-                                                                                                                    parent_frame.prefix))
+            params = (*(geom.origin.xyz + geom.origin.rpy),) if geom.origin else (0, 0, 0, 0, 0, 0,)
             origin_transform = TransformationMatrix.from_xyz_rpy(*params)
             if isinstance(geom.geometry, urdf.Box):
                 color = Color(*material_dict.get(geom.material.name,
@@ -225,6 +218,28 @@ class URDFParser:
             elif isinstance(geom.geometry, urdf.Mesh):
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
-                res.append(Mesh(origin=origin_transform, filename=geom.geometry.filename,
+                res.append(Mesh(origin=origin_transform, filename=self.parse_file_path(geom.geometry.filename),
                                 scale=Scale(*(geom.geometry.scale or (1, 1, 1)))))
         return res
+
+    @staticmethod
+    def parse_file_path(file_path: str) -> str:
+        """
+        Parses a file path which contains a ros package to a path in the local file system.
+        :param file_path: The path to the URDF file.
+        :return: The parsed and processed file path.
+        """
+        if "package://" in file_path:
+            try:
+                from ament_index_python.packages import get_package_share_directory
+            except ImportError:
+                raise ImportError("No ROS install found while the URDF file contains references to ROS packages. ")
+            # Splits the file path at '//' to get the package  and the rest of the path
+            package_split = file_path.split('//')
+            # Splits the path after the // to get the package name and the rest of the path
+            package_name = package_split[1].split('/')[0]
+            package_path = get_package_share_directory(package_name)
+            file_path = file_path.replace("package://" + package_name, package_path)
+        if 'file://' in file_path:
+            file_path = file_path.replace("file://", './')
+        return file_path

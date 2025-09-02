@@ -2,17 +2,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 import numpy as np
 
 from . import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
 from .prefixed_name import PrefixedName
-from .spatial_types.derivatives import Derivatives
+from .spatial_types.derivatives import Derivatives, DerivativeMap
 from .spatial_types.math import quaternion_from_rotation_matrix
-from .world_entity import Connection
 from .types import NpMatrix4x4
+from .world_entity import Connection
+
+
 
 class Has1DOFState:
     """
@@ -168,15 +170,17 @@ class PrismaticConnection(ActiveConnection, Has1DOFState):
         else:
             self.offset = self.offset
         self.axis = self.axis
-        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(self.name))
+        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(str(self.name)))
         self.active_dofs = [self.dof]
 
-        motor_expression = self.dof.get_symbol(Derivatives.position) * self.multiplier + self.offset
+        motor_expression = self.dof.symbols.position * self.multiplier + self.offset
         translation_axis = cas.Vector3(self.axis) * motor_expression
         parent_T_child = cas.TransformationMatrix.from_xyz_rpy(x=translation_axis[0],
                                                                y=translation_axis[1],
                                                                z=translation_axis[2])
         self.origin_expression = self.origin_expression.dot(parent_T_child)
+        self.origin_expression.reference_frame = self.parent
+        self.origin_expression.child_frame = self.child
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -220,13 +224,15 @@ class RevoluteConnection(ActiveConnection, Has1DOFState):
         else:
             self.offset = self.offset
         self.axis = self.axis
-        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(self.name))
+        self.dof = self.dof or self._world.create_degree_of_freedom(name=PrefixedName(str(self.name)))
         self.active_dofs = [self.dof]
 
-        motor_expression = self.dof.get_symbol(Derivatives.position) * self.multiplier + self.offset
+        motor_expression = self.dof.symbols.position * self.multiplier + self.offset
         rotation_axis = cas.Vector3(self.axis)
         parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, motor_expression)
         self.origin_expression = self.origin_expression.dot(cas.TransformationMatrix(parent_R_child))
+        self.origin_expression.reference_frame = self.parent
+        self.origin_expression.child_frame = self.child
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -262,27 +268,27 @@ class Connection6DoF(PassiveConnection):
 
     def __post_init__(self):
         super().__post_init__()
-        self.x = self.x or self._world.create_degree_of_freedom(name=PrefixedName('x', self.name))
-        self.y = self.y or self._world.create_degree_of_freedom(name=PrefixedName('y', self.name))
-        self.z = self.z or self._world.create_degree_of_freedom(name=PrefixedName('z', self.name))
-        self.qx = self.qx or self._world.create_degree_of_freedom(name=PrefixedName('qx', self.name))
-        self.qy = self.qy or self._world.create_degree_of_freedom(name=PrefixedName('qy', self.name))
-        self.qz = self.qz or self._world.create_degree_of_freedom(name=PrefixedName('qz', self.name))
-        self.qw = self.qw or self._world.create_degree_of_freedom(name=PrefixedName('qw', self.name))
+        self.x = self.x or self._world.create_degree_of_freedom(name=PrefixedName('x', str(self.name)))
+        self.y = self.y or self._world.create_degree_of_freedom(name=PrefixedName('y', str(self.name)))
+        self.z = self.z or self._world.create_degree_of_freedom(name=PrefixedName('z', str(self.name)))
+        self.qx = self.qx or self._world.create_degree_of_freedom(name=PrefixedName('qx', str(self.name)))
+        self.qy = self.qy or self._world.create_degree_of_freedom(name=PrefixedName('qy', str(self.name)))
+        self.qz = self.qz or self._world.create_degree_of_freedom(name=PrefixedName('qz', str(self.name)))
+        self.qw = self.qw or self._world.create_degree_of_freedom(name=PrefixedName('qw', str(self.name)))
         self.passive_dofs = [self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw]
 
         self._world.state[self.qw.name].position = 1.
-        parent_P_child = cas.Point3((self.x.get_symbol(Derivatives.position),
-                                     self.y.get_symbol(Derivatives.position),
-                                     self.z.get_symbol(Derivatives.position)))
-        parent_R_child = cas.Quaternion((self.qx.get_symbol(Derivatives.position),
-                                         self.qy.get_symbol(Derivatives.position),
-                                         self.qz.get_symbol(Derivatives.position),
-                                         self.qw.get_symbol(Derivatives.position))).to_rotation_matrix()
+        parent_P_child = cas.Point3((self.x.symbols.position,
+                                     self.y.symbols.position,
+                                     self.z.symbols.position))
+        parent_R_child = cas.Quaternion((self.qx.symbols.position,
+                                         self.qy.symbols.position,
+                                         self.qz.symbols.position,
+                                         self.qw.symbols.position)).to_rotation_matrix()
         self.origin_expression = cas.TransformationMatrix.from_point_rotation_matrix(point=parent_P_child,
-                                                                          rotation_matrix=parent_R_child,
-                                                                          reference_frame=self.parent.name,
-                                                                          child_frame=self.child.name)
+                                                                                     rotation_matrix=parent_R_child,
+                                                                                     reference_frame=self.parent,
+                                                                                     child_frame=self.child)
 
     @property
     def origin(self) -> NpMatrix4x4:
@@ -336,6 +342,15 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
     def __post_init__(self):
         super().__post_init__()
         stringified_name = str(self.name)
+        lower_translation_limits = DerivativeMap()
+        lower_translation_limits.velocity = -self.translation_velocity_limits
+        upper_translation_limits = DerivativeMap()
+        upper_translation_limits.velocity = self.translation_velocity_limits
+        lower_rotation_limits = DerivativeMap()
+        lower_rotation_limits.velocity = -self.rotation_velocity_limits
+        upper_rotation_limits = DerivativeMap()
+        upper_rotation_limits.velocity = self.rotation_velocity_limits
+
         self.x = self.x or self._world.create_degree_of_freedom(name=PrefixedName('x', stringified_name))
         self.y = self.y or self._world.create_degree_of_freedom(name=PrefixedName('y', stringified_name))
         self.z = self.z or self._world.create_degree_of_freedom(name=PrefixedName('z', stringified_name))
@@ -344,32 +359,34 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
         self.pitch = self.pitch or self._world.create_degree_of_freedom(name=PrefixedName('pitch', stringified_name))
         self.yaw = self.yaw or self._world.create_degree_of_freedom(
             name=PrefixedName('yaw', stringified_name),
-            lower_limits={Derivatives.velocity: -self.rotation_velocity_limits},
-            upper_limits={Derivatives.velocity: self.rotation_velocity_limits})
+            lower_limits=lower_rotation_limits,
+            upper_limits=upper_rotation_limits)
 
         self.x_vel = self.x_vel or self._world.create_degree_of_freedom(
             name=PrefixedName('x_vel', stringified_name),
-            lower_limits={Derivatives.velocity: -self.translation_velocity_limits},
-            upper_limits={Derivatives.velocity: self.translation_velocity_limits})
+            lower_limits=lower_translation_limits,
+            upper_limits=upper_translation_limits)
         self.y_vel = self.y_vel or self._world.create_degree_of_freedom(
             name=PrefixedName('y_vel', stringified_name),
-            lower_limits={Derivatives.velocity: -self.translation_velocity_limits},
-            upper_limits={Derivatives.velocity: self.translation_velocity_limits})
+            lower_limits=lower_translation_limits,
+            upper_limits=upper_translation_limits)
         self.active_dofs = [self.x_vel, self.y_vel, self.yaw]
         self.passive_dofs = [self.x, self.y, self.z, self.roll, self.pitch]
 
-        odom_T_bf = cas.TransformationMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
-                                                          y=self.y.get_symbol(Derivatives.position),
-                                                          yaw=self.yaw.get_symbol(Derivatives.position))
-        bf_T_bf_vel = cas.TransformationMatrix.from_xyz_rpy(x=self.x_vel.get_symbol(Derivatives.position),
-                                                            y=self.y_vel.get_symbol(Derivatives.position))
+        odom_T_bf = cas.TransformationMatrix.from_xyz_rpy(x=self.x.symbols.position,
+                                                          y=self.y.symbols.position,
+                                                          yaw=self.yaw.symbols.position)
+        bf_T_bf_vel = cas.TransformationMatrix.from_xyz_rpy(x=self.x_vel.symbols.position,
+                                                            y=self.y_vel.symbols.position)
         bf_vel_T_bf = cas.TransformationMatrix.from_xyz_rpy(x=0,
                                                             y=0,
-                                                            z=self.z.get_symbol(Derivatives.position),
-                                                            roll=self.roll.get_symbol(Derivatives.position),
-                                                            pitch=self.pitch.get_symbol(Derivatives.position),
+                                                            z=self.z.symbols.position,
+                                                            roll=self.roll.symbols.position,
+                                                            pitch=self.pitch.symbols.position,
                                                             yaw=0)
         self.origin_expression = odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
+        self.origin_expression.reference_frame = self.parent
+        self.origin_expression.child_frame = self.child
 
     def update_state(self, dt: float) -> None:
         state = self._world.state

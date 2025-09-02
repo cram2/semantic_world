@@ -1,45 +1,14 @@
-from typing import Tuple
-
 import numpy as np
 import pytest
 
-from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, FixedConnection, \
-    UnitVector
+from semantic_world.connections import PrismaticConnection, RevoluteConnection, Connection6DoF
+from semantic_world.exceptions import AddingAnExistingViewError, DuplicateViewError
 from semantic_world.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.math import rotation_matrix_from_rpy
 from semantic_world.spatial_types.symbol_manager import symbol_manager
-from semantic_world.world import World, Body
+from semantic_world.testing import world_setup, pr2_world
 from semantic_world.world_entity import View
-
-
-@pytest.fixture
-def world_setup() -> Tuple[World, Body, Body, Body, Body, Body]:
-    world = World()
-    root = Body(name=PrefixedName(name='root', prefix='world'))
-    l1 = Body(name=PrefixedName('l1'))
-    l2 = Body(name=PrefixedName('l2'))
-    bf = Body(name=PrefixedName('bf'))
-    r1 = Body(name=PrefixedName('r1'))
-    r2 = Body(name=PrefixedName('r2'))
-
-    with world.modify_world():
-        [world.add_body(b) for b in [root, l1, l2, bf, r1, r2]]
-        dof = world.create_degree_of_freedom(name=PrefixedName('dof'), lower_limits={Derivatives.velocity: -1},
-                                             upper_limits={Derivatives.velocity: 1})
-
-        c_l1_l2 = PrismaticConnection(parent=l1, child=l2, dof=dof, axis=UnitVector(1, 0, 0))
-        c_r1_r2 = RevoluteConnection(parent=r1, child=r2, dof=dof, axis=UnitVector(0, 0, 1))
-        bf_root_l1 = FixedConnection(parent=bf, child=l1)
-        bf_root_r1 = FixedConnection(parent=bf, child=r1)
-        world.add_connection(c_l1_l2)
-        world.add_connection(c_r1_r2)
-        world.add_connection(bf_root_l1)
-        world.add_connection(bf_root_r1)
-        c_root_bf = Connection6DoF(parent=root, child=bf, _world=world)
-        world.add_connection(c_root_bf)
-
-    return world, l1, l2, bf, r1, r2
 
 
 def test_set_state(world_setup):
@@ -230,23 +199,26 @@ def test_compute_relative_pose(world_setup):
 
     np.testing.assert_array_almost_equal(relative_pose, expected_pose)
 
+
 def test_compute_relative_pose_both(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     world.get_connection(world.root, bf).origin = np.array([[0., -1., 0., 1.],
-                                                        [1., 0., 0., 0.],
-                                                        [0., 0., 1., 0.],
-                                                        [0., 0., 0., 1.]])
+                                                            [1., 0., 0., 0.],
+                                                            [0., 0., 1., 0.],
+                                                            [0., 0., 0., 1.]])
     world.notify_state_change()
 
     pose = np.eye(4)
     pose[0, 3] = 1.0  # Translate along x-axis
     relative_pose = world.compute_relative_pose(pose, world.root, bf)
+    # Rotation is 90 degrees around z-axis, translation is 1 along x-axis
     expected_pose = np.array([[0., -1., 0., 1.],
                               [1., 0., 0., 1.],
                               [0., 0., 1., 0.],
                               [0., 0., 0., 1.]])
 
     np.testing.assert_array_almost_equal(relative_pose, expected_pose)
+
 
 def test_compute_relative_pose_only_translation(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
@@ -264,6 +236,7 @@ def test_compute_relative_pose_only_translation(world_setup):
 
     np.testing.assert_array_almost_equal(relative_pose, expected_pose)
 
+
 def test_compute_relative_pose_only_rotation(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     connection: RevoluteConnection = world.get_connection(r1, r2)
@@ -279,10 +252,106 @@ def test_compute_relative_pose_only_rotation(world_setup):
 
     np.testing.assert_array_almost_equal(relative_pose, expected_pose)
 
+
 def test_add_view(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     v = View(name=PrefixedName('muh'))
     world.add_view(v)
-    with pytest.raises(ValueError):
+    with pytest.raises(AddingAnExistingViewError):
         world.add_view(v)
-    assert world.get_view_by_name(v.name) == v
+    assert world.get_view_by_name_and_type(v.name, type(v)) == v
+
+
+def test_duplicate_view(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    v = View(name=PrefixedName('muh'))
+    world.add_view(v)
+    world.views.append(v)
+    with pytest.raises(DuplicateViewError):
+        world.get_view_by_name_and_type(v.name, type(v))
+
+
+def test_merge_world(world_setup, pr2_world):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    base_link = pr2_world.get_body_by_name("base_link")
+    r_gripper_tool_frame = pr2_world.get_body_by_name('r_gripper_tool_frame')
+    torso_lift_link = pr2_world.get_body_by_name("torso_lift_link")
+    r_shoulder_pan_joint = pr2_world.get_connection(torso_lift_link, pr2_world.get_body_by_name("r_shoulder_pan_link"))
+
+    l_shoulder_pan_joint = pr2_world.get_connection(torso_lift_link, pr2_world.get_body_by_name("l_shoulder_pan_link"))
+
+    world.merge_world(pr2_world)
+
+    assert base_link in world.bodies
+    assert r_gripper_tool_frame in world.bodies
+    assert l_shoulder_pan_joint in world.connections
+    assert torso_lift_link._world == world
+    assert r_shoulder_pan_joint._world == world
+
+
+def test_merge_with_connection(world_setup, pr2_world):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    base_link = pr2_world.get_body_by_name("base_link")
+    r_gripper_tool_frame = pr2_world.get_body_by_name('r_gripper_tool_frame')
+    torso_lift_link = pr2_world.get_body_by_name("torso_lift_link")
+    r_shoulder_pan_joint = pr2_world.get_connection(torso_lift_link, pr2_world.get_body_by_name("r_shoulder_pan_link"))
+
+    new_connection = Connection6DoF(parent=l1, child=pr2_world.root, _world=world)
+
+    world.merge_world(pr2_world, new_connection)
+
+    assert base_link in world.bodies
+    assert r_gripper_tool_frame in world.bodies
+    assert new_connection in world.connections
+    assert torso_lift_link._world == world
+    assert r_shoulder_pan_joint._world == world
+
+
+def test_merge_with_pose(world_setup, pr2_world):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    base_link = pr2_world.get_body_by_name("base_link")
+    r_gripper_tool_frame = pr2_world.get_body_by_name('r_gripper_tool_frame')
+    torso_lift_link = pr2_world.get_body_by_name("torso_lift_link")
+    r_shoulder_pan_joint = pr2_world.get_connection(torso_lift_link, pr2_world.get_body_by_name("r_shoulder_pan_link"))
+
+    pose = np.eye(4)
+    pose[0, 3] = 1.0  # Translate along x-axis
+
+    world.merge_world_at_pose(pr2_world, pose)
+
+    assert base_link in world.bodies
+    assert r_gripper_tool_frame in world.bodies
+    assert torso_lift_link._world == world
+    assert r_shoulder_pan_joint._world == world
+    assert world.compute_forward_kinematics_np(world.root, base_link)[0, 3] == pytest.approx(1.0, abs=1e-6)
+
+
+def test_merge_with_pose_rotation(world_setup, pr2_world):
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    base_link = pr2_world.get_body_by_name("base_link")
+    r_gripper_tool_frame = pr2_world.get_body_by_name('r_gripper_tool_frame')
+    torso_lift_link = pr2_world.get_body_by_name("torso_lift_link")
+    r_shoulder_pan_joint = pr2_world.get_connection(torso_lift_link, pr2_world.get_body_by_name("r_shoulder_pan_link"))
+    base_footprint = pr2_world.get_body_by_name("base_footprint")
+
+    # Rotation is 90 degrees around z-axis, translation is 1 along x-axis
+    pose = np.array([[0., -1., 0., 1.],
+                     [1., 0., 0., 1.],
+                     [0., 0., 1., 0.],
+                     [0., 0., 0., 1.]])
+
+    world.merge_world_at_pose(pr2_world, pose)
+
+    assert base_link in world.bodies
+    assert r_gripper_tool_frame in world.bodies
+    assert torso_lift_link._world == world
+    assert r_shoulder_pan_joint._world == world
+    fk_base = world.compute_forward_kinematics_np(world.root, base_footprint)
+    assert fk_base[0, 3] == pytest.approx(1.0, abs=1e-6)
+    assert fk_base[1, 3] == pytest.approx(1.0, abs=1e-6)
+    assert fk_base[2, 3] == pytest.approx(0.0, abs=1e-6)
+    np.testing.assert_array_almost_equal(rotation_matrix_from_rpy(0, 0, np.pi / 2)[:3, :3], fk_base[:3, :3], decimal=6)

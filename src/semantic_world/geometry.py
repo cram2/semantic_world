@@ -81,6 +81,14 @@ class Shape(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
+    @property
+    def mesh(self) -> trimesh.Trimesh:
+        """
+        The mesh object of the shape.
+        This should be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement the mesh property.")
+
 @dataclass
 class Mesh(Shape):
     """
@@ -111,6 +119,8 @@ class Mesh(Shape):
         return BoundingBox.from_mesh(self.mesh)
 
 
+
+
 @dataclass
 class Primitive(Shape):
     """
@@ -130,6 +140,13 @@ class Sphere(Primitive):
     Radius of the sphere.
     """
 
+    @property
+    def mesh(self) -> trimesh.Trimesh:
+        """
+        Returns a trimesh object representing the sphere.
+        """
+        return trimesh.creation.icosphere(subdivisions=2, radius=self.radius)
+
     def as_bounding_box(self) -> BoundingBox:
         """
         Returns the bounding box of the sphere.
@@ -145,6 +162,15 @@ class Cylinder(Primitive):
     """
     width: float = 0.5
     height: float = 0.5
+
+    @property
+    def mesh(self) -> trimesh.Trimesh:
+        """
+        Returns a trimesh object representing the cylinder.
+        """
+        return trimesh.creation.cylinder(radius=self.width / 2, height=self.height, sections=16)
+
+
 
     def as_bounding_box(self) -> BoundingBox:
         """
@@ -163,6 +189,14 @@ class Box(Primitive):
     A box shape. Pivot point is at the center of the box.
     """
     scale: Scale = field(default_factory=Scale)
+
+    @property
+    def mesh(self) -> trimesh.Trimesh:
+        """
+        Returns a trimesh object representing the box.
+        The box is centered at the origin and has the specified scale.
+        """
+        return trimesh.creation.box(extents=(self.scale.x, self.scale.y, self.scale.z))
 
     def as_bounding_box(self) -> BoundingBox:
         """
