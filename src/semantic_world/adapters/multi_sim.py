@@ -141,8 +141,10 @@ class MultiSim:
     def is_stable(self, body_names: List[str], max_simulation_steps: int = 100, atol: float = 1E-2) -> bool:
         """
         Checks if an object is stable in the world. Stable meaning that it's pose will not change after simulating
-        physics in the World. This will be done by simulating the world for 10 seconds and compare
-        the previous coordinates with the coordinates after the simulation.
+        physics in the World. This function will pause the simulation, set the read objects to the given body names,
+        unpause the simulation, and check if the pose of the objects change after a certain number of simulation steps.
+        If the pose of the objects change, the function will return False. If the pose of the objects do not change,
+        the function will return True. After checking, the function will restore the read objects and the simulation state.
 
         :param body_names: The names of the bodies to check for stability
         :param max_simulation_steps: The maximum number of simulation steps to run
