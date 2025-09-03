@@ -2,13 +2,9 @@ import os.path
 import unittest
 
 from semantic_world.adapters.multi_parser import MultiParser
-from semantic_world.connections import FixedConnection, Connection6DoF
-
-from semantic_world.world_description.connections import FixedConnection
+from semantic_world.world_description.connections import FixedConnection, Connection6DoF
 
 
-
-@unittest.skipIf(not multiparser_found, "multiparser could not be imported.")
 class MultiParserTestCase(unittest.TestCase):
     urdf_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
