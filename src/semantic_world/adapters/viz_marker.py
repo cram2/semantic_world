@@ -19,7 +19,7 @@ except ImportError as e:
 
 from scipy.spatial.transform import Rotation
 
-from ..world_description import Mesh, Box, Sphere, Cylinder, Primitive, TriangleMesh
+from ..world_description.geometry import Mesh, Box, Sphere, Cylinder, Primitive, TriangleMesh
 from ..world import World
 
 

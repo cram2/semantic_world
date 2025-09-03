@@ -10,8 +10,11 @@ from ..world_description.connections import (
     FixedConnection,
     RevoluteConnection,
 )
-from ..world_description import DegreeOfFreedom, Scale, BoundingBoxCollection, Box, Body
-from ..datastructures import PrefixedName, SpatialVariables
+from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..world_description.geometry import Scale, BoundingBoxCollection, Box
+from ..world_description.world_entity import Body
+from ..datastructures.prefixed_name import PrefixedName
+from ..datastructures.variables import SpatialVariables
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     TransformationMatrix,

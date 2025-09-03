@@ -7,9 +7,9 @@ import pytest
 from entity_query_language import an, entity, let, symbolic_mode, in_
 from numpy.ma.testutils import assert_equal
 
-from semantic_world.world_description import FixedConnection, PrismaticConnection
+from semantic_world.world_description.connections import FixedConnection, PrismaticConnection
 from semantic_world.reasoning.world_reasoner import WorldReasoner
-from semantic_world.world_description import KinematicStructureEntity
+from semantic_world.world_description.world_entity import KinematicStructureEntity
 
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer

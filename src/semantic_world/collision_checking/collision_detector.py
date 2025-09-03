@@ -7,7 +7,8 @@ from typing_extensions import Tuple, Set, List, Optional
 
 import numpy as np
 
-from ..world_description import ActiveConnection, Body
+from ..world_description.connections import ActiveConnection
+from ..world_description.world_entity import Body
 from ..world import World
 
 

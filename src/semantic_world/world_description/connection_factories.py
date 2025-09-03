@@ -12,7 +12,7 @@ from .connections import (
     Connection6DoF,
 )
 from .geometry import transformation_from_json, transformation_to_json
-from ..datastructures import PrefixedName
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.spatial_types import TransformationMatrix
 from ..spatial_types.symbol_manager import symbol_manager
 from ..world import World

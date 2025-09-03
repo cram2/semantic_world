@@ -3,7 +3,7 @@ from typing_extensions import Tuple, Union, List
 import numpy as np
 
 from .derivatives import Derivatives
-from ..datastructures import NpMatrix4x4, AnyMatrix4x4
+from ..datastructures.types import NpMatrix4x4, AnyMatrix4x4
 
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:

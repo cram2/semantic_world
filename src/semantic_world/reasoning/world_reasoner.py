@@ -4,7 +4,7 @@ from os.path import dirname
 from typing_extensions import Optional, List, Dict, Any, Type, Callable, ClassVar
 
 from semantic_world.world import World
-from semantic_world.world_description import View
+from semantic_world.world_description.world_entity import View
 from semantic_world.reasoning.reasoner import CaseReasoner
 
 

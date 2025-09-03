@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from semantic_world.world_description import PrismaticConnection, RevoluteConnection, Connection6DoF, FixedConnection
+from semantic_world.world_description.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, FixedConnection
 from semantic_world.exceptions import AddingAnExistingViewError, DuplicateViewError, ViewNotFoundError
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
@@ -9,7 +9,7 @@ from semantic_world.spatial_types.math import rotation_matrix_from_rpy
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.testing import world_setup, pr2_world
-from semantic_world.world_description import View, Body
+from semantic_world.world_description.world_entity import View, Body
 
 
 def test_set_state(world_setup):

@@ -3,13 +3,13 @@ from dataclasses import dataclass
 
 import trimesh
 
-from ..world_description import Connection6DoF
+from ..world_description.connections import Connection6DoF
 from ..spatial_types.spatial_types import RotationMatrix
-from ..world_description import Mesh, TriangleMesh
-from ..datastructures import PrefixedName
+from ..world_description.geometry import Mesh, TriangleMesh
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import TransformationMatrix, Point3
 from ..world import World
-from ..world_description import Body
+from ..world_description.world_entity import Body
 
 
 @dataclass

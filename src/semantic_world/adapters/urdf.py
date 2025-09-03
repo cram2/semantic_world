@@ -6,7 +6,8 @@ from typing_extensions import Optional, Tuple, Union, List, Dict
 
 from urdf_parser_py import urdf as urdfpy
 
-from ..world_description import (RevoluteConnection, PrismaticConnection, FixedConnection, DegreeOfFreedom)
+from ..world_description.connections import (RevoluteConnection, PrismaticConnection, FixedConnection)
+from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..exceptions import ParsingError
 from ..world_description.geometry import Box, Sphere, Cylinder, Mesh, Scale, Shape, Color
 from ..datastructures.prefixed_name import PrefixedName

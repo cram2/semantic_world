@@ -8,13 +8,13 @@ from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
 import daqp
 import numpy as np
 
-from ..world_description import ActiveConnection, PassiveConnection
+from ..world_description.connections import ActiveConnection, PassiveConnection
 from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..spatial_types import spatial_types as cas
 
 if TYPE_CHECKING:
     from ..world import World
-    from ..world_description import Body
+    from ..world_description.world_entity import Body
 
 
 _large_value = np.inf

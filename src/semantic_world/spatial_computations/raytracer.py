@@ -6,8 +6,8 @@ import numpy as np
 import trimesh
 from trimesh import Scene
 
-from ..datastructures import NpMatrix4x4
-from ..world_description import Body
+from ..datastructures.types import NpMatrix4x4
+from ..world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from ..world import World

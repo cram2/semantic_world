@@ -8,7 +8,7 @@ import semantic_world.world_description.degree_of_freedom
 import semantic_world.robots
 import semantic_world.views.views
 import semantic_world.world_description.world_entity
-from semantic_world.world_description import FixedConnection
+from semantic_world.world_description.connections import FixedConnection
 from semantic_world.orm.model import *
 from semantic_world.datastructures.prefixed_name import PrefixedName
 

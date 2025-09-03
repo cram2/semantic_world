@@ -5,7 +5,7 @@ from typing_extensions import Dict, Any
 
 from random_events.utils import SubclassJSONSerializer
 
-from ..datastructures import PrefixedName
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import Derivatives, DerivativeMap
 from ..spatial_types.symbol_manager import symbol_manager

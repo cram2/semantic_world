@@ -10,7 +10,7 @@ import casadi as ca
 from scipy import sparse as sp
 
 if TYPE_CHECKING:
-    from ..world_description import KinematicStructureEntity
+    from ..world_description.world_entity import KinematicStructureEntity
 
 all_expressions = Union[
     Symbol_,

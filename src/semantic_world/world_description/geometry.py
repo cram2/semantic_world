@@ -20,10 +20,10 @@ from ..spatial_types import TransformationMatrix, Point3
 from ..spatial_types.spatial_types import Expression
 from ..spatial_types.symbol_manager import symbol_manager
 from ..utils import IDGenerator
-from ..datastructures import SpatialVariables
+from ..datastructures.variables import SpatialVariables
 
 if TYPE_CHECKING:
-    from ..world_description import KinematicStructureEntity
+    from ..world_description.world_entity import KinematicStructureEntity
 
 id_generator = IDGenerator()
 

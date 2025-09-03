@@ -16,9 +16,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...orm.ormatic_interface import *
-from ...datastructures import PrefixedName
+from ...datastructures.prefixed_name import PrefixedName
 from ...world import World
-from ...world_description import (WorldModelModificationBlock, WorldModelModification, )
+from ...world_description.world_modification import (WorldModelModificationBlock, WorldModelModification, )
 
 
 @dataclass

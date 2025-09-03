@@ -20,18 +20,18 @@ import rustworkx.visualization
 from lxml import etree
 from typing_extensions import List
 
-from .world_description import ActiveConnection, PassiveConnection, FixedConnection, Connection6DoF
+from .world_description.connections import ActiveConnection, PassiveConnection, FixedConnection, Connection6DoF
 from .world_description.connections import HasUpdateState, Has1DOFState
 from .world_description.degree_of_freedom import DegreeOfFreedom
 from .exceptions import (DuplicateViewError, AddingAnExistingViewError, ViewNotFoundError,
                                        AlreadyBelongsToAWorldError, )
-from .calculations.ik_solver import InverseKinematicsSolver
-from .datastructures import PrefixedName
+from .spatial_computations.ik_solver import InverseKinematicsSolver
+from .datastructures.prefixed_name import PrefixedName
 from .robots import AbstractRobot
 from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives
 from .spatial_types.math import inverse_frame
-from .datastructures import NpMatrix4x4
+from .datastructures.types import NpMatrix4x4
 from .utils import IDGenerator, copy_lru_cache
 from .world_description.world_entity import (Body, Connection, View, KinematicStructureEntity, Region, GenericKinematicStructureEntity,
                                                            CollisionCheckingConfig, )

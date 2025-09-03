@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing_extensions import Optional, List, Type, TYPE_CHECKING
 
-from .datastructures import PrefixedName
+from .datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
     from .world import World
-    from .world_description import View, WorldEntity
+    from .world_description.world_entity import View, WorldEntity
 
 
 class LogicalError(Exception):

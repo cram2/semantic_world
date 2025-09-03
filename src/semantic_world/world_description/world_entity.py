@@ -27,13 +27,13 @@ from trimesh.sample import sample_surface
 from trimesh.util import concatenate
 
 from .geometry import BoundingBoxCollection, BoundingBox, Shape
-from ..datastructures import PrefixedName
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.spatial_types import TransformationMatrix, Expression
 from ..utils import IDGenerator
 
 if TYPE_CHECKING:
-    from ..world_description import DegreeOfFreedom
+    from ..world_description.degree_of_freedom import DegreeOfFreedom
     from ..world import World
 
 id_generator = IDGenerator()

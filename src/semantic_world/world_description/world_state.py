@@ -2,7 +2,7 @@ from typing_extensions import MutableMapping, List, Dict
 
 import numpy as np
 
-from ..datastructures import PrefixedName
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.derivatives import Derivatives
 
 

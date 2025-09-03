@@ -3,7 +3,7 @@ from typing_extensions import Dict, Callable, Union, Tuple, List
 import numpy as np
 
 from . import spatial_types as cas
-from ..datastructures import AnyMatrix4x4
+from ..datastructures.types import AnyMatrix4x4
 
 Provider = Union[float, Callable[[], float]]
 

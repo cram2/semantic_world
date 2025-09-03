@@ -35,8 +35,9 @@ You can read more about GCS [here](https://arxiv.org/abs/2101.11565).
 Let's get hands on! First, we need to create a world that makes navigation non-trivial.
 
 ```{code-cell} ipython2
-from semantic_world.world_description import Box, Scale, Color, Body
-from semantic_world.datastructures import PrefixedName
+from semantic_world.world_description.geometry import Box, Scale, Color
+from semantic_world.world_description.world_entity import Body
+from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types import TransformationMatrix
 from semantic_world.world import World
 
@@ -56,7 +57,8 @@ be unable to fly by constraining the z-axis. Otherwise, he would get the idea to
 
 ```{code-cell} ipython2
 from random_events.interval import SimpleInterval
-from semantic_world.world_description import GraphOfConvexSets, BoundingBox
+from semantic_world.world_description.graph_of_convex_sets import GraphOfConvexSets
+from semantic_world.world_description.geometry import BoundingBox
 
 search_space = BoundingBox(min_x=-1, max_x=1,
                            min_y=-1, max_y=1,

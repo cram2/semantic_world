@@ -8,10 +8,10 @@ import numpy as np
 
 from .. import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
-from ..datastructures import PrefixedName
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.math import quaternion_from_rotation_matrix
-from ..datastructures import NpMatrix4x4
+from ..datastructures.types import NpMatrix4x4
 from .world_entity import CollisionCheckingConfig, Connection
 
 if TYPE_CHECKING:

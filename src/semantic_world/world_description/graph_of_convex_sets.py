@@ -5,9 +5,9 @@ import logging
 import matplotlib.pyplot as plt
 
 from .geometry import BoundingBox, BoundingBoxCollection
-from ..datastructures import SpatialVariables
+from ..datastructures.variables import SpatialVariables
 from ..world import World
-from ..world_description import View, EnvironmentView
+from .world_entity import View, EnvironmentView
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ import casadi as ca
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..world_description import KinematicStructureEntity
+    from ..world_description.world_entity import KinematicStructureEntity
 
 builtin_max = builtins.max
 builtin_min = builtins.min

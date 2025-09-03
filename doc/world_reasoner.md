@@ -88,8 +88,8 @@ from posixpath import dirname
 from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional, Type, Union
 from ripple_down_rules.rdr import GeneralRDR
 from ripple_down_rules.datastructures.dataclasses import CaseQuery
-from semantic_world.world_description import View
-from semantic_world.reasoning import WorldReasoner
+from semantic_world.world_description.world_entity import View
+from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.world import World
 from semantic_world.views.views import Drawer
 
@@ -108,8 +108,8 @@ from posixpath import dirname
 from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional, Type, Union
 from ripple_down_rules.rdr import GeneralRDR
 from ripple_down_rules.datastructures.dataclasses import CaseQuery
-from semantic_world.world_description import View
-from semantic_world.reasoning import WorldReasoner
+from semantic_world.world_description.world_entity import View
+from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.world import World
 from semantic_world.views.views import Drawer
 
