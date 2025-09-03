@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 from ormatic.dao import to_dao
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.orm.ormatic_interface import *
-from semantic_world.views import Table
+from semantic_world.views.views import Table
 
 # setup ros 2
 rclpy.init()
@@ -43,7 +43,7 @@ Base.metadata.create_all(bind=session.bind)
 # load the table world from urdf
 urdf_dir = os.path.join(os.getcwd(), "..",  "resources", "urdf")
 table = os.path.join(urdf_dir, "table.urdf")
-world = URDFParser(table).parse()
+world = URDFParser.from_file(table).parse()
 ```
 
 Next, we create a semantic annotation that describes the table.

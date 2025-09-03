@@ -76,24 +76,6 @@
     <dynamics damping="0.02"/>
   </joint>
   <link name="base_footprint">
-    <inertial>
-      <mass value="1"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.01 0.01 0.01"/>
-      </geometry>
-      <material name="White"/>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.071"/>
-      <geometry>
-        <box size="0.001 0.001 0.001"/>
-      </geometry>
-    </collision>
   </link>
   <joint name="base_footprint_joint" type="fixed">
     <parent link="base_footprint"/>
@@ -882,26 +864,7 @@
     <child link="head_plate_frame"/>
     <origin rpy="0 0 0" xyz="0.0232 0 0.0645"/>
   </joint>
-  <link name="head_plate_frame">
-    <inertial>
-      <mass value="0.01"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.01 0.01 0.01"/>
-      </geometry>
-      <material name="Blue"/>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.01 0.01 0.01"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="head_plate_frame"/>
   <gazebo reference="head_plate_frame">
     <material value="Gazebo/Grey"/>
   </gazebo>
@@ -1342,52 +1305,13 @@
     <child link="head_mount_link"/>
     <origin rpy="0 0 0" xyz="-0.138 0 0.091"/>
   </joint>
-  <link name="head_mount_link">
-    <inertial>
-      <mass value="0.1"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.05 0.05 0.05"/>
-      </geometry>
-      <material name="gray">
-        <color rgba="0.5 0.5 0.5 1"/>
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="head_mount_link"/>
   <joint name="head_mount_kinect_ir_joint" type="fixed">
     <parent link="head_mount_link"/>
     <child link="head_mount_kinect_ir_link"/>
     <origin rpy="0 0 0" xyz="-0.032267 0.0125 0.136453"/>
   </joint>
-  <link name="head_mount_kinect_ir_link">
-    <inertial>
-      <mass value="0.1"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="head_mount_kinect_ir_link"/>
   <joint name="head_mount_kinect_ir_optical_frame_joint" type="fixed">
     <parent link="head_mount_kinect_ir_link"/>
     <child link="head_mount_kinect_ir_optical_frame"/>
@@ -1436,25 +1360,7 @@
     <child link="head_mount_kinect_rgb_link"/>
     <origin rpy="-0.006362360178 -0.036288968859 -0.003498282839" xyz="-0.011274983694 -0.024595566211 -0.010102622757"/>
   </joint>
-  <link name="head_mount_kinect_rgb_link">
-    <inertial>
-      <mass value="0.1"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="head_mount_kinect_rgb_link"/>
   <joint name="head_mount_kinect_rgb_optical_frame_joint" type="fixed">
     <parent link="head_mount_kinect_rgb_link"/>
     <child link="head_mount_kinect_rgb_optical_frame"/>
@@ -1517,25 +1423,7 @@
     <child link="head_mount_prosilica_link"/>
     <origin rpy="0 0 0" xyz="-0.046457 0.0125 0.088921"/>
   </joint>
-  <link name="head_mount_prosilica_link">
-    <inertial>
-      <mass value="0.1"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <sphere radius="0.0005"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="head_mount_prosilica_link"/>
   <joint name="head_mount_prosilica_optical_frame_joint" type="fixed">
     <parent link="head_mount_prosilica_link"/>
     <child link="head_mount_prosilica_optical_frame"/>
@@ -2067,25 +1955,7 @@
     <child link="r_gripper_motor_accelerometer_link"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
-  <link name="r_gripper_motor_accelerometer_link">
-    <inertial>
-      <mass value="0.001"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.001 0.001 0.001"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.001 0.001 0.001"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="r_gripper_motor_accelerometer_link"/>
   <joint name="r_gripper_tool_joint" type="fixed">
     <parent link="r_gripper_palm_link"/>
     <child link="r_gripper_tool_frame"/>
@@ -2892,25 +2762,7 @@
     <child link="l_gripper_motor_accelerometer_link"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
-  <link name="l_gripper_motor_accelerometer_link">
-    <inertial>
-      <mass value="0.001"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.001 0.001 0.001"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.001 0.001 0.001"/>
-      </geometry>
-    </collision>
-  </link>
+  <link name="l_gripper_motor_accelerometer_link"/>
   <joint name="l_gripper_tool_joint" type="fixed">
     <parent link="l_gripper_palm_link"/>
     <child link="l_gripper_tool_frame"/>

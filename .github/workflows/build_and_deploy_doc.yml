@@ -47,7 +47,7 @@ jobs:
       run: |
         sudo apt-get update
         cd /opt/ros/overlay_ws/src/semantic_world
-        source ../semantic_world-venv/bin/activate    
+        source /opt/ros/semantic_world-venv/bin/activate    
         pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
 
     # (optional) Cache your executed notebooks between runs
@@ -64,7 +64,7 @@ jobs:
     - name: Build the book
       run: |
         cd /opt/ros/overlay_ws/src/semantic_world
-        source ../semantic_world-venv/bin/activate 
+        source /opt/ros/semantic_world-venv/bin/activate 
         jupyter-book build doc
 
     # Upload the book's HTML as an artifact

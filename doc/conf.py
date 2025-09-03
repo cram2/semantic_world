@@ -14,15 +14,16 @@
 #
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath(os.path.join("..", "src", "semantic_world")))
 
 # -- Project information -----------------------------------------------------
 
-project = 'semantic_world'
-copyright = '2025, AICOR Institute for Artificial Intelligence'
-author = 'AICOR Institute for Artificial Intelligence'
+project = "semantic_world"
+copyright = "2025, AICOR Institute for Artificial Intelligence"
+author = "AICOR Institute for Artificial Intelligence"
 
 # The short X.Y version
-version = ''
+version = ""
 # The full version, including alpha/beta/rc tags
-release = ''
+release = ""

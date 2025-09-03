@@ -9,6 +9,7 @@ parts:
     - file: kinematic_world
     - file: views
     - file: world_reasoner
+    - file: world_synchronization
     - file: style_guide
 - caption: Examples
   chapters:

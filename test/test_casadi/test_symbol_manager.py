@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing_extensions import Tuple
 from unittest.mock import Mock
 
 import numpy as np
@@ -20,7 +20,7 @@ class TestSymbolManager:
     def test_init(self):
         """Test proper initialization of SymbolManager"""
         manager = SymbolManager()
-        assert hasattr(manager, 'symbol_to_provider')
+        assert hasattr(manager, "symbol_to_provider")
         assert isinstance(manager.symbol_to_provider, dict)
 
     def test_register_symbol_provider_with_callable(self):
@@ -30,7 +30,7 @@ class TestSymbolManager:
         def provider():
             return 42.0
 
-        symbol = manager.register_symbol_provider('test_symbol', provider)
+        symbol = manager.register_symbol_provider("test_symbol", provider)
 
         assert isinstance(symbol, cas.Symbol)
         assert symbol in manager.symbol_to_provider
@@ -40,7 +40,7 @@ class TestSymbolManager:
         """Test registering symbols with float values"""
         manager = SymbolManager()
 
-        symbol = manager.register_symbol_provider('test_float', 3.14)
+        symbol = manager.register_symbol_provider("test_float", 3.14)
 
         assert isinstance(symbol, cas.Symbol)
         assert symbol in manager.symbol_to_provider
@@ -53,7 +53,7 @@ class TestSymbolManager:
         def point_provider() -> Tuple[float, float, float]:
             return (1.0, 2.0, 3.0)
 
-        point = manager.register_point3('test_point', point_provider)
+        point = manager.register_point3("test_point", point_provider)
 
         assert isinstance(point, cas.Point3)
         # Check that x, y, z symbols were registered
@@ -62,12 +62,12 @@ class TestSymbolManager:
         z_symbol = None
 
         for symbol in manager.symbol_to_provider.keys():
-            if hasattr(symbol, 'name'):
-                if symbol.name == 'test_point.x':
+            if hasattr(symbol, "name"):
+                if symbol.name == "test_point.x":
                     x_symbol = symbol
-                elif symbol.name == 'test_point.y':
+                elif symbol.name == "test_point.y":
                     y_symbol = symbol
-                elif symbol.name == 'test_point.z':
+                elif symbol.name == "test_point.z":
                     z_symbol = symbol
 
         assert x_symbol is not None
@@ -86,15 +86,15 @@ class TestSymbolManager:
         def vector_provider() -> Tuple[float, float, float]:
             return (4.0, 5.0, 6.0)
 
-        vector = manager.register_vector3('test_vector', vector_provider)
+        vector = manager.register_vector3("test_vector", vector_provider)
 
         assert isinstance(vector, cas.Vector3)
         # Similar checks as for point3
         symbols_found = 0
         for symbol in manager.symbol_to_provider.keys():
-            if hasattr(symbol, 'name'):
+            if hasattr(symbol, "name"):
                 name = symbol.name
-                if name in ['test_vector.x', 'test_vector.y', 'test_vector.z']:
+                if name in ["test_vector.x", "test_vector.y", "test_vector.z"]:
                     symbols_found += 1
 
         assert symbols_found == 3
@@ -106,15 +106,15 @@ class TestSymbolManager:
         def quat_provider() -> Tuple[float, float, float, float]:
             return (0.0, 0.0, 0.0, 1.0)
 
-        quaternion = manager.register_quaternion('test_quat', quat_provider)
+        quaternion = manager.register_quaternion("test_quat", quat_provider)
 
         assert isinstance(quaternion, cas.Quaternion)
         # Check that x, y, z, w symbols were registered
         symbols_found = 0
         for symbol in manager.symbol_to_provider.keys():
-            if hasattr(symbol, 'name'):
+            if hasattr(symbol, "name"):
                 name = symbol.name
-                if name in ['test_quat.x', 'test_quat.y', 'test_quat.z', 'test_quat.w']:
+                if name in ["test_quat.x", "test_quat.y", "test_quat.z", "test_quat.w"]:
                     symbols_found += 1
 
         assert symbols_found == 4
@@ -124,21 +124,19 @@ class TestSymbolManager:
         manager = SymbolManager()
 
         def matrix_provider():
-            return (
-                (1.0, 0.0, 0.0, 0.1),
-                (0.0, 1.0, 0.0, 0.2),
-                (0.0, 0.0, 1.0, 0.3)
-            )
+            return ((1.0, 0.0, 0.0, 0.1), (0.0, 1.0, 0.0, 0.2), (0.0, 0.0, 1.0, 0.3))
 
-        trans_matrix = manager.register_transformation_matrix('test_matrix', matrix_provider)
+        trans_matrix = manager.register_transformation_matrix(
+            "test_matrix", matrix_provider
+        )
 
         assert isinstance(trans_matrix, cas.TransformationMatrix)
         # Check that 12 symbols were registered (3x4 matrix)
         matrix_symbols = 0
         for symbol in manager.symbol_to_provider.keys():
-            if hasattr(symbol, 'name'):
+            if hasattr(symbol, "name"):
                 name = symbol.name
-                if 'test_matrix[' in name:
+                if "test_matrix[" in name:
                     matrix_symbols += 1
 
         assert matrix_symbols == 12
@@ -147,8 +145,8 @@ class TestSymbolManager:
         """Test resolving a single list of symbols"""
         manager = SymbolManager()
 
-        symbol1 = manager.register_symbol_provider('test1', lambda: 1.0)
-        symbol2 = manager.register_symbol_provider('test2', lambda: 2.0)
+        symbol1 = manager.register_symbol_provider("test1", lambda: 1.0)
+        symbol2 = manager.register_symbol_provider("test2", lambda: 2.0)
 
         result = manager.resolve_symbols([symbol1, symbol2])
 
@@ -159,9 +157,9 @@ class TestSymbolManager:
         """Test resolving nested lists of symbols"""
         manager = SymbolManager()
 
-        symbol1 = manager.register_symbol_provider('test1', lambda: 1.0)
-        symbol2 = manager.register_symbol_provider('test2', lambda: 2.0)
-        symbol3 = manager.register_symbol_provider('test3', lambda: 3.0)
+        symbol1 = manager.register_symbol_provider("test1", lambda: 1.0)
+        symbol2 = manager.register_symbol_provider("test2", lambda: 2.0)
+        symbol3 = manager.register_symbol_provider("test3", lambda: 3.0)
 
         result = manager.resolve_symbols([[symbol1, symbol2], [symbol3]])
 
@@ -184,11 +182,10 @@ class TestSymbolManager:
         manager = SymbolManager()
 
         # Create a symbol that's not registered
-        unregistered_symbol = cas.Symbol('unregistered')
+        unregistered_symbol = cas.Symbol("unregistered")
 
-        with pytest.raises(KeyError, match='Cannot resolve'):
+        with pytest.raises(KeyError, match="Cannot resolve"):
             manager.resolve_symbols([unregistered_symbol])
-
 
     def test_evaluate_expr_with_number(self):
         """Test evaluating numeric expressions"""
@@ -250,18 +247,18 @@ class TestSymbolManager:
         def failing_provider():
             raise ValueError("Provider failed")
 
-        symbol = manager.register_symbol_provider('failing', failing_provider)
+        symbol = manager.register_symbol_provider("failing", failing_provider)
 
-        with pytest.raises(KeyError, match='Cannot resolve'):
+        with pytest.raises(KeyError, match="Cannot resolve"):
             manager.resolve_symbols([symbol])
 
     def test_symbol_name_consistency(self):
         """Test that symbol names are consistent with registration names"""
         manager = SymbolManager()
 
-        symbol = manager.register_symbol_provider('test_name', lambda: 1.0)
+        symbol = manager.register_symbol_provider("test_name", lambda: 1.0)
 
         # Note: This test assumes the symbol has a name() method
         # The actual implementation may vary based on the cas.Symbol class
-        if hasattr(symbol, 'name'):
-            assert symbol.name == 'test_name'
+        if hasattr(symbol, "name"):
+            assert symbol.name == "test_name"
