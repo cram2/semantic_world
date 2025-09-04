@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import inspect
+from abc import abstractmethod
+import os
 import itertools
 from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache, cached_property
+from functools import reduce, lru_cache, cached_property
 from typing_extensions import (
     Deque,
     Type,
@@ -19,6 +21,10 @@ from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
 from typing_extensions import Set
 
 import numpy as np
+from random_events.interval import closed
+from random_events.polytope import Polytope
+from random_events.product_algebra import SimpleEvent
+from random_events.variable import Continuous
 from random_events.utils import SubclassJSONSerializer
 from scipy.stats import geom
 from trimesh import Trimesh
@@ -26,13 +32,16 @@ from trimesh.proximity import closest_point, nearby_faces
 from trimesh.sample import sample_surface
 from trimesh.util import concatenate
 
-from .geometry import BoundingBoxCollection, BoundingBox, Shape
+from .geometry import BoundingBoxCollection, BoundingBox
+from .geometry import Shape
 from ..datastructures.prefixed_name import PrefixedName
+from ..datastructures.variables import SpatialVariables
 from ..spatial_types import spatial_types as cas
-from ..spatial_types.spatial_types import TransformationMatrix, Expression
+from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
 from ..utils import IDGenerator
 
 if TYPE_CHECKING:
+
     from ..world_description.degree_of_freedom import DegreeOfFreedom
     from ..world import World
 
@@ -130,6 +139,17 @@ class KinematicStructureEntity(WorldEntity):
         Returns the parent KinematicStructureEntity of this entity.
         """
         return self._world.compute_parent_kinematic_structure_entity(self)
+
+    @abstractmethod
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
+    ) -> BoundingBoxCollection:
+        """
+        Provides the bounding box collection for this entity given a transformation matrix as origin.
+        :param origin: The origin to express the bounding boxes from.
+        :returns: A collection of bounding boxes in world-space coordinates.
+        """
+        pass
 
 
 @dataclass
@@ -328,12 +348,12 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
         ]
         return points_min_self, points_min_other, dist_min
 
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
     ) -> BoundingBoxCollection:
         """
-        Provides the bounding box collection for this entity in the given reference frame.
-        :param reference_frame: The reference frame to express the bounding boxes in.
+        Provides the bounding box collection for this entity given a transformation matrix as origin.
+        :param origin: The origin to express the bounding boxes from.
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         world_bboxes = []
@@ -342,10 +362,10 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
             if shape.origin.reference_frame is None:
                 continue
             local_bb: BoundingBox = shape.local_frame_bounding_box
-            world_bb = local_bb.transform_to_frame(reference_frame)
+            world_bb = local_bb.transform_to_origin(origin)
             world_bboxes.append(world_bb)
 
-        return BoundingBoxCollection(reference_frame, world_bboxes)
+        return BoundingBoxCollection(origin.reference_frame, world_bboxes)
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -385,15 +405,92 @@ class Region(KinematicStructureEntity):
     def __hash__(self):
         return id(self)
 
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all areas in this region.
         """
         bbs = [shape.local_frame_bounding_box for shape in self.area]
-        bbs = [bb.transform_to_frame(reference_frame) for bb in bbs]
-        return BoundingBoxCollection(reference_frame, bbs)
+        bbs = [bb.transform_to_origin(origin) for bb in bbs]
+        return BoundingBoxCollection(origin.reference_frame, bbs)
+
+    @classmethod
+    def from_3d_points(
+        cls,
+        points_3d: List[Point3],
+        drop_dimension: SpatialVariables,
+        name: Optional[PrefixedName] = None,
+        reference_frame: Optional[Body] = None,
+    ) -> Self:
+        """
+        Constructs a region from a set of 3D points. Requires one dimension to be 'dropped', to create a 2s polygon.
+        The min and max point of the dropped dimension still contribute to the region, but are not considered when
+        calculating the polygon. 'minimum_dropped_dimension_thickness'
+
+        :param points_3d: List of 3D points.
+        :param drop_dimension: Dimension to be dropped to calculate the 2d polygon
+        :param name: Optional prefixed name for the region.
+        :param reference_frame: Optional reference frame.
+
+        :return: Region object.
+        """
+
+        # Deterministic axis order to preserve original branch behavior
+        axis_order = [SpatialVariables.x, SpatialVariables.y, SpatialVariables.z]
+
+        # Keep the two axes that aren't dropped, preserving XYZ order
+        kept_axes = [ax for ax in axis_order if ax is not drop_dimension]
+        x_0, x_1 = kept_axes  # these become x_0 and x_1
+
+        points_2d = np.array(
+            [
+                [getattr(p, x_0.name).to_np(), getattr(p, x_1.name).to_np()]
+                for p in points_3d
+            ]
+        )
+
+        min_dropped_dimension_thickness = min(
+            getattr(p, drop_dimension.name).to_np() for p in points_3d
+        )
+        max_dropped_dimension_thickness = max(
+            getattr(p, drop_dimension.name).to_np() for p in points_3d
+        )
+
+        if min_dropped_dimension_thickness == max_dropped_dimension_thickness:
+            # intervall should not be 0, adding a minimal thickness
+            min_dropped_dimension_thickness -= 0.00001
+            max_dropped_dimension_thickness *= 0.00001
+
+        polytope = Polytope.from_2d_points(points_2d)
+        region_event = polytope.maximum_inner_box().to_simple_event().as_composite_set()
+
+        region_event = region_event.update_variables(
+            {
+                Continuous("x_0"): x_0.value,
+                Continuous("x_1"): x_1.value,
+            }
+        )
+
+        region_event.fill_missing_variables([drop_dimension.value])
+        floor_event = SimpleEvent(
+            {
+                drop_dimension.value: closed(
+                    min_dropped_dimension_thickness, max_dropped_dimension_thickness
+                ),
+            }
+        ).as_composite_set()
+        floor_event.fill_missing_variables(SpatialVariables.xz)
+
+        region_event = region_event & floor_event
+
+        region_bb_collection = BoundingBoxCollection.from_event(
+            reference_frame=reference_frame, event=region_event
+        )
+
+        region_shapes = region_bb_collection.as_shapes()
+
+        return cls(name=name, area=region_shapes)
 
 
 GenericKinematicStructureEntity = TypeVar(
@@ -475,8 +572,8 @@ class View(WorldEntity):
         """
         return self._kinematic_structure_entities(set(), Region)
 
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this view.
@@ -485,11 +582,11 @@ class View(WorldEntity):
         """
 
         collections = iter(
-            entity.as_bounding_box_collection_in_frame(reference_frame)
+            entity.as_bounding_box_collection_at_origin(origin)
             for entity in self.kinematic_structure_entities
             if isinstance(entity, Body) and entity.has_collision()
         )
-        bbs = BoundingBoxCollection(reference_frame, [])
+        bbs = BoundingBoxCollection(origin.reference_frame, [])
 
         for bb_collection in collections:
             bbs = bbs.merge(bb_collection)

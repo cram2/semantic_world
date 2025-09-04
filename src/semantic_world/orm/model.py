@@ -16,15 +16,16 @@ from ..spatial_types.spatial_types import Quaternion
 from ..spatial_types.symbol_manager import symbol_manager
 from ..world import World, Body
 from ..world_description.connections import Connection
-from ..world_description.world_entity import View
+from ..world_description.world_entity import View, KinematicStructureEntity
 
 
 @dataclass
 class WorldMapping(AlternativeMapping[World]):
-    bodies: List[Body]
+    kinematic_structure_entities: List[KinematicStructureEntity]
     connections: List[Connection]
     views: List[View]
     degrees_of_freedom: List[DegreeOfFreedom]
+    name: Optional[str] = field(default=None)
 
     @classmethod
     def create_instance(cls, obj: World):
@@ -34,14 +35,15 @@ class WorldMapping(AlternativeMapping[World]):
             obj.connections,
             obj.views,
             list(obj.degrees_of_freedom),
+            obj.name,
         )
 
     def create_from_dao(self) -> World:
-        result = World()
+        result = World(name=self.name)
 
         with result.modify_world():
-            for body in self.bodies:
-                result.add_kinematic_structure_entity(body)
+            for entity in self.kinematic_structure_entities:
+                result.add_kinematic_structure_entity(entity)
             for connection in self.connections:
                 result.add_connection(connection)
             for view in self.views:

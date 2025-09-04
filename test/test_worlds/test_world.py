@@ -1,8 +1,17 @@
 import numpy as np
 import pytest
 
-from semantic_world.world_description.connections import PrismaticConnection, RevoluteConnection, Connection6DoF, FixedConnection
-from semantic_world.exceptions import AddingAnExistingViewError, DuplicateViewError, ViewNotFoundError
+from semantic_world.world_description.connections import (
+    PrismaticConnection,
+    RevoluteConnection,
+    Connection6DoF,
+    FixedConnection,
+)
+from semantic_world.exceptions import (
+    AddingAnExistingViewError,
+    DuplicateViewError,
+    ViewNotFoundError,
+)
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
 from semantic_world.spatial_types.math import rotation_matrix_from_rpy
@@ -519,4 +528,6 @@ def test_add_entity_with_duplicate_name(world_setup):
     body_duplicate = Body(name=PrefixedName("l1"))
     with pytest.raises(AttributeError):
         with world.modify_world():
-            world.add_kinematic_structure_entity(body_duplicate)
+            world.add_kinematic_structure_entity(
+                body_duplicate, handle_duplicates=False
+            )

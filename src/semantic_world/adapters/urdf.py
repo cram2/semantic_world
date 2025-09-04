@@ -6,10 +6,22 @@ from typing_extensions import Optional, Tuple, Union, List, Dict
 
 from urdf_parser_py import urdf as urdfpy
 
-from ..world_description.connections import (RevoluteConnection, PrismaticConnection, FixedConnection)
+from ..world_description.connections import (
+    RevoluteConnection,
+    PrismaticConnection,
+    FixedConnection,
+)
 from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..exceptions import ParsingError
-from ..world_description.geometry import Box, Sphere, Cylinder, Mesh, Scale, Shape, Color
+from ..world_description.geometry import (
+    Box,
+    Sphere,
+    Cylinder,
+    FileMesh,
+    Scale,
+    Shape,
+    Color,
+)
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import Derivatives, DerivativeMap
@@ -337,7 +349,7 @@ class URDFParser:
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
                 res.append(
-                    Mesh(
+                    FileMesh(
                         origin=origin_transform,
                         filename=self.parse_file_path(geom.geometry.filename),
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),

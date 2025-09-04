@@ -7,8 +7,12 @@ from random_events.product_algebra import SimpleEvent
 
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.world_description.geometry import BoundingBox, BoundingBoxCollection
-from semantic_world.world_description.graph_of_convex_sets import GraphOfConvexSets, PoseOccupiedError
+from semantic_world.world_description.graph_of_convex_sets import (
+    GraphOfConvexSets,
+    PoseOccupiedError,
+)
 from semantic_world.spatial_types import Point3
+from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.datastructures.variables import SpatialVariables
 from semantic_world.world import World
 from semantic_world.world_description.world_entity import Body
@@ -87,7 +91,7 @@ class GCSFromWorldTestCase(unittest.TestCase):
             max_y=2,
             min_z=0,
             max_z=2,
-            reference_frame=self.world.root,
+            origin=TransformationMatrix(reference_frame=self.world.root),
         ).as_collection()
         gcs = GraphOfConvexSets.free_space_from_world(
             self.world, search_space=search_space
@@ -117,7 +121,7 @@ class GCSFromWorldTestCase(unittest.TestCase):
             max_y=2,
             min_z=0,
             max_z=2,
-            reference_frame=self.world.root,
+            origin=TransformationMatrix(reference_frame=self.world.root),
         ).as_collection()
         gcs = GraphOfConvexSets.navigation_map_from_world(
             self.world, search_space=search_space

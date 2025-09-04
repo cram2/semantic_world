@@ -36,8 +36,9 @@ def test_collision_matrix(world_setup_simple):
         }
     )
     assert len(collisions) == 2
-    assert collisions[0].body_a == body1
-    assert collisions[0].body_b == body2
+    pairs = {(c.body_a, c.body_b) for c in collisions}
+    assert (body1, body2) in pairs
+    assert (body3, body4) in pairs
 
 
 def test_all_collisions(world_setup_simple):

@@ -6,8 +6,15 @@ import pytest
 from rustworkx import NoPathFound
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.world_description.connections import OmniDrive, PrismaticConnection, RevoluteConnection
-from semantic_world.spatial_computations.ik_solver import MaxIterationsException, UnreachableException
+from semantic_world.world_description.connections import (
+    OmniDrive,
+    PrismaticConnection,
+    RevoluteConnection,
+)
+from semantic_world.spatial_computations.ik_solver import (
+    MaxIterationsException,
+    UnreachableException,
+)
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.robots import PR2, KinematicChain
 from semantic_world.spatial_types.derivatives import Derivatives
@@ -328,5 +335,14 @@ def test_load_collision_config_srdf(pr2_world):
         "pr2.srdf",
     )
     pr2_world.load_collision_srdf(path)
-    assert len([b for b in pr2_world.bodies if b.get_collision_config().disabled]) == 20
+    assert (
+        len(
+            [
+                b
+                for b in pr2_world.kinematic_structure_entities
+                if b.get_collision_config().disabled
+            ]
+        )
+        == 20
+    )
     assert len(pr2_world.disabled_collision_pairs) == 1128
