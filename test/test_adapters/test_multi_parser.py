@@ -35,14 +35,15 @@ class MultiParserTestCase(unittest.TestCase):
 
     def test_table_parsing(self):
         for world, body_num in zip(
-            [self.table_urdf_parser.parse(), self.table_xml_parser.parse()], [6, 7]
+            [self.table_urdf_parser.parse(), self.table_xml_parser.parse()], [7, 7]
         ):
             world.validate()
             self.assertTrue(len(world.kinematic_structure_entities) == body_num)
 
-            origin_left_front_leg_joint = world.get_connection(
-                world.root, world.kinematic_structure_entities[1]
-            )
+            table_to_world = world.get_body_by_name("table_origin").parent_connection
+            self.assertIsInstance(table_to_world, FixedConnection)
+
+            origin_left_front_leg_joint = world.get_body_by_name("left_front_leg").parent_connection
             self.assertIsInstance(origin_left_front_leg_joint, FixedConnection)
 
     def test_kitchen_parsing(self):
@@ -64,17 +65,14 @@ class MultiParserTestCase(unittest.TestCase):
             self.assertTrue(len(world.connections) > 0)
 
     def test_pr2_parsing(self):
-        for world, root_name in zip(
-            [self.pr2_urdf_parser.parse(), self.pr2_xml_parser.parse()],
-            ["base_footprint", "world"],
-        ):
+        for world in [self.pr2_urdf_parser.parse(), self.pr2_xml_parser.parse()]:
             world.validate()
             self.assertTrue(len(world.kinematic_structure_entities) > 0)
             self.assertTrue(len(world.connections) > 0)
-            self.assertTrue(world.root.name.name == root_name)
+            self.assertTrue(world.root.name.name == "world")
 
     def test_free_bodies(self):
-        world = self.single_cube_parser.parse()
+        world = self.single_cube_parser.parse(fixed_base=False)
         self.assertIsInstance(world.get_body_by_name("box").parent_connection, Connection6DoF)
 
 

@@ -33,7 +33,7 @@ except ImportError as e:
     JointType = None
     UsdUrdf = None
 
-from ..world_description.connections import RevoluteConnection, PrismaticConnection, FixedConnection
+from ..world_description.connections import RevoluteConnection, PrismaticConnection, FixedConnection, Connection6DoF
 from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
@@ -47,23 +47,23 @@ def get_free_body_names(factory: Factory) -> Set[str]:
     :param factory: The factory instance that contains the world builder.
     :return: A set of names of free bodies.
     """
-    non_free_body_names = set()
+    constrained_body_names = set()
     stage = factory.world_builder.stage
     for joint in [UsdPhysics.Joint(joint_prim) for joint_prim in stage.TraverseAll() if  # type: ignore
                   joint_prim.IsA(UsdPhysics.Joint)]:  # type: ignore
         for child_body_path in joint.GetBody1Rel().GetTargets():
             child_body_prim = stage.GetPrimAtPath(child_body_path)
-            non_free_body_names.add(child_body_prim.GetName())
+            constrained_body_names.add(child_body_prim.GetName())
             for each_child_body_prim in child_body_prim.GetAllChildren():
                 if each_child_body_prim.IsA(UsdGeom.Xform):  # type: ignore
-                    non_free_body_names.add(each_child_body_prim.GetName())
+                    constrained_body_names.add(each_child_body_prim.GetName())
 
     free_body_names = set()
     for xform_prim in [prim for prim in stage.TraverseAll() if
                        prim.IsA(UsdGeom.Xform) and  # type: ignore
                        prim.HasAPI(UsdPhysics.MassAPI) and  # type: ignore
                        prim.HasAPI(UsdPhysics.RigidBodyAPI)]:  # type: ignore
-        if xform_prim.GetName() in non_free_body_names:
+        if xform_prim.GetName() in constrained_body_names:
             continue
         free_body_names.add(xform_prim.GetName())
 
@@ -89,8 +89,7 @@ class MultiParser:
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
 
-    def parse(self) -> World:
-        fixed_base = None
+    def parse(self, fixed_base=True) -> World:
         root_name = None
         with_physics = True
         with_visual = True
@@ -101,7 +100,7 @@ class MultiParser:
         file_ext = os.path.splitext(self.file_path)[1]
         if file_ext in [".usd", ".usda", ".usdc"]:
             factory = UsdImporter(file_path=self.file_path,
-                                  fixed_base=fixed_base,
+                                  fixed_base=True,
                                   root_name=root_name,
                                   with_physics=with_physics,
                                   with_visual=with_visual,
@@ -111,7 +110,7 @@ class MultiParser:
         elif file_ext == ".urdf":
             factory = UrdfImporter(
                 file_path=self.file_path,
-                fixed_base=fixed_base,
+                fixed_base=False,
                 root_name=root_name,
                 with_physics=with_physics,
                 with_visual=with_visual,
@@ -124,7 +123,7 @@ class MultiParser:
                 root_name = "world"
             factory = MjcfImporter(
                 file_path=self.file_path,
-                fixed_base=fixed_base,
+                fixed_base=False,
                 root_name=root_name,
                 with_physics=with_physics,
                 with_visual=with_visual,
@@ -143,11 +142,14 @@ class MultiParser:
             for body_builder in factory.world_builder.body_builders
         ]
         world = World()
+
         root = bodies[0]
-        world.add_body(root)
+        if root.name.name != "world":
+            with world.modify_world():
+                root = Body(name=PrefixedName("world"))
+                world.add_body(root)
 
         with world.modify_world():
-            world.add_kinematic_structure_entity(bodies[0])
             for body in bodies:
                 world.add_kinematic_structure_entity(body)
             joints = []
@@ -160,8 +162,13 @@ class MultiParser:
 
             for free_body_name in free_body_names:
                 body = world.get_body_by_name(free_body_name)
-                free_joint = Connection6DoF(parent=root, child=body, _world=world)
-                world.add_connection(free_joint)
+                if body.name.name == root.name.name:
+                    continue
+                if fixed_base:
+                    joint = FixedConnection(parent=root, child=body)
+                else:
+                    joint = Connection6DoF(parent=root, child=body, _world=world)
+                world.add_connection(joint)
 
         return world
 
