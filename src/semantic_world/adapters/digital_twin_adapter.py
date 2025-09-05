@@ -12,7 +12,7 @@ import mujoco as mj
 
 # ⬇️ Adjust these imports if your module paths differ
 from semantic_world.world import Body
-from semantic_world.prefixed_name import PrefixedName
+from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.views.views import Cabinet, Door, Handle  # your dataclasses
 
 # ---------- Build a semantic Cabinet view from a MuJoCo model ----------
