@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing_extensions import Optional, Dict, Any, Self
+
+from random_events.utils import SubclassJSONSerializer
 
 
 @dataclass
-class PrefixedName:
+class PrefixedName(SubclassJSONSerializer):
     name: str
     prefix: Optional[str] = None
 
@@ -15,6 +17,13 @@ class PrefixedName:
 
     def __eq__(self, other):
         return str(self) == str(other)
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "name": self.name, "prefix": self.prefix}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(name=data["name"], prefix=data["prefix"])
 
     def __lt__(self, other):
         return str(self) < str(other)

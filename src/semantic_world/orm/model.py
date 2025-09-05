@@ -1,16 +1,22 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from io import BytesIO
+from typing_extensions import List
+from typing_extensions import Optional
 
+import trimesh
+import trimesh.exchange.stl
 from ormatic.dao import AlternativeMapping
+from sqlalchemy import TypeDecorator, types
 
-from ..degree_of_freedom import DegreeOfFreedom
-from ..prefixed_name import PrefixedName
+from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import RotationMatrix, Vector3, Point3, TransformationMatrix
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import Quaternion
 from ..spatial_types.symbol_manager import symbol_manager
 from ..world import World, Body
-from ..world_entity import Connection, View
+from ..world_description.connections import Connection
+from ..world_description.world_entity import View
 
 
 @dataclass
@@ -44,7 +50,8 @@ class WorldMapping(AlternativeMapping[World]):
                 d = DegreeOfFreedom(
                     name=dof.name,
                     lower_limits=dof.lower_limits,
-                    upper_limits=dof.upper_limits)
+                    upper_limits=dof.upper_limits,
+                )
                 result.add_degree_of_freedom(d)
             result.delete_orphaned_dofs()
 
@@ -137,8 +144,7 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
     def create_instance(cls, obj: TransformationMatrix):
         position = obj.to_position()
         rotation = obj.to_quaternion()
-        result = cls(position=position,
-                     rotation=rotation)
+        result = cls(position=position, rotation=rotation)
         result.reference_frame = obj.reference_frame
         result.child_frame = obj.child_frame
 
@@ -147,8 +153,10 @@ class TransformationMatrixMapping(AlternativeMapping[TransformationMatrix]):
     def create_from_dao(self) -> TransformationMatrix:
         return TransformationMatrix.from_point_rotation_matrix(
             point=self.position,
-            rotation_matrix=RotationMatrix.from_quaternion(self.rotation), reference_frame=None,
-            child_frame=self.child_frame, )
+            rotation_matrix=RotationMatrix.from_quaternion(self.rotation),
+            reference_frame=None,
+            child_frame=self.child_frame,
+        )
 
 
 @dataclass
@@ -159,25 +167,34 @@ class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):
 
     @classmethod
     def create_instance(cls, obj: DegreeOfFreedom):
-        return cls(name=obj.name, lower_limits=obj.lower_limits.data, upper_limits=obj.upper_limits.data)
+        return cls(
+            name=obj.name,
+            lower_limits=obj.lower_limits.data,
+            upper_limits=obj.upper_limits.data,
+        )
 
     def create_from_dao(self) -> DegreeOfFreedom:
         lower_limits = DerivativeMap(data=self.lower_limits)
         upper_limits = DerivativeMap(data=self.upper_limits)
-        return DegreeOfFreedom(name=self.name, lower_limits=lower_limits, upper_limits=upper_limits)
+        return DegreeOfFreedom(
+            name=self.name, lower_limits=lower_limits, upper_limits=upper_limits
+        )
 
 
-@dataclass
-class DegreeOfFreedomMapping(AlternativeMapping[DegreeOfFreedom]):
-    name: PrefixedName
-    lower_limits: List[float]
-    upper_limits: List[float]
+class TrimeshType(TypeDecorator):
+    """
+    Type that casts fields that are of type `type` to their class name on serialization and converts the name
+    to the class itself through the globals on load.
+    """
 
-    @classmethod
-    def create_instance(cls, obj: DegreeOfFreedom):
-        return cls(name=obj.name, lower_limits=obj.lower_limits.data, upper_limits=obj.upper_limits.data)
+    impl = types.LargeBinary(4 * 1024 * 1024 * 1024 - 1)  # 4 GB max
 
-    def create_from_dao(self) -> DegreeOfFreedom:
-        lower_limits = DerivativeMap(data=self.lower_limits)
-        upper_limits = DerivativeMap(data=self.upper_limits)
-        return DegreeOfFreedom(name=self.name, lower_limits=lower_limits, upper_limits=upper_limits)
+    def process_bind_param(self, value: trimesh.Trimesh, dialect):
+        # return binary version of trimesh
+        return trimesh.exchange.stl.export_stl(value)
+
+    def process_result_value(self, value: impl, dialect) -> Optional[trimesh.Trimesh]:
+        if value is None:
+            return None
+        mesh = trimesh.Trimesh(**trimesh.exchange.stl.load_stl_binary(BytesIO(value)))
+        return mesh

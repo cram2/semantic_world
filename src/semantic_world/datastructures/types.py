@@ -1,5 +1,5 @@
 from typing_extensions import Annotated, Literal
-from typing import Sequence
+from typing_extensions import Sequence
 import numpy as np
 import numpy.typing as npt
 

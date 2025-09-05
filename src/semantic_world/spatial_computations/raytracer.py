@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from typing import Tuple, List, TYPE_CHECKING
+from typing_extensions import Tuple, List, TYPE_CHECKING
 
 import numpy as np
 import trimesh
 from trimesh import Scene
 
-from .types import NpMatrix4x4
-from .world_entity import Body
+from ..datastructures.types import NpMatrix4x4
+from ..world_description.world_entity import Body
 
 if TYPE_CHECKING:
-    from .world import World
+    from ..world import World
 
 
 class RayTracer:
@@ -39,6 +39,7 @@ class RayTracer:
     """
     The trimesh scene used for ray tracing which mirrors the world.
     """
+
     def __init__(self, world):
         """
         Initializes the RayTracer with the given world.
@@ -80,12 +81,15 @@ class RayTracer:
         ]
         for body in bodies_to_add:
             for i, collision in enumerate(body.collision):
-                self.scene.add_geometry(collision.mesh,
-                                        node_name=body.name.name + f"_collision_{i}",
-                                        parent_node_name="world",
-                                        transform=self.world.compute_forward_kinematics_np(
-                                            self.world.root,
-                                            body) @ collision.origin.to_np())
+                self.scene.add_geometry(
+                    collision.mesh,
+                    node_name=body.name.name + f"_collision_{i}",
+                    parent_node_name="world",
+                    transform=self.world.compute_forward_kinematics_np(
+                        self.world.root, body
+                    )
+                    @ collision.origin.to_np(),
+                )
                 self.scene_to_index[body.name.name + f"_collision_{i}"] = body.index
                 self.index_to_body[body.index] = body
 
@@ -96,24 +100,30 @@ class RayTracer:
         """
         for body in self.world.bodies:
             for i, collision in enumerate(body.collision):
-                transform = self.world.compute_forward_kinematics_np(self.world.root,
-                                                                     body) @ collision.origin.to_np()
+                transform = (
+                    self.world.compute_forward_kinematics_np(self.world.root, body)
+                    @ collision.origin.to_np()
+                )
                 self.scene.graph[body.name.name + f"_collision_{i}"] = transform
 
-    def create_segmentation_mask(self, camera_pose: NpMatrix4x4,
-                                 resolution: int = 512) -> np.ndarray:
+    def create_segmentation_mask(
+        self, camera_pose: NpMatrix4x4, resolution: int = 512
+    ) -> np.ndarray:
         """
-        Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
-        in the mask corresponds to the index of a  body in the scene or -1 if no body is hit at that pixel.
-<
-        :param camera_pose: The position of the camera.
-        :param resolution: The resolution of the segmentation mask.
-        :return: A segmentation mask as a numpy array.
+                Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
+                in the mask corresponds to the index of a  body in the scene or -1 if no body is hit at that pixel.
+        <
+                :param camera_pose: The position of the camera.
+                :param resolution: The resolution of the segmentation mask.
+                :return: A segmentation mask as a numpy array.
         """
         self.update_scene()
-        ray_origins, ray_directions, pixels = self.create_camera_rays(camera_pose, resolution=resolution)
-        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(ray_origins, ray_directions,
-                                                                                       multiple_hits=False)
+        ray_origins, ray_directions, pixels = self.create_camera_rays(
+            camera_pose, resolution=resolution
+        )
+        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(
+            ray_origins, ray_directions, multiple_hits=False
+        )
         bodies = self.scene.triangles_node[index_tri]
 
         # map the name of the scene objects to the index
@@ -130,8 +140,9 @@ class RayTracer:
 
         return a
 
-    def create_depth_map(self, camera_position: NpMatrix4x4,
-                         resolution: int = 512) -> np.ndarray:
+    def create_depth_map(
+        self, camera_position: NpMatrix4x4, resolution: int = 512
+    ) -> np.ndarray:
         """
         Creates a depth map for the ray tracer scene from the camera position to the target position. Each pixel in the
         depth map corresponds to the distance from the camera to the closest point on the surface of the scene or -1 if
@@ -142,11 +153,16 @@ class RayTracer:
         :return: A depth map as a numpy array.
         """
         self.update_scene()
-        ray_origins, ray_directions, pixels = self.create_camera_rays(camera_position, resolution=resolution)
+        ray_origins, ray_directions, pixels = self.create_camera_rays(
+            camera_position, resolution=resolution
+        )
         # Code from the example in trimesh repo: examples/raytrace.py
-        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(ray_origins, ray_directions,
-                                                                                    multiple_hits=False)
-        depth = trimesh.util.diagonal_dot(points - ray_origins[0], ray_directions[index_ray])
+        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(
+            ray_origins, ray_directions, multiple_hits=False
+        )
+        depth = trimesh.util.diagonal_dot(
+            points - ray_origins[0], ray_directions[index_ray]
+        )
         pixel_ray = pixels[index_ray]
 
         # create a numpy array we can turn into an image
@@ -158,8 +174,9 @@ class RayTracer:
 
         return a
 
-    def create_camera_rays(self, camera_pose: NpMatrix4x4,
-                           resolution: int = 512, fov=90) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def create_camera_rays(
+        self, camera_pose: NpMatrix4x4, resolution: int = 512, fov=90
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Creates camera rays for the ray tracer scene from the camera position to the target position. Places the camera
         at the given position and orientation view of the camera is along the x-axis.
@@ -185,7 +202,9 @@ class RayTracer:
 
         return self.scene.camera_rays()
 
-    def ray_test(self, origin_points: np.ndarray, target_points: np.ndarray) -> Tuple[np.ndarray, np.ndarray, List[Body]]:
+    def ray_test(
+        self, origin_points: np.ndarray, target_points: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, List[Body]]:
         """
         Performs a ray test from the origin point to the target point in the ray tracer scene.
 
@@ -200,8 +219,9 @@ class RayTracer:
             raise ValueError("Origin and target points must have the same shape.")
 
         ray_directions = target_points - origin_points
-        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(origin_points, ray_directions,
-                                                                                   multiple_hits=False)
+        points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(
+            origin_points, ray_directions, multiple_hits=False
+        )
         bodies = self.scene.triangles_node[index_tri]
 
         # map the name of the scene objects to the index

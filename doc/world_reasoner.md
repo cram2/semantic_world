@@ -24,7 +24,7 @@ The way to use the reasoner is like the following example:
 
 ```python
 from os.path import join, dirname
-from semantic_world.reasoner import WorldReasoner
+from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.adapters.urdf import URDFParser
 
 kitchen_world = URDFParser.from_file(join(dirname(__file__), '..', 'resources', 'urdf', 'kitchen-small.urdf')).parse()
@@ -52,12 +52,14 @@ For example, let's say you want to improve an existing rule that classifies Draw
 
 ```python
 from os.path import join, dirname
-from semantic_world.reasoner import WorldReasoner
+from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views.views import Drawer
 
+
 def create_kitchen_world():
     return URDFParser.from_file(join(dirname(__file__), '..', 'resources', 'urdf', 'kitchen-small.urdf')).parse()
+
 
 kitchen_world = create_kitchen_world()
 reasoner = WorldReasoner(kitchen_world)
@@ -86,10 +88,11 @@ from posixpath import dirname
 from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional, Type, Union
 from ripple_down_rules.rdr import GeneralRDR
 from ripple_down_rules.datastructures.dataclasses import CaseQuery
-from semantic_world.world_entity import View
-from semantic_world.reasoner import WorldReasoner
+from semantic_world.world_description.world_entity import View
+from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.world import World
 from semantic_world.views.views import Drawer
+
 
 def world_views_of_type_drawer(case: World) -> List[Drawer]:
     """Get possible value(s) for World.views  of type Drawer."""
@@ -105,14 +108,15 @@ from posixpath import dirname
 from typing_extensions import Any, Callable, ClassVar, Dict, List, Optional, Type, Union
 from ripple_down_rules.rdr import GeneralRDR
 from ripple_down_rules.datastructures.dataclasses import CaseQuery
-from semantic_world.world_entity import View
-from semantic_world.reasoner import WorldReasoner
+from semantic_world.world_description.world_entity import View
+from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.world import World
 from semantic_world.views.views import Drawer
 
+
 def world_views_of_type_drawer(case: World) -> List[Drawer]:
     """Get possible value(s) for World.views  of type Drawer."""
-    known_drawers =  [v for v in case.views if isinstance(v, Drawer)]
+    known_drawers = [v for v in case.views if isinstance(v, Drawer)]
     good_drawers = [d for d in known_drawers if d.name.name != "bad_drawer"]
     return good_drawers
 ```

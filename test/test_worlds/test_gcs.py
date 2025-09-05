@@ -6,12 +6,12 @@ from random_events.interval import SimpleInterval
 from random_events.product_algebra import SimpleEvent
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.geometry import BoundingBox, BoundingBoxCollection
-from semantic_world.graph_of_convex_sets import GraphOfConvexSets, PoseOccupiedError
+from semantic_world.world_description.geometry import BoundingBox, BoundingBoxCollection
+from semantic_world.world_description.graph_of_convex_sets import GraphOfConvexSets, PoseOccupiedError
 from semantic_world.spatial_types import Point3
-from semantic_world.variables import SpatialVariables
+from semantic_world.datastructures.variables import SpatialVariables
 from semantic_world.world import World
-from semantic_world.world_entity import Body
+from semantic_world.world_description.world_entity import Body
 
 
 class GCSTestCase(unittest.TestCase):
@@ -24,19 +24,27 @@ class GCSTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         world = World()
-        world.add_kinematic_structure_entity(Body())
+        with world.modify_world():
+            world.add_kinematic_structure_entity(Body())
         gcs = GraphOfConvexSets(world)
 
         obstacle = BoundingBox(0, 0, 0, 1, 1, 1, world.root)
 
-        z_lim = SimpleInterval(.45, .55)
+        z_lim = SimpleInterval(0.45, 0.55)
         x_lim = SimpleInterval(-2, 3)
         y_lim = SimpleInterval(-2, 3)
-        limiting_event = SimpleEvent({SpatialVariables.x.value: x_lim,
-                                      SpatialVariables.y.value: y_lim,
-                                      SpatialVariables.z.value: z_lim,})
+        limiting_event = SimpleEvent(
+            {
+                SpatialVariables.x.value: x_lim,
+                SpatialVariables.y.value: y_lim,
+                SpatialVariables.z.value: z_lim,
+            }
+        )
         obstacles = BoundingBoxCollection.from_event(
-            world.root, ~obstacle.simple_event.as_composite_set() & limiting_event.as_composite_set())
+            world.root,
+            ~obstacle.simple_event.as_composite_set()
+            & limiting_event.as_composite_set(),
+        )
         [gcs.add_node(bb) for bb in obstacles]
         gcs.calculate_connectivity()
         cls.gcs = gcs
@@ -64,16 +72,26 @@ class GCSFromWorldTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
+        urdf_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
+        )
         apartment = os.path.join(urdf_dir, "table.urdf")
         apartment_parser = URDFParser.from_file(file_path=apartment)
         cls.world = apartment_parser.parse()
 
     def test_from_world(self):
-        search_space = BoundingBox(min_x=-5, max_x=-2,
-                                   min_y=-1, max_y=2,
-                                   min_z=0, max_z=2, reference_frame=self.world.root).as_collection()
-        gcs = GraphOfConvexSets.free_space_from_world(self.world, search_space=search_space)
+        search_space = BoundingBox(
+            min_x=-5,
+            max_x=-2,
+            min_y=-1,
+            max_y=2,
+            min_z=0,
+            max_z=2,
+            reference_frame=self.world.root,
+        ).as_collection()
+        gcs = GraphOfConvexSets.free_space_from_world(
+            self.world, search_space=search_space
+        )
         self.assertIsNotNone(gcs)
         self.assertGreater(len(gcs.graph.nodes()), 0)
         self.assertGreater(len(gcs.graph.edges()), 0)
@@ -92,14 +110,21 @@ class GCSFromWorldTestCase(unittest.TestCase):
             gcs.path_from_to(start, target)
 
     def test_navigation_map_from_world(self):
-        search_space = BoundingBox(min_x=-5, max_x=-2,
-                                   min_y=-1, max_y=2,
-                                   min_z=0, max_z=2,
-                                   reference_frame=self.world.root).as_collection()
-        gcs = GraphOfConvexSets.navigation_map_from_world(self.world, search_space=search_space)
+        search_space = BoundingBox(
+            min_x=-5,
+            max_x=-2,
+            min_y=-1,
+            max_y=2,
+            min_z=0,
+            max_z=2,
+            reference_frame=self.world.root,
+        ).as_collection()
+        gcs = GraphOfConvexSets.navigation_map_from_world(
+            self.world, search_space=search_space
+        )
         self.assertGreater(len(gcs.graph.nodes()), 0)
         self.assertGreater(len(gcs.graph.edges()), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

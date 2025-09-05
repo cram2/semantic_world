@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from copy import deepcopy
 from functools import lru_cache, wraps
-from typing import Any, Tuple
+from typing_extensions import Any, Tuple, Iterable
 from xml.etree import ElementTree as ET
+
+from sqlalchemy import Engine, inspect, text, MetaData
 
 
 class IDGenerator:
@@ -63,7 +66,9 @@ class suppress_stdout_stderr(object):
             os.close(fd)
 
 
-def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'gazebo')) -> str:
+def hacky_urdf_parser_fix(
+    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
 
@@ -76,7 +81,7 @@ def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'g
                 parent.remove(elem)
 
     # Turn back to string
-    return ET.tostring(root, encoding='unicode')
+    return ET.tostring(root, encoding="unicode")
 
 
 def robot_name_from_urdf_string(urdf_string: str) -> str:
@@ -104,3 +109,21 @@ def copy_lru_cache(maxsize=None, typed=False):
         return wrapper
 
     return decorator
+
+
+def bpy_installed() -> bool:
+    try:
+        import bpy
+
+        return True
+    except ImportError:
+        return False
+
+
+def rclpy_installed() -> bool:
+    try:
+        import rclpy
+
+        return True
+    except ImportError:
+        return False

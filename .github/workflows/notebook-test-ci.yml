@@ -39,18 +39,18 @@ jobs:
 
       - name: Update semantic_world source files
         run: |
-          rm -rf /opt/ros/overlay_ws/src/semantic_world/* 
-          cd /opt/ros/overlay_ws/src/semantic_world
+          rm -rf /opt/ros/semantic_world/* 
+          cd /opt/ros/semantic_world
           rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-          cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/overlay_ws/src
+          cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros
 
       # ----------------------------------------------------------------------------------------------------------------
 
       - name: Install python dependencies
         run: |
-          source /opt/ros/overlay_ws/src/semantic_world-venv/bin/activate
+          source /opt/ros/semantic_world-venv/bin/activate
           pip install --upgrade pip --root-user-action=ignore
-          cd /opt/ros/overlay_ws/src/semantic_world
+          cd /opt/ros/semantic_world
           pip install -r requirements.txt
           pip install jupytext treon
           pip install -e .
@@ -58,14 +58,14 @@ jobs:
       # ----------------------------------------------------------------------------------------------------------------
       - name: Convert Notebooks
         run: |
-          source /opt/ros/overlay_ws/src/semantic_world-venv/bin/activate
-          cd /opt/ros/overlay_ws/src/semantic_world/examples
+          cd /opt/ros/semantic_world/examples
+          source /opt/ros/semantic_world-venv/bin/activate
           python -m jupytext --to notebook *.md
 
       - name: Run tests
         run: |
           source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/overlay_ws/src/semantic_world-venv/bin/activate
-          cd /opt/ros/overlay_ws/src/semantic_world/examples/
+          source /opt/ros/semantic_world-venv/bin/activate
+          cd /opt/ros/semantic_world/examples/
           python -m treon --thread 1 -v
           rm *.ipynb

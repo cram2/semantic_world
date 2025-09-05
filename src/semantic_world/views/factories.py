@@ -1,18 +1,20 @@
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import TypeVar, Generic
+from typing_extensions import TypeVar, Generic
 
 from numpy import ndarray
 from random_events.product_algebra import *
 
-from semantic_world.connections import (
+from ..world_description.connections import (
     PrismaticConnection,
     FixedConnection,
     RevoluteConnection,
 )
-from ..degree_of_freedom import DegreeOfFreedom
-from ..geometry import Scale, BoundingBoxCollection, Box
-from ..prefixed_name import PrefixedName
+from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..world_description.geometry import Scale, BoundingBoxCollection, Box
+from ..world_description.world_entity import Body
+from ..datastructures.prefixed_name import PrefixedName
+from ..datastructures.variables import SpatialVariables
 from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     TransformationMatrix,
@@ -20,7 +22,6 @@ from ..spatial_types.spatial_types import (
     Point3,
 )
 from ..utils import IDGenerator
-from ..variables import SpatialVariables
 from ..views.views import (
     Container,
     Handle,
@@ -31,7 +32,6 @@ from ..views.views import (
     DoubleDoor,
 )
 from ..world import World
-from ..world_entity import Body
 
 id_generator = IDGenerator()
 
@@ -70,12 +70,26 @@ class ViewFactory(Generic[T], ABC):
     """
 
     @abstractmethod
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Create the world containing a view of type T.
+        Put the custom logic in here.
+
+        :param world: The world to create the view in.
         :return: The world.
         """
         raise NotImplementedError()
+
+    def create(self) -> World:
+        """
+        Create the world containing a view of type T.
+
+        :return: The world.
+        """
+        world = World()
+        with world.modify_world():
+            world = self._create(world)
+        return world
 
 
 @dataclass
@@ -99,7 +113,7 @@ class ContainerFactory(ViewFactory[Container]):
     The direction in which the container is open.
     """
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Return a world with a container body at its root.
         """
@@ -107,13 +121,14 @@ class ContainerFactory(ViewFactory[Container]):
         container_event = self.create_container_event()
 
         container_body = Body(name=self.name)
-        collision_shapes = BoundingBoxCollection.from_event(container_body, container_event).as_shapes()
+        collision_shapes = BoundingBoxCollection.from_event(
+            container_body, container_event
+        ).as_shapes()
         container_body.collision = collision_shapes
         container_body.visual = collision_shapes
 
         container_view = Container(body=container_body, name=self.name)
 
-        world = World()
         world.add_kinematic_structure_entity(container_body)
         world.add_view(container_view)
 
@@ -197,7 +212,7 @@ class HandleFactory(ViewFactory[Handle]):
     Thickness of the handle bar.
     """
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Create a world with a handle body at its root.
         """
@@ -211,7 +226,6 @@ class HandleFactory(ViewFactory[Handle]):
 
         handle_view = Handle(name=self.name, body=handle)
 
-        world = World()
         world.add_kinematic_structure_entity(handle)
         world.add_view(handle_view)
         return world
@@ -267,6 +281,7 @@ class HandleFactory(ViewFactory[Handle]):
 
         return inner_box
 
+
 @dataclass
 class EntryWayFactory(ViewFactory[T], ABC):
     """
@@ -296,7 +311,7 @@ class DoorFactory(EntryWayFactory[Door]):
     The direction on the door in which the handle positioned.
     """
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Return a world with a door body at its root. The door has a handle and is defined by its scale and handle direction.
         """
@@ -309,7 +324,6 @@ class DoorFactory(EntryWayFactory[Door]):
         body.collision = collision
         body.visual = collision
 
-        world = World()
         world.add_kinematic_structure_entity(body)
 
         handle_world = self.handle_factory.create()
@@ -416,23 +430,23 @@ class DoubleDoorFactory(EntryWayFactory[DoubleDoor]):
         """
         self.one_door_scale = Scale(self.scale.x, self.scale.y / 2, self.scale.z)
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Return a world with a virtual body at its root that is the parent of the two doors making up the double door.
         """
         door_factories = self.create_door_factories()
 
-        world = World()
         double_door_body = Body(name=self.name)
         world.add_kinematic_structure_entity(double_door_body)
 
         assert len(door_factories) == 2, "Double door must have exactly two doors"
 
-
-        left_door, right_door = self.add_doors_to_world(parent_world=world, door_factories=door_factories)
+        left_door, right_door = self.add_doors_to_world(
+            parent_world=world, door_factories=door_factories
+        )
 
         double_door_view = DoubleDoor(
-            body=double_door_body,left_door=left_door, right_door=right_door
+            body=double_door_body, left_door=left_door, right_door=right_door
         )
         world.add_view(double_door_view)
 
@@ -517,7 +531,7 @@ class DrawerFactory(ViewFactory[Drawer]):
     The factory used to create the container of the drawer.
     """
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Return a world with a drawer at its root. The drawer consists of a container and a handle.
         """
@@ -580,7 +594,7 @@ class DresserFactory(ViewFactory[Dresser]):
     The transformations for the doors relative to the dresser container.
     """
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Return a world with a dresser at its root. The dresser consists of a container, potentially drawers, and doors.
         Assumes that the number of drawers matches the number of drawer transforms.
@@ -674,7 +688,9 @@ class DresserFactory(ViewFactory[Dresser]):
         :param world: The world containing the dresser body as its root.
         """
         dresser_body: Body = world.root
-        container_event = dresser_body.as_bounding_box_collection_in_frame(dresser_body).event
+        container_event = dresser_body.as_bounding_box_collection_in_frame(
+            dresser_body
+        ).event
 
         container_footprint = self.subtract_bodies_from_container_footprint(
             world, container_event
@@ -682,7 +698,9 @@ class DresserFactory(ViewFactory[Dresser]):
 
         container_event = self.fill_container_body(container_footprint, container_event)
 
-        collision_shapes = BoundingBoxCollection.from_event(dresser_body, container_event).as_shapes()
+        collision_shapes = BoundingBoxCollection.from_event(
+            dresser_body, container_event
+        ).as_shapes()
         dresser_body.collision = collision_shapes
         dresser_body.visual = collision_shapes
         return world
@@ -746,9 +764,7 @@ class WallFactory(ViewFactory[Wall]):
     The scale of the wall.
     """
 
-    door_factories: List[EntryWayFactory] = field(
-        default_factory=list
-    )
+    door_factories: List[EntryWayFactory] = field(default_factory=list)
     """
     The factories used to create the doors and double doors of the wall.
     """
@@ -758,14 +774,12 @@ class WallFactory(ViewFactory[Wall]):
     The transformations for the doors and double doors relative to the wall body.
     """
 
-    def create(self) -> World:
+    def _create(self, world: World) -> World:
         """
         Return a world with the wall body at its root and potentially doors and double doors as children of the wall body.
         """
-        wall_world = World()
-        wall_body = Body(
-            name=self.name
-        )
+        wall_world = world
+        wall_body = Body(name=self.name)
         wall_collision = self._create_wall_collision(wall_body)
         wall_body.collision = wall_collision
         wall_body.visual = wall_collision
@@ -792,7 +806,9 @@ class WallFactory(ViewFactory[Wall]):
 
         wall_event = self.remove_doors_from_wall_event(wall_event)
 
-        bounding_box_collection = BoundingBoxCollection.from_event(reference_frame, wall_event)
+        bounding_box_collection = BoundingBoxCollection.from_event(
+            reference_frame, wall_event
+        )
 
         wall_collision = bounding_box_collection.as_shapes()
         return wall_collision
@@ -842,7 +858,9 @@ class WallFactory(ViewFactory[Wall]):
             door_thickness_spatial_variable = SpatialVariables.x.value
 
             for door in doors:
-                door_event = door.body.as_bounding_box_collection_in_frame(temp_world.root).event
+                door_event = door.body.as_bounding_box_collection_in_frame(
+                    temp_world.root
+                ).event
                 door_event = door_event.marginal(door_plane_spatial_variables)
                 door_event.fill_missing_variables([door_thickness_spatial_variable])
 
@@ -877,15 +895,16 @@ class WallFactory(ViewFactory[Wall]):
         out the doors from the wall event.
         """
         temp_world = World()
-        temp_world.add_kinematic_structure_entity(Body())
+        with temp_world.modify_world():
+            temp_world.add_kinematic_structure_entity(Body())
 
-        connection = FixedConnection(
-            parent=temp_world.root,
-            child=door_world.root,
-            origin_expression=door_transform,
-        )
+            connection = FixedConnection(
+                parent=temp_world.root,
+                child=door_world.root,
+                origin_expression=door_transform,
+            )
 
-        temp_world.merge_world(door_world, connection)
+            temp_world.merge_world(door_world, connection)
 
         return temp_world
 
@@ -910,6 +929,7 @@ class WallFactory(ViewFactory[Wall]):
                     )
 
                     wall_world.merge_world(door_world, connection)
+
 
 def add_door_to_world(
     door_factory: DoorFactory, parent_T_door: TransformationMatrix, parent_world: World

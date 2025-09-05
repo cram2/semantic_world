@@ -12,6 +12,7 @@ class SpatialVariables(Enum):
     """
     Enum for spatial variables used in the semantic world. Used in the context of random events.
     """
+
     x = Continuous("x")
     y = Continuous("y")
     z = Continuous("z")

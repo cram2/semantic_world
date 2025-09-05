@@ -4,10 +4,12 @@ import sys
 import unittest
 
 import pytest
+from entity_query_language import an, entity, let, symbolic_mode, in_
 from numpy.ma.testutils import assert_equal
 
-from semantic_world.reasoner import WorldReasoner
-from semantic_world.world_entity import KinematicStructureEntity
+from semantic_world.world_description.connections import FixedConnection, PrismaticConnection
+from semantic_world.reasoning.world_reasoner import WorldReasoner
+from semantic_world.world_description.world_entity import KinematicStructureEntity
 
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -23,18 +25,22 @@ from semantic_world.adapters.urdf import URDFParser
 from semantic_world.views.views import *
 
 try:
-    from semantic_world.world_rdr import world_rdr
+    from semantic_world.reasoning.world_rdr import world_rdr
 except ImportError as e:
     world_rdr = None
 from semantic_world.world import World
+
 
 @dataclass
 class TestView(View):
     """
     A Generic View for multiple bodies.
     """
+
     _private_entity: KinematicStructureEntity = field(default=None)
-    entity_list: List[KinematicStructureEntity] = field(default_factory=list, hash=False)
+    entity_list: List[KinematicStructureEntity] = field(
+        default_factory=list, hash=False
+    )
     views: List[View] = field(default_factory=list, hash=False)
     root_entity_1: KinematicStructureEntity = field(default=None)
     root_entity_2: KinematicStructureEntity = field(default=None)
@@ -54,21 +60,34 @@ class TestView(View):
         """
         Returns itself as a kinematic chain.
         """
-        return self._world.compute_chain_of_kinematic_structure_entities(self.root_entity_1, self.tip_entity_1)
+        return self._world.compute_chain_of_kinematic_structure_entities(
+            self.root_entity_1, self.tip_entity_1
+        )
 
     @property
     def _private_chain(self) -> list[KinematicStructureEntity]:
         """
         Returns itself as a kinematic chain.
         """
-        return self._world.compute_chain_of_kinematic_structure_entities(self.root_entity_2, self.tip_entity_2)
+        return self._world.compute_chain_of_kinematic_structure_entities(
+            self.root_entity_2, self.tip_entity_2
+        )
 
     def __hash__(self):
         """
         Custom hash function to ensure that the view is hashable.
         """
-        return hash((self._private_entity, tuple(self.entity_list), tuple(self.views),
-                     self.root_entity_1, self.root_entity_2, self.tip_entity_1, self.tip_entity_2))
+        return hash(
+            (
+                self._private_entity,
+                tuple(self.entity_list),
+                tuple(self.views),
+                self.root_entity_1,
+                self.root_entity_2,
+                self.tip_entity_1,
+                self.tip_entity_2,
+            )
+        )
 
 
 class ViewTestCase(unittest.TestCase):
@@ -87,13 +106,16 @@ class ViewTestCase(unittest.TestCase):
     cd test/test_views && python -m pytest -k "test_kitchen_views"
 
     """
-    urdf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf")
+
+    urdf_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
+    )
     kitchen = os.path.join(urdf_dir, "kitchen-small.urdf")
     apartment = os.path.join(urdf_dir, "apartment.urdf")
-    main_dir = os.path.join(os.path.dirname(__file__), '..', '..')
+    main_dir = os.path.join(os.path.dirname(__file__), "..", "..")
     views_dir = os.path.join(main_dir, "src/semantic_world/views")
     views_rdr_model_name = "world_rdr"
-    test_dir = os.path.join(main_dir, 'tests')
+    test_dir = os.path.join(main_dir, "tests")
     expert_answers_dir = os.path.join(test_dir, "test_expert_answers")
     app: Optional[QApplication] = None
     viewer: Optional[RDRCaseViewer] = None
@@ -138,13 +160,46 @@ class ViewTestCase(unittest.TestCase):
         world_view.tip_entity_2 = self.kitchen_world.kinematic_structure_entities[20]
 
         # The aggregation should not include the private dataclass field body or the body added exclusively in the private property
-        assert_equal(world_view.kinematic_structure_entities, set(self.kitchen_world.kinematic_structure_entities) - {self.kitchen_world.kinematic_structure_entities[0], self.kitchen_world.kinematic_structure_entities[19]})
+        assert_equal(
+            world_view.kinematic_structure_entities,
+            set(self.kitchen_world.kinematic_structure_entities)
+            - {
+                self.kitchen_world.kinematic_structure_entities[0],
+                self.kitchen_world.kinematic_structure_entities[19],
+            },
+        )
+
+    def test_handle_view_eql(self):
+        world = self.apartment_world
+        with symbolic_mode():
+            body = let("body", type_=Body, domain=world.bodies)
+            query = an(entity(Handle(body=body), in_("handle", body.name.name.lower())))
+        handles = list(query.evaluate())
+        assert len(handles) > 0
 
     def test_handle_view(self):
         self.fit_rules_for_a_view_in_apartment(Handle, scenario=self.test_handle_view)
 
     def test_container_view(self):
-        self.fit_rules_for_a_view_in_apartment(Container, scenario=self.test_container_view)
+        self.fit_rules_for_a_view_in_apartment(
+            Container, scenario=self.test_container_view
+        )
+
+    def test_drawer_view_eql(self):
+        world = self.apartment_world
+        with symbolic_mode():
+            cabinet_body = let("cabinet_body", type_=Body, domain=world.bodies)
+            drawer_body = let("drawer_body", type_=Body, domain=world.bodies)
+            handle_body = let("handle_body", type_=Body, domain=world.bodies)
+            fixed_conn = let("fixed_conn", type_=FixedConnection, domain=world.connections)
+            prismatic_conn = let("prismatic_conn", type_=PrismaticConnection, domain=world.connections)
+            query = an(entity(Drawer(handle=Handle(body=handle_body), container=Container(body=drawer_body)),
+                              cabinet_body == prismatic_conn.parent,
+                              drawer_body == prismatic_conn.child,
+                              handle_body == fixed_conn.child,
+                              drawer_body == fixed_conn.parent))
+        drawers = list(query.evaluate())
+        assert len(drawers) > 0
 
     def test_drawer_view(self):
         self.fit_rules_for_a_view_in_apartment(Drawer, scenario=self.test_drawer_view)
@@ -156,40 +211,56 @@ class ViewTestCase(unittest.TestCase):
         self.fit_rules_for_a_view_in_apartment(Door, scenario=self.test_door_view)
 
     def test_fridge_view(self):
-        self.fit_rules_for_a_view_in_kitchen(Fridge, scenario=self.test_fridge_view, update_existing_views=False)
+        self.fit_rules_for_a_view_in_kitchen(
+            Fridge, scenario=self.test_fridge_view, update_existing_views=False
+        )
 
     @unittest.skip("Skipping test for wardrobe view as it requires user input")
     def test_wardrobe_view(self):
-        self.fit_rules_for_a_view_in_apartment(Wardrobe, scenario=self.test_wardrobe_view)
+        self.fit_rules_for_a_view_in_apartment(
+            Wardrobe, scenario=self.test_wardrobe_view
+        )
 
     @pytest.mark.skipif(world_rdr is None, reason="requires world_rdr")
     def test_generated_views(self):
         found_views = world_rdr.classify(self.kitchen_world)["views"]
 
-        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
+        drawer_container_names = [
+            v.body.name.name for v in found_views if isinstance(v, Container)
+        ]
         self.assertTrue(len(drawer_container_names) == 14)
 
     @pytest.mark.order("second_to_last")
     def test_apartment_views(self):
         world_reasoner = WorldReasoner(self.apartment_world)
-        world_reasoner.fit_views([Handle, Container, Drawer, Cabinet],
-                                 world_factory=self.get_apartment_world, scenario=self.test_apartment_views)
+        world_reasoner.fit_views(
+            [Handle, Container, Drawer, Cabinet],
+            world_factory=self.get_apartment_world,
+            scenario=self.test_apartment_views,
+        )
 
         found_views = world_reasoner.infer_views()
 
-        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
+        drawer_container_names = [
+            v.body.name.name for v in found_views if isinstance(v, Container)
+        ]
 
         self.assertTrue(len(drawer_container_names) == 19)
 
     @pytest.mark.order("last")
     def test_kitchen_views(self):
         world_reasoner = WorldReasoner(self.kitchen_world)
-        world_reasoner.fit_views([Handle, Container, Drawer, Cabinet],
-                                 world_factory=self.get_kitchen_world, scenario=self.test_kitchen_views)
+        world_reasoner.fit_views(
+            [Handle, Container, Drawer, Cabinet],
+            world_factory=self.get_kitchen_world,
+            scenario=self.test_kitchen_views,
+        )
 
         found_views = world_reasoner.infer_views()
 
-        drawer_container_names = [v.body.name.name for v in found_views if isinstance(v, Container)]
+        drawer_container_names = [
+            v.body.name.name for v in found_views if isinstance(v, Container)
+        ]
 
         self.assertTrue(len(drawer_container_names) == 14)
 
@@ -213,8 +284,12 @@ class ViewTestCase(unittest.TestCase):
         world.validate()
         return world
 
-    def fit_rules_for_a_view_in_kitchen(self, view_type: Type[View], update_existing_views: bool = False,
-                                        scenario: Optional[Callable] = None) -> None:
+    def fit_rules_for_a_view_in_kitchen(
+        self,
+        view_type: Type[View],
+        update_existing_views: bool = False,
+        scenario: Optional[Callable] = None,
+    ) -> None:
         """
         Template method to test a specific view type in the kitchen world.
 
@@ -222,11 +297,20 @@ class ViewTestCase(unittest.TestCase):
         :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
-        self.fit_rules_for_a_view_and_assert(self.kitchen_world, view_type, update_existing_views=update_existing_views,
-                                             world_factory=self.get_kitchen_world, scenario=scenario)
+        self.fit_rules_for_a_view_and_assert(
+            self.kitchen_world,
+            view_type,
+            update_existing_views=update_existing_views,
+            world_factory=self.get_kitchen_world,
+            scenario=scenario,
+        )
 
-    def fit_rules_for_a_view_in_apartment(self, view_type: Type[View], update_existing_views: bool = False,
-                                          scenario: Optional[Callable] = None) -> None:
+    def fit_rules_for_a_view_in_apartment(
+        self,
+        view_type: Type[View],
+        update_existing_views: bool = False,
+        scenario: Optional[Callable] = None,
+    ) -> None:
         """
         Template method to test a specific view type in the apartment world.
 
@@ -234,14 +318,22 @@ class ViewTestCase(unittest.TestCase):
         :param update_existing_views: If True, existing views will be updated with new rules, else they will be skipped.
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
-        self.fit_rules_for_a_view_and_assert(self.apartment_world, view_type,
-                                             update_existing_views=update_existing_views,
-                                             world_factory=self.get_apartment_world, scenario=scenario)
+        self.fit_rules_for_a_view_and_assert(
+            self.apartment_world,
+            view_type,
+            update_existing_views=update_existing_views,
+            world_factory=self.get_apartment_world,
+            scenario=scenario,
+        )
 
     @staticmethod
-    def fit_rules_for_a_view_and_assert(world: World, view_type: Type[View], update_existing_views: bool = False,
-                                        world_factory: Optional[Callable] = None,
-                                        scenario: Optional[Callable] = None) -> None:
+    def fit_rules_for_a_view_and_assert(
+        world: World,
+        view_type: Type[View],
+        update_existing_views: bool = False,
+        world_factory: Optional[Callable] = None,
+        scenario: Optional[Callable] = None,
+    ) -> None:
         """
         Template method to test a specific view type in the given world.
 
@@ -252,9 +344,18 @@ class ViewTestCase(unittest.TestCase):
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
         world_reasoner = WorldReasoner(world)
-        world_reasoner.fit_views([view_type], update_existing_views=update_existing_views,
-                                 world_factory=world_factory, scenario=scenario)
+        world_reasoner.fit_views(
+            [view_type],
+            update_existing_views=update_existing_views,
+            world_factory=world_factory,
+            scenario=scenario,
+        )
 
         found_views = world_reasoner.infer_views()
 
         assert any(isinstance(v, view_type) for v in found_views)
+
+
+if __name__ == "__main__":
+    import pytest
+    pytest.main(["-s", "-k", "test_drawer_view"])

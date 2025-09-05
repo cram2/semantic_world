@@ -2,53 +2,82 @@ from __future__ import annotations
 
 import itertools
 import tempfile
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional, List, Iterator, TYPE_CHECKING
+from typing_extensions import Optional, List, Iterator, TYPE_CHECKING, Dict, Any
 
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from random_events.interval import SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
+from random_events.utils import SubclassJSONSerializer
 from trimesh import Trimesh
 from typing_extensions import Self
 
-from .spatial_types import TransformationMatrix, Point3
-from .spatial_types.spatial_types import Expression
-from .utils import IDGenerator
-from .variables import SpatialVariables
+from ..spatial_types import TransformationMatrix, Point3
+from ..spatial_types.spatial_types import Expression
+from ..spatial_types.symbol_manager import symbol_manager
+from ..utils import IDGenerator
+from ..datastructures.variables import SpatialVariables
 
 if TYPE_CHECKING:
-    from .world_entity import KinematicStructureEntity
+    from ..world_description.world_entity import KinematicStructureEntity
 
 id_generator = IDGenerator()
 
 
+def transformation_from_json(data: Dict[str, Any]) -> TransformationMatrix:
+    """
+    Creates a transformation matrix from a JSON-compatible dictionary.
+
+    Use this together with `transformation_to_json`.
+
+    This is needed since SpatialTypes cannot inherit from SubClassJSONSerializer.
+    They can't inherit since the conversion to JSON needs the symbol_manager, which would cause a cyclic dependency.
+    """
+    return TransformationMatrix.from_xyz_quat(*data["position"], *data["quaternion"])
+
+
+def transformation_to_json(transformation: TransformationMatrix) -> Dict[str, Any]:
+    """
+    Converts a transformation matrix to a JSON-compatible dictionary.
+
+    Use this together with `transformation_from_json`.
+
+    This is needed since SpatialTypes cannot inherit from SubClassJSONSerializer.
+    They can't inherit since the conversion to JSON needs the symbol_manager, which would cause a cyclic dependency.
+    """
+    position = symbol_manager.evaluate_expr(transformation.to_position()).tolist()
+    quaternion = symbol_manager.evaluate_expr(transformation.to_quaternion()).tolist()
+    return {"position": position, "quaternion": quaternion}
+
+
 @dataclass
-class Color:
+class Color(SubclassJSONSerializer):
     """
     Dataclass for storing rgba_color as an RGBA value.
     The values are stored as floats between 0 and 1.
     The default rgba_color is white.
     """
-    R: float = 1.
+
+    R: float = 1.0
     """
     Red value of the color.
     """
 
-    G: float = 1.
+    G: float = 1.0
     """
     Green value of the color.
     """
 
-    B: float = 1.
+    B: float = 1.0
     """
     Blue value of the color.
     """
 
-    A: float = 1.
+    A: float = 1.0
     """
     Opacity of the color.
     """
@@ -62,27 +91,41 @@ class Color:
         self.B = float(self.B)
         self.A = float(self.A)
 
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "R": self.R, "G": self.G, "B": self.B, "A": self.A}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(R=data["R"], G=data["G"], B=data["B"], A=data["A"])
+
 
 @dataclass
-class Scale:
+class Scale(SubclassJSONSerializer):
     """
     Dataclass for storing the scale of geometric objects.
     """
 
-    x: float = 1.
+    x: float = 1.0
     """
     The scale in the x direction.
     """
 
-    y: float = 1.
+    y: float = 1.0
     """
     The scale in the y direction.
     """
 
-    z: float = 1.
+    z: float = 1.0
     """
     The scale in the z direction.
     """
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "x": self.x, "y": self.y, "z": self.z}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(x=data["x"], y=data["y"], z=data["z"])
 
     def __post_init__(self):
         """
@@ -94,10 +137,11 @@ class Scale:
 
 
 @dataclass
-class Shape(ABC):
+class Shape(ABC, SubclassJSONSerializer):
     """
     Base class for all shapes in the world.
     """
+
     origin: TransformationMatrix = field(default_factory=TransformationMatrix)
 
     color: Color = field(default_factory=Color)
@@ -108,7 +152,6 @@ class Shape(ABC):
         """
         Returns the bounding box of the shape
         """
-        ...
 
     @property
     @abstractmethod
@@ -117,14 +160,25 @@ class Shape(ABC):
         The mesh object of the shape.
         This should be implemented by subclasses.
         """
-        ...
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "origin": transformation_to_json(self.origin),
+        }
 
 
 @dataclass
-class Primitive(Shape):
+class Primitive(Shape, ABC):
     """
     A primitive shape.
     """
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "origin": transformation_to_json(self.origin),
+        }
 
 
 @dataclass
@@ -159,6 +213,23 @@ class Mesh(Shape):
         """
         return BoundingBox.from_mesh(self.mesh, self.origin.reference_frame)
 
+    def as_triangle_mesh(self) -> TriangleMesh:
+        """
+        Returns a triangle mesh representation of the mesh.
+        """
+        return TriangleMesh(mesh=self.mesh, origin=self.origin, scale=self.scale)
+
+    def to_json(self) -> Dict[str, Any]:
+        return self.as_triangle_mesh().to_json()
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        raise NotImplementedError(
+            f"{cls} does not support loading from JSON due to filenames across different systems."
+            f" Use TriangleMesh instead."
+        )
+
+
 @dataclass
 class TriangleMesh(Shape):
     mesh: Optional[Trimesh] = None
@@ -185,6 +256,34 @@ class TriangleMesh(Shape):
         """
         return BoundingBox.from_mesh(self.mesh, self.origin.reference_frame)
 
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "mesh": self.mesh.to_dict(),
+            "scale": self.scale.to_json(),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> "TriangleMesh":
+        mesh = trimesh.Trimesh(
+            vertices=data["mesh"]["vertices"], faces=data["mesh"]["faces"]
+        )
+        origin = transformation_from_json(data["origin"])
+        scale = Scale.from_json(data["scale"])
+        return cls(mesh=mesh, origin=origin, scale=scale)
+
+
+@dataclass
+class Primitive(Shape, ABC):
+    """
+    A primitive shape.
+    """
+
+    color: Color = field(default_factory=Color)
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "color": self.color.to_json()}
+
 
 @dataclass
 class Sphere(Primitive):
@@ -209,8 +308,26 @@ class Sphere(Primitive):
         """
         Returns the bounding box of the sphere.
         """
-        return BoundingBox(-self.radius, -self.radius, -self.radius,
-                           self.radius, self.radius, self.radius, self.origin.reference_frame)
+        return BoundingBox(
+            -self.radius,
+            -self.radius,
+            -self.radius,
+            self.radius,
+            self.radius,
+            self.radius,
+            self.origin.reference_frame,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "radius": self.radius}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(
+            radius=data["radius"],
+            origin=transformation_from_json(data["origin"]),
+            color=Color.from_json(data["color"]),
+        )
 
 
 @dataclass
@@ -218,6 +335,7 @@ class Cylinder(Primitive):
     """
     A cylinder shape.
     """
+
     width: float = 0.5
     height: float = 0.5
 
@@ -226,7 +344,9 @@ class Cylinder(Primitive):
         """
         Returns a trimesh object representing the cylinder.
         """
-        return trimesh.creation.cylinder(radius=self.width / 2, height=self.height, sections=16)
+        return trimesh.creation.cylinder(
+            radius=self.width / 2, height=self.height, sections=16
+        )
 
     @property
     def local_frame_bounding_box(self) -> BoundingBox:
@@ -236,8 +356,27 @@ class Cylinder(Primitive):
         """
         half_width = self.width / 2
         half_height = self.height / 2
-        return BoundingBox(-half_width, -half_width, -half_height,
-                           half_width, half_width, half_height, self.origin.reference_frame)
+        return BoundingBox(
+            -half_width,
+            -half_width,
+            -half_height,
+            half_width,
+            half_width,
+            half_height,
+            self.origin.reference_frame,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "width": self.width, "height": self.height}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(
+            width=data["width"],
+            height=data["height"],
+            origin=transformation_from_json(data["origin"]),
+            color=Color.from_json(data["color"]),
+        )
 
 
 @dataclass
@@ -245,6 +384,7 @@ class Box(Primitive):
     """
     A box shape. Pivot point is at the center of the box.
     """
+
     scale: Scale = field(default_factory=Scale)
 
     @property
@@ -272,6 +412,17 @@ class Box(Primitive):
             half_y,
             half_z,
             self.origin.reference_frame,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {**super().to_json(), "scale": self.scale.to_json()}
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(
+            scale=Scale.from_json(data["scale"]),
+            origin=transformation_from_json(data["origin"]),
+            color=Color.from_json(data["color"]),
         )
 
 
@@ -314,7 +465,9 @@ class BoundingBox:
 
     def __hash__(self):
         # The hash should be this since comparing those via hash is checking if those are the same and not just equal
-        return hash((self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z))
+        return hash(
+            (self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z)
+        )
 
     @property
     def x_interval(self) -> SimpleInterval:
@@ -361,11 +514,17 @@ class BoundingBox:
         """
         :return: The bounding box as a random event.
         """
-        return SimpleEvent({SpatialVariables.x.value: self.x_interval,
-                            SpatialVariables.y.value: self.y_interval,
-                            SpatialVariables.z.value: self.z_interval})
+        return SimpleEvent(
+            {
+                SpatialVariables.x.value: self.x_interval,
+                SpatialVariables.y.value: self.y_interval,
+                SpatialVariables.z.value: self.z_interval,
+            }
+        )
 
-    def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> BoundingBox:
+    def bloat(
+        self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
+    ) -> BoundingBox:
         """
         Enlarges the bounding box by a given amount in all dimensions.
 
@@ -388,9 +547,11 @@ class BoundingBox:
         """
         Check if the bounding box contains a point.
         """
-        x, y, z = (point.x.to_np(), point.y.to_np(), point.z.to_np()) if isinstance(point.z, Expression) else (point.x,
-                                                                                                               point.y,
-                                                                                                               point.z)
+        x, y, z = (
+            (point.x.to_np(), point.y.to_np(), point.z.to_np())
+            if isinstance(point.z, Expression)
+            else (point.x, point.y, point.z)
+        )
 
         return self.simple_event.contains((x, y, z))
 
@@ -411,9 +572,11 @@ class BoundingBox:
         :return: The list of bounding boxes.
         """
         result = []
-        for x, y, z in itertools.product(simple_event[SpatialVariables.x.value].simple_sets,
-                                         simple_event[SpatialVariables.y.value].simple_sets,
-                                         simple_event[SpatialVariables.z.value].simple_sets):
+        for x, y, z in itertools.product(
+            simple_event[SpatialVariables.x.value].simple_sets,
+            simple_event[SpatialVariables.y.value].simple_sets,
+            simple_event[SpatialVariables.z.value].simple_sets,
+        ):
             result.append(cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper))
         return result
 
@@ -429,8 +592,15 @@ class BoundingBox:
             return None
         return self.__class__.from_simple_event(result)[0]
 
-    def enlarge(self, min_x: float = 0., min_y: float = 0, min_z: float = 0,
-                max_x: float = 0., max_y: float = 0., max_z: float = 0.):
+    def enlarge(
+        self,
+        min_x: float = 0.0,
+        min_y: float = 0,
+        min_z: float = 0,
+        max_x: float = 0.0,
+        max_y: float = 0.0,
+        max_z: float = 0.0,
+    ):
         """
         Enlarge the axis-aligned bounding box by a given amount in-place.
         :param min_x: The amount to enlarge the minimum x-coordinate
@@ -453,11 +623,12 @@ class BoundingBox:
 
         :param amount: The amount to enlarge the bounding box
         """
-        self.enlarge(amount, amount, amount,
-                     amount, amount, amount)
+        self.enlarge(amount, amount, amount, amount, amount, amount)
 
     @classmethod
-    def from_mesh(cls, mesh: trimesh.Trimesh, reference_frame: KinematicStructureEntity) -> Self:
+    def from_mesh(
+        cls, mesh: trimesh.Trimesh, reference_frame: KinematicStructureEntity
+    ) -> Self:
         """
         Create a bounding box from a trimesh object.
         :param mesh: The trimesh object.
@@ -465,7 +636,15 @@ class BoundingBox:
         :return: The bounding box.
         """
         bounds = mesh.bounds
-        return cls(bounds[0][0], bounds[0][1], bounds[0][2], bounds[1][0], bounds[1][1], bounds[1][2], reference_frame=reference_frame)
+        return cls(
+            bounds[0][0],
+            bounds[0][1],
+            bounds[0][2],
+            bounds[1][0],
+            bounds[1][1],
+            bounds[1][2],
+            reference_frame=reference_frame,
+        )
 
     def get_points(self) -> List[Point3]:
         """
@@ -473,15 +652,15 @@ class BoundingBox:
 
         :return: A list of Point3 objects representing the corners of the bounding box.
         """
-        return [Point3(x, y, z)
-                for x in (self.min_x, self.max_x)
-                for y in (self.min_y, self.max_y)
-                for z in (self.min_z, self.max_z)]
+        return [
+            Point3(x, y, z)
+            for x in (self.min_x, self.max_x)
+            for y in (self.min_y, self.max_y)
+            for z in (self.min_z, self.max_z)
+        ]
 
     @classmethod
-    def from_min_max(
-        cls, min_point: Point3, max_point: Point3
-    ) -> Self:
+    def from_min_max(cls, min_point: Point3, max_point: Point3) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
 
@@ -489,7 +668,9 @@ class BoundingBox:
         :param max_point: The maximum point
         """
         assert min_point.reference_frame is not None
-        assert min_point.reference_frame == max_point.reference_frame, "The reference frames of the minimum and maximum points must be the same."
+        assert (
+            min_point.reference_frame == max_point.reference_frame
+        ), "The reference frames of the minimum and maximum points must be the same."
         return cls(
             *min_point.to_np()[:3],
             *max_point.to_np()[:3],
@@ -497,9 +678,11 @@ class BoundingBox:
         )
 
     def as_shape(self) -> Box:
-        scale = Scale(x=self.max_x - self.min_x,
-                      y=self.max_y - self.min_y,
-                      z=self.max_z - self.min_z)
+        scale = Scale(
+            x=self.max_x - self.min_x,
+            y=self.max_y - self.min_y,
+            z=self.max_z - self.min_z,
+        )
         x = (self.max_x + self.min_x) / 2
         y = (self.max_y + self.min_y) / 2
         z = (self.max_z + self.min_z) / 2
@@ -541,10 +724,11 @@ class BoundingBox:
 
         world_bb = BoundingBox.from_min_max(
             Point3.from_iterable(min_corner, reference_frame=reference_frame),
-            Point3.from_iterable(max_corner, reference_frame=reference_frame)
+            Point3.from_iterable(max_corner, reference_frame=reference_frame),
         )
 
         return world_bb
+
 
 @dataclass
 class BoundingBoxCollection:
@@ -562,9 +746,11 @@ class BoundingBoxCollection:
     The list of bounding boxes.
     """
 
-    def  __post_init__(self):
+    def __post_init__(self):
         for box in self.bounding_boxes:
-            assert box.reference_frame == self.reference_frame, "All bounding boxes must have the same reference frame."
+            assert (
+                box.reference_frame == self.reference_frame
+            ), "All bounding boxes must have the same reference frame."
 
     def __iter__(self) -> Iterator[BoundingBox]:
         return iter(self.bounding_boxes)
@@ -587,7 +773,9 @@ class BoundingBoxCollection:
             self.reference_frame, self.bounding_boxes + other.bounding_boxes
         )
 
-    def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> BoundingBoxCollection:
+    def bloat(
+        self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
+    ) -> BoundingBoxCollection:
         """
         Enlarges all bounding boxes in the collection by a given amount in all dimensions.
 
@@ -618,9 +806,11 @@ class BoundingBoxCollection:
         :return: The list of bounding boxes.
         """
         result = []
-        for x, y, z in itertools.product(simple_event[SpatialVariables.x.value].simple_sets,
-                                         simple_event[SpatialVariables.y.value].simple_sets,
-                                         simple_event[SpatialVariables.z.value].simple_sets):
+        for x, y, z in itertools.product(
+            simple_event[SpatialVariables.x.value].simple_sets,
+            simple_event[SpatialVariables.y.value].simple_sets,
+            simple_event[SpatialVariables.z.value].simple_sets,
+        ):
 
             bb = BoundingBox(
                 x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, reference_frame
@@ -631,7 +821,9 @@ class BoundingBoxCollection:
         return BoundingBoxCollection(reference_frame, result)
 
     @classmethod
-    def from_event(cls, reference_frame: KinematicStructureEntity, event: Event) -> Self:
+    def from_event(
+        cls, reference_frame: KinematicStructureEntity, event: Event
+    ) -> Self:
         """
         Create a list of bounding boxes from a random event.
 

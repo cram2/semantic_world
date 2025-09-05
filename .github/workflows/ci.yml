@@ -25,27 +25,27 @@ jobs:
         submodules: 'false'
     - name: Update semantic_world source files
       run: |
-        rm -rf /opt/ros/overlay_ws/src/semantic_world/* 
-        cd /opt/ros/overlay_ws/src/semantic_world
+        rm -rf /opt/ros/semantic_world/* 
+        cd /opt/ros//semantic_world
         rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/overlay_ws/src
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        cd /opt/ros/overlay_ws/src/semantic_world
+        cd /opt/ros/semantic_world
+        source /opt/ros/semantic_world-venv/bin/activate
         git submodule init
         git submodule update
-        source ../semantic_world-venv/bin/activate    
         pip install -U pip && pip install -r requirements.txt && pip install -e . && pip install pytest
         pip install -e ./src/ripple_down_rules_meta
-        echo "PATH=/opt/ros/overlay_ws/src/Multiverse-Parser/ext/blender:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
-        echo "PYTHONPATH=/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/src" >> $GITHUB_ENV
+#        echo "PATH=/opt/ros/overlay_ws/src/Multiverse-Parser/ext/blender:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
+#        echo "PYTHONPATH=/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/src" >> $GITHUB_ENV
 
 
     - name: Run tests
       run: |
         source /opt/ros/overlay_ws/install/setup.bash
-        source /opt/ros/overlay_ws/src/semantic_world-venv/bin/activate
-        cd /opt/ros/overlay_ws/src/semantic_world
+        source /opt/ros/semantic_world-venv/bin/activate
+        cd /opt/ros/semantic_world
         python -m pytest -v test/

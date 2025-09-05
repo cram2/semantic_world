@@ -1,6 +1,6 @@
 from semantic_world.testing import two_arm_robot_world
 from semantic_world.world import World
-from semantic_world.world_entity import Body
+from semantic_world.world_description.world_entity import Body
 
 
 def test_simple_two_arm_robot(two_arm_robot_world: World):

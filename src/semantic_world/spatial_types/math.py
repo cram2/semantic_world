@@ -1,24 +1,30 @@
-from typing import Tuple, Union, List
+from typing_extensions import Tuple, Union, List
 
 import numpy as np
 
 from .derivatives import Derivatives
-from ..types import NpMatrix4x4, AnyMatrix4x4
+from ..datastructures.types import NpMatrix4x4, AnyMatrix4x4
 
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
     x0, y0, z0, w0 = quaternion0
     x1, y1, z1, w1 = quaternion1
-    return np.array((
-        x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-        -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-        x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
-        -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0), dtype=np.float64)
+    return np.array(
+        (
+            x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+            -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+            x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
+            -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
+        ),
+        dtype=np.float64,
+    )
 
 
 def quaternion_conjugate(quaternion: np.ndarray) -> np.ndarray:
-    return np.array((-quaternion[0], -quaternion[1],
-                     -quaternion[2], quaternion[3]), dtype=np.float64)
+    return np.array(
+        (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
+        dtype=np.float64,
+    )
 
 
 def qv_mult(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarray:
@@ -33,13 +39,19 @@ def qv_mult(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarray:
     return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 
-def quaternion_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray],
-                               angle: float) -> np.ndarray:
+def quaternion_from_axis_angle(
+    axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float
+) -> np.ndarray:
     half_angle = angle / 2
-    return np.array([axis[0] * np.sin(half_angle),
-                     axis[1] * np.sin(half_angle),
-                     axis[2] * np.sin(half_angle),
-                     np.cos(half_angle)], dtype=np.float64)
+    return np.array(
+        [
+            axis[0] * np.sin(half_angle),
+            axis[1] * np.sin(half_angle),
+            axis[2] * np.sin(half_angle),
+            np.cos(half_angle),
+        ],
+        dtype=np.float64,
+    )
 
 
 _EPS = np.finfo(float).eps * 4.0
@@ -56,7 +68,10 @@ def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> Tuple[float, float, float]:
     j = 1
     k = 2
 
-    cy = np.sqrt(rotation_matrix[i, i] * rotation_matrix[i, i] + rotation_matrix[j, i] * rotation_matrix[j, i])
+    cy = np.sqrt(
+        rotation_matrix[i, i] * rotation_matrix[i, i]
+        + rotation_matrix[j, i] * rotation_matrix[j, i]
+    )
     if cy - _EPS > 0:
         roll = np.arctan2(rotation_matrix[k, j], rotation_matrix[k, k])
         pitch = np.arctan2(-rotation_matrix[k, i], cy)
@@ -68,7 +83,9 @@ def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> Tuple[float, float, float]:
     return roll, pitch, yaw
 
 
-def rpy_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Tuple[float, float, float]:
+def rpy_from_quaternion(
+    qx: float, qy: float, qz: float, qw: float
+) -> Tuple[float, float, float]:
     return rpy_from_matrix(rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
@@ -78,22 +95,36 @@ def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> NpMatrix4
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
     :return: 4x4 Matrix
     """
-    rx = np.array([[1, 0, 0, 0],
-                   [0, np.cos(roll), -np.sin(roll), 0],
-                   [0, np.sin(roll), np.cos(roll), 0],
-                   [0, 0, 0, 1]])
-    ry = np.array([[np.cos(pitch), 0, np.sin(pitch), 0],
-                   [0, 1, 0, 0],
-                   [-np.sin(pitch), 0, np.cos(pitch), 0],
-                   [0, 0, 0, 1]])
-    rz = np.array([[np.cos(yaw), -np.sin(yaw), 0, 0],
-                   [np.sin(yaw), np.cos(yaw), 0, 0],
-                   [0, 0, 1, 0],
-                   [0, 0, 0, 1]])
+    rx = np.array(
+        [
+            [1, 0, 0, 0],
+            [0, np.cos(roll), -np.sin(roll), 0],
+            [0, np.sin(roll), np.cos(roll), 0],
+            [0, 0, 0, 1],
+        ]
+    )
+    ry = np.array(
+        [
+            [np.cos(pitch), 0, np.sin(pitch), 0],
+            [0, 1, 0, 0],
+            [-np.sin(pitch), 0, np.cos(pitch), 0],
+            [0, 0, 0, 1],
+        ]
+    )
+    rz = np.array(
+        [
+            [np.cos(yaw), -np.sin(yaw), 0, 0],
+            [np.sin(yaw), np.cos(yaw), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ]
+    )
     return np.dot(np.dot(rz, ry), rx)
 
 
-def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> NpMatrix4x4:
+def rotation_matrix_from_quaternion(
+    x: float, y: float, z: float, w: float
+) -> NpMatrix4x4:
     """
     Unit quaternion to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -103,14 +134,20 @@ def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> N
     y2 = y * y
     z2 = z * z
     w2 = w * w
-    return np.array([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
-                     [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
-                     [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                     [0, 0, 0, 1]], dtype=np.float64)
+    return np.array(
+        [
+            [w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
+            [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
+            [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
+            [0, 0, 0, 1],
+        ],
+        dtype=np.float64,
+    )
 
 
-def rotation_matrix_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float) \
-        -> NpMatrix4x4:
+def rotation_matrix_from_axis_angle(
+    axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float
+) -> NpMatrix4x4:
     return rotation_matrix_from_quaternion(*quaternion_from_axis_angle(axis, angle))
 
 
@@ -146,10 +183,12 @@ def quaternion_from_rotation_matrix(matrix: AnyMatrix4x4) -> np.ndarray:
     return q
 
 
-def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[np.ndarray, float]:
+def axis_angle_from_quaternion(
+    x: float, y: float, z: float, w: float
+) -> Tuple[np.ndarray, float]:
     l = np.linalg.norm(np.array([x, y, z, w]))
     x, y, z, w = x / l, y / l, z / l, w / l
-    w2 = np.sqrt(1 - w ** 2)
+    w2 = np.sqrt(1 - w**2)
     if w2 == 0:
         m = 1
     else:
@@ -157,7 +196,7 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
     if w2 == 0:
         angle = 0
     else:
-        angle = (2 * np.arccos(min(max(-1, w), 1)))
+        angle = 2 * np.arccos(min(max(-1, w), 1))
     if w2 == 0:
         x = 0
         y = 0
@@ -173,22 +212,26 @@ def axis_angle_from_rotation_matrix(m: NpMatrix4x4) -> Tuple[np.ndarray, float]:
     return axis_angle_from_quaternion(*quaternion_from_rotation_matrix(m))
 
 
-def axis_angle_from_rpy(roll: float, pitch: float, yaw: float) -> Tuple[np.ndarray, float]:
+def axis_angle_from_rpy(
+    roll: float, pitch: float, yaw: float
+) -> Tuple[np.ndarray, float]:
     return axis_angle_from_quaternion(*quaternion_from_rpy(roll, pitch, yaw))
 
 
 def gauss(n: float) -> float:
-    return (n ** 2 + n) / 2
+    return (n**2 + n) / 2
 
 
-def max_velocity_from_horizon_and_jerk(prediction_horizon: int,
-                                       vel_limit: float,
-                                       acc_limit: float,
-                                       jerk_limit: float,
-                                       sample_period: float,
-                                       max_derivative: Derivatives):
+def max_velocity_from_horizon_and_jerk(
+    prediction_horizon: int,
+    vel_limit: float,
+    acc_limit: float,
+    jerk_limit: float,
+    sample_period: float,
+    max_derivative: Derivatives,
+):
     n2 = int((prediction_horizon) / 2)
-    vel_jerk_limited = (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
+    vel_jerk_limited = (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period**2
     vel_acc_limits = acc_limit * sample_period * prediction_horizon
     if max_derivative == Derivatives.jerk:
         return min(vel_limit, vel_acc_limits, vel_jerk_limited)
@@ -250,10 +293,11 @@ def point_to_single_caster_angle(px, py, caster_v, forward_velocity):
         circumference = 2 * np.pi * radius
         number_of_revolutions = forward_velocity / circumference
         angular_velocity = number_of_revolutions / (2 * np.pi)
-        angular_velocity = min(max(angular_velocity, -max_angular_velocity), max_angular_velocity)
+        angular_velocity = min(
+            max(angular_velocity, -max_angular_velocity), max_angular_velocity
+        )
     else:
         angular_velocity = max_angular_velocity
-    print(f'angular velocity {angular_velocity}')
     return angle, c_V_goal
 
 
@@ -268,22 +312,22 @@ def point_to_caster_angles(px, py):
     # center_P_br = np.array([-1, -1, 0, 1])
     # print(f'br {point_to_single_caster_angle(px, py, center_P_br, forward_velocity)}')
     center = np.array([0, 0, 0, 1])
-    print(f'center {point_to_single_caster_angle(px, py, center, forward_velocity)}')
+    print(f"center {point_to_single_caster_angle(px, py, center, forward_velocity)}")
 
 
 def shortest_angular_distance(from_angle, to_angle):
-    """ Given 2 angles, this returns the shortest angular
-        difference.  The inputs and ouputs are of course radians.
+    """Given 2 angles, this returns the shortest angular
+    difference.  The inputs and ouputs are of course radians.
 
-        The result would always be -pi <= result <= pi. Adding the result
-        to "from" will always get you an equivelent angle to "to".
+    The result would always be -pi <= result <= pi. Adding the result
+    to "from" will always get you an equivelent angle to "to".
     """
     return normalize_angle(to_angle - from_angle)
 
 
 def normalize_angle(angle):
-    """ Normalizes the angle to be -pi to +pi
-        It takes and returns radians."""
+    """Normalizes the angle to be -pi to +pi
+    It takes and returns radians."""
     a = normalize_angle_positive(angle)
     if a > np.pi:
         a -= 2.0 * np.pi
@@ -291,8 +335,8 @@ def normalize_angle(angle):
 
 
 def normalize_angle_positive(angle):
-    """ Normalizes the angle to be 0 to 2*pi
-        It takes and returns radians. """
+    """Normalizes the angle to be 0 to 2*pi
+    It takes and returns radians."""
     return angle % (2.0 * np.pi)
 
 

@@ -21,3 +21,6 @@ rtree
 daqp
 pathlib
 probabilistic_model
+python-fcl
+manifold3d
+entity_query_language

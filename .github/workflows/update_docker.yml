@@ -5,6 +5,8 @@ on:
       - main
     paths:
       - 'docker/Dockerfile'
+      - 'semantic_world_msgs'
+      - 'docker/entrypoint.sh'
 # only run when a commit has changes in the requirements.txt file
 
 jobs:

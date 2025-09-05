@@ -2,15 +2,15 @@ import os
 import unittest
 
 from semantic_world.adapters.mesh import STLParser
-from semantic_world.geometry import Mesh
+from semantic_world.world_description.geometry import Mesh
 
 
 class STLAdapterTestCase(unittest.TestCase):
 
     def setUp(self):
         # Set up any necessary resources or state before each test
-        self.milk_path = os.path.join(__file__, "..", "resources", "stl", 'milk.stl')
-        self.cup = os.path.join(__file__, "..", "resources", "stl", 'jeroen_cup.stl')
+        self.milk_path = os.path.join(__file__, "..", "resources", "stl", "milk.stl")
+        self.cup = os.path.join(__file__, "..", "resources", "stl", "jeroen_cup.stl")
 
     def test_stl_parsing_construct(self):
         stl_parser = STLParser(self.milk_path)

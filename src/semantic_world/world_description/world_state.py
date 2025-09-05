@@ -1,9 +1,9 @@
-from typing import MutableMapping, List, Dict
+from typing_extensions import MutableMapping, List, Dict
 
 import numpy as np
 
-from .prefixed_name import PrefixedName
-from .spatial_types.derivatives import Derivatives
+from ..datastructures.prefixed_name import PrefixedName
+from ..spatial_types.derivatives import Derivatives
 
 
 class WorldStateView:
@@ -96,7 +96,9 @@ class WorldState(MutableMapping):
     def __setitem__(self, name: PrefixedName, value: np.ndarray) -> None:
         arr = np.asarray(value, dtype=float)
         if arr.shape != (4,):
-            raise ValueError(f"Value for '{name}' must be length-4 array (pos, vel, acc, jerk).")
+            raise ValueError(
+                f"Value for '{name}' must be length-4 array (pos, vel, acc, jerk)."
+            )
         if name not in self._index:
             self._add_dof(name)
         idx = self._index[name]
@@ -132,8 +134,13 @@ class WorldState(MutableMapping):
         return name in self._index
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({{ " + ", ".join(f"{n}: {list(self.data[:, i])}"
-                                                            for i, n in enumerate(self._names)) + " })"
+        return (
+            f"{self.__class__.__name__}({{ "
+            + ", ".join(
+                f"{n}: {list(self.data[:, i])}" for i, n in enumerate(self._names)
+            )
+            + " })"
+        )
 
     def to_position_dict(self) -> Dict[PrefixedName, float]:
         return {joint_name: self[joint_name].position for joint_name in self._names}

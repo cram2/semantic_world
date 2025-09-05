@@ -3,18 +3,18 @@ from __future__ import annotations
 from ctypes import c_int
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, TYPE_CHECKING, List, Tuple
+from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
 
 import daqp
 import numpy as np
 
-from .connections import ActiveConnection, PassiveConnection
-from .degree_of_freedom import DegreeOfFreedom
-from .spatial_types import spatial_types as cas
+from ..world_description.connections import ActiveConnection, PassiveConnection
+from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..spatial_types import spatial_types as cas
 
 if TYPE_CHECKING:
-    from .world import World
-    from .world_entity import Body
+    from ..world import World
+    from ..world_description.world_entity import Body
 
 
 _large_value = np.inf
@@ -22,6 +22,7 @@ _large_value = np.inf
 Used as bounds for slack variables. 
 Only needs to be changed when a different QP solver is used, as some can't handle inf.
 """
+
 
 class IKSolverException(Exception):
     pass
@@ -35,7 +36,9 @@ class UnreachableException(IKSolverException):
 
     def __init__(self, iterations: int):
         self.iterations = iterations
-        super().__init__(f'Converged after {self.iterations}, but target pose not reached.')
+        super().__init__(
+            f"Converged after {self.iterations}, but target pose not reached."
+        )
 
 
 class MaxIterationsException(IKSolverException):
@@ -45,21 +48,22 @@ class MaxIterationsException(IKSolverException):
     """
 
     def __init__(self, iterations: int):
-        super().__init__(f'Failed to converge in {iterations} iterations.')
+        super().__init__(f"Failed to converge in {iterations} iterations.")
 
 
 class DAQPSolverExitFlag(Enum):
     """
     Exit flags for the DAQP solver.
     """
-    SOFT_OPTIMAL = (2, 'Soft optimal')
-    OPTIMAL = (1, 'Optimal')
-    INFEASIBLE = (-1, 'Infeasible')
-    CYCLING_DETECTED = (-2, 'Cycling detected')
-    UNBOUNDED_PROBLEM = (-3, 'Unbounded problem')
-    ITERATION_LIMIT_REACHED = (-4, 'Iteration limit reached')
-    NONCONVEX_PROBLEM = (-5, 'Nonconvex problem')
-    INITIAL_WORKING_SET_OVERDETERMINED = (-6, 'Initial working set overdetermined')
+
+    SOFT_OPTIMAL = (2, "Soft optimal")
+    OPTIMAL = (1, "Optimal")
+    INFEASIBLE = (-1, "Infeasible")
+    CYCLING_DETECTED = (-2, "Cycling detected")
+    UNBOUNDED_PROBLEM = (-3, "Unbounded problem")
+    ITERATION_LIMIT_REACHED = (-4, "Iteration limit reached")
+    NONCONVEX_PROBLEM = (-5, "Nonconvex problem")
+    INITIAL_WORKING_SET_OVERDETERMINED = (-6, "Initial working set overdetermined")
 
     def __init__(self, code, description):
         self.code = code
@@ -76,7 +80,9 @@ class DAQPSolverExitFlag(Enum):
 class QPSolverException(IKSolverException):
     def __init__(self, exit_flag_code):
         self.exit_flag = DAQPSolverExitFlag.from_code(exit_flag_code)
-        super().__init__(f'QP solver failed with exit flag: {self.exit_flag.description}')
+        super().__init__(
+            f"QP solver failed with exit flag: {self.exit_flag.description}"
+        )
 
 
 @dataclass
@@ -135,9 +141,16 @@ class InverseKinematicsSolver:
     Unit is m for the position target or rad for the orientation target.
     """
 
-    def solve(self, root: Body, tip: Body, target: cas.TransformationMatrix,
-              dt: float = 0.05, max_iterations: int = 200,
-              translation_velocity: float = 0.2, rotation_velocity: float = 0.2) -> Dict[DegreeOfFreedom, float]:
+    def solve(
+        self,
+        root: Body,
+        tip: Body,
+        target: cas.TransformationMatrix,
+        dt: float = 0.05,
+        max_iterations: int = 200,
+        translation_velocity: float = 0.2,
+        rotation_velocity: float = 0.2,
+    ) -> Dict[DegreeOfFreedom, float]:
         """
         Solve inverse kinematics problem.
 
@@ -157,22 +170,33 @@ class InverseKinematicsSolver:
             target=target,
             dt=dt,
             max_translation_velocity=translation_velocity,
-            max_rotation_velocity=rotation_velocity
+            max_rotation_velocity=rotation_velocity,
         )
 
         # Initialize solver state
         solver_state = SolverState(
-            position=np.array([self.world.state[dof.name].position for dof in qp_problem.active_dofs]),
-            passive_position=np.array([self.world.state[dof.name].position for dof in qp_problem.passive_dofs])
+            position=np.array(
+                [self.world.state[dof.name].position for dof in qp_problem.active_dofs]
+            ),
+            passive_position=np.array(
+                [self.world.state[dof.name].position for dof in qp_problem.passive_dofs]
+            ),
         )
 
         # Run iterative solver
-        final_position = self._solve_iteratively(qp_problem, solver_state, dt, max_iterations)
+        final_position = self._solve_iteratively(
+            qp_problem, solver_state, dt, max_iterations
+        )
 
         return {dof: final_position[i] for i, dof in enumerate(qp_problem.active_dofs)}
 
-    def _solve_iteratively(self, qp_problem: QPProblem, solver_state: SolverState, dt: float,
-                           max_iterations: int) -> np.ndarray:
+    def _solve_iteratively(
+        self,
+        qp_problem: QPProblem,
+        solver_state: SolverState,
+        dt: float,
+        max_iterations: int,
+    ) -> np.ndarray:
         """
         Tries to solve the inverse kinematics problem iteratively.
         :param qp_problem: Problem definition.
@@ -193,7 +217,9 @@ class InverseKinematicsSolver:
             raise MaxIterationsException(max_iterations)
         return solver_state.position
 
-    def _solve_qp_step(self, qp_problem: QPProblem, solver_state: SolverState) -> Tuple[np.ndarray, np.ndarray]:
+    def _solve_qp_step(
+        self, qp_problem: QPProblem, solver_state: SolverState
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Evaluate the QP matrices at the current state and solve the QP.
         :param qp_problem: Problem definition.
@@ -210,14 +236,21 @@ class InverseKinematicsSolver:
 
         # Solve QP
         (xstar, fval, exitflag, info) = daqp.solve(
-            qp_matrices.H, qp_matrices.g, qp_matrices.A,
-            qp_matrices.u, qp_matrices.l, sense
+            qp_matrices.H,
+            qp_matrices.g,
+            qp_matrices.A,
+            qp_matrices.u,
+            qp_matrices.l,
+            sense,
         )
 
         if exitflag != 1:
             raise QPSolverException(exitflag)
 
-        return xstar[:len(qp_problem.active_symbols)], xstar[len(qp_problem.active_symbols):]
+        return (
+            xstar[: len(qp_problem.active_symbols)],
+            xstar[len(qp_problem.active_symbols) :],
+        )
 
     def _check_convergence(self, velocity: np.ndarray, slack: np.ndarray) -> bool:
         """
@@ -225,8 +258,12 @@ class InverseKinematicsSolver:
         :param slack: Current slack values.
         :return: Whether the solver has converged.
         """
-        vel_below_threshold = np.max(np.abs(velocity)) < self._convergence_velocity_tolerance
-        slack_below_threshold = np.max(np.abs(slack)) < self._convergence_slack_tolerance
+        vel_below_threshold = (
+            np.max(np.abs(velocity)) < self._convergence_velocity_tolerance
+        )
+        slack_below_threshold = (
+            np.max(np.abs(slack)) < self._convergence_slack_tolerance
+        )
         if vel_below_threshold and slack_below_threshold:
             return True
         if vel_below_threshold and not slack_below_threshold:
@@ -270,27 +307,42 @@ class QPProblem:
 
     def __post_init__(self):
         # Extract DOFs and setup problem
-        self.active_dofs, self.passive_dofs, self.active_symbols, self.passive_symbols = self._extract_dofs()
+        (
+            self.active_dofs,
+            self.passive_dofs,
+            self.active_symbols,
+            self.passive_symbols,
+        ) = self._extract_dofs()
         self._setup_constraints()
         self._setup_weights()
         self._compile_functions()
 
-    def _extract_dofs(self) -> Tuple[list[DegreeOfFreedom], list[DegreeOfFreedom], list[cas.Symbol], list[cas.Symbol]]:
+    def _extract_dofs(
+        self,
+    ) -> Tuple[
+        list[DegreeOfFreedom], list[DegreeOfFreedom], list[cas.Symbol], list[cas.Symbol]
+    ]:
         """
         Extract active and passive DOFs from the kinematic chain.
         :return: Active Dofs, Passive Dofs, Active Symbols, Passive Symbols.
         """
         active_dofs_set = set()
         passive_dofs_set = set()
-        root_to_common_link, common_link_to_tip = self.world.compute_split_chain_of_connections(self.root, self.tip)
+        root_to_common_link, common_link_to_tip = (
+            self.world.compute_split_chain_of_connections(self.root, self.tip)
+        )
         for connection in root_to_common_link + common_link_to_tip:
             if isinstance(connection, ActiveConnection):
                 active_dofs_set.update(connection.active_dofs)
             if isinstance(connection, PassiveConnection):
                 passive_dofs_set.update(connection.passive_dofs)
 
-        active_dofs: List[DegreeOfFreedom] = list(sorted(active_dofs_set, key=lambda d: str(d.name)))
-        passive_dofs: List[DegreeOfFreedom] = list(sorted(passive_dofs_set, key=lambda d: str(d.name)))
+        active_dofs: List[DegreeOfFreedom] = list(
+            sorted(active_dofs_set, key=lambda d: str(d.name))
+        )
+        passive_dofs: List[DegreeOfFreedom] = list(
+            sorted(passive_dofs_set, key=lambda d: str(d.name))
+        )
 
         active_symbols = [dof.symbols.position for dof in active_dofs]
         passive_symbols = [dof.symbols.position for dof in passive_dofs]
@@ -300,19 +352,24 @@ class QPProblem:
     def _setup_constraints(self):
         """Setup all constraints for the QP problem."""
         self.constraint_builder = ConstraintBuilder(
-            self.world, self.root, self.tip, self.target,
-            self.dt, self.max_translation_velocity, self.max_rotation_velocity
+            self.world,
+            self.root,
+            self.tip,
+            self.target,
+            self.dt,
+            self.max_translation_velocity,
+            self.max_rotation_velocity,
         )
 
         # Box constraints
-        self.lower_box_constraints, self.upper_box_constraints = self.constraint_builder.build_box_constraints(
-            self.active_dofs
+        self.lower_box_constraints, self.upper_box_constraints = (
+            self.constraint_builder.build_box_constraints(self.active_dofs)
         )
         self.box_constraint_matrix = cas.eye(len(self.lower_box_constraints))
 
         # Goal constraints
-        self.eq_bound_expr, self.neq_matrix = self.constraint_builder.build_goal_constraints(
-            self.active_symbols
+        self.eq_bound_expr, self.neq_matrix = (
+            self.constraint_builder.build_goal_constraints(self.active_symbols)
         )
 
         # Combine constraints
@@ -322,9 +379,11 @@ class QPProblem:
 
     def _setup_weights(self):
         """Setup quadratic and linear weights for the QP problem."""
-        dof_weights = [0.001 * (1. / min(1., dof.upper_limits.velocity)) ** 2
-                       for dof in self.active_dofs]
-        slack_weights = [2500 * (1. / 0.2) ** 2] * 6
+        dof_weights = [
+            0.001 * (1.0 / min(1.0, dof.upper_limits.velocity)) ** 2
+            for dof in self.active_dofs
+        ]
+        slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
 
         self.quadratic_weights = cas.Expression(dof_weights + slack_weights)
         self.linear_weights = cas.zeros(*self.quadratic_weights.shape)
@@ -342,8 +401,14 @@ class QPProblem:
     def evaluate_at_state(self, solver_state) -> QPMatrices:
         """Evaluate QP matrices at the current solver state."""
         return QPMatrices(
-            H=np.diag(self.quadratic_weights_f.fast_call(solver_state.position, solver_state.passive_position)),
-            g=self.linear_weights_f.fast_call(solver_state.position, solver_state.passive_position),
+            H=np.diag(
+                self.quadratic_weights_f.fast_call(
+                    solver_state.position, solver_state.passive_position
+                )
+            ),
+            g=self.linear_weights_f.fast_call(
+                solver_state.position, solver_state.passive_position
+            ),
             A=self.A_f.fast_call(solver_state.position, solver_state.passive_position),
             l=self.l_f.fast_call(solver_state.position, solver_state.passive_position),
             u=self.u_f.fast_call(solver_state.position, solver_state.passive_position),
@@ -389,8 +454,9 @@ class ConstraintBuilder:
     Used to limit the velocity of the DOFs, because the default values defined in the semantic world are sometimes unreasonably high.
     """
 
-
-    def build_box_constraints(self, active_dofs: List[DegreeOfFreedom]) -> Tuple[cas.Expression, cas.Expression]:
+    def build_box_constraints(
+        self, active_dofs: List[DegreeOfFreedom]
+    ) -> Tuple[cas.Expression, cas.Expression]:
         """Build position and velocity limit constraints for DOFs."""
         lower_constraints = []
         upper_constraints = []
@@ -413,19 +479,20 @@ class ConstraintBuilder:
 
         return cas.Expression(lower_constraints), cas.Expression(upper_constraints)
 
-    def build_goal_constraints(self, active_symbols: List[cas.Symbol]) -> Tuple[cas.Expression, cas.Expression]:
+    def build_goal_constraints(
+        self, active_symbols: List[cas.Symbol]
+    ) -> Tuple[cas.Expression, cas.Expression]:
         """Build position and rotation goal constraints."""
-        root_T_tip = self.world.compose_forward_kinematics_expression(self.root, self.tip)
+        root_T_tip = self.world.compose_forward_kinematics_expression(
+            self.root, self.tip
+        )
 
         # Position and rotation errors
         position_state, position_error = self._compute_position_error(root_T_tip)
         rotation_state, rotation_error = self._compute_rotation_error(root_T_tip)
 
         # Current state and jacobian
-        current_expr = cas.vstack([
-            position_state,
-            rotation_state
-        ])
+        current_expr = cas.vstack([position_state, rotation_state])
         eq_bound_expr = cas.vstack([position_error, rotation_error])
 
         J = cas.jacobian(current_expr, active_symbols)
@@ -433,7 +500,9 @@ class ConstraintBuilder:
 
         return eq_bound_expr, neq_matrix
 
-    def _compute_position_error(self, root_T_tip: cas.TransformationMatrix) -> Tuple[cas.Expression, cas.Expression]:
+    def _compute_position_error(
+        self, root_T_tip: cas.TransformationMatrix
+    ) -> Tuple[cas.Expression, cas.Expression]:
         """
         Compute position error with velocity limits.
         :param root_T_tip: Forward kinematics expression.
@@ -447,11 +516,15 @@ class ConstraintBuilder:
         position_error = root_P_tip_goal[:3] - root_P_tip[:3]
 
         for i in range(3):
-            position_error[i] = cas.limit(position_error[i], -translation_cap, translation_cap)
+            position_error[i] = cas.limit(
+                position_error[i], -translation_cap, translation_cap
+            )
 
         return root_P_tip[:3], position_error
 
-    def _compute_rotation_error(self, root_T_tip: cas.TransformationMatrix) -> Tuple[cas.Expression, cas.Expression]:
+    def _compute_rotation_error(
+        self, root_T_tip: cas.TransformationMatrix
+    ) -> Tuple[cas.Expression, cas.Expression]:
         """
         Compute rotation error with velocity limits.
         :param root_T_tip: Forward kinematics expression.
@@ -468,7 +541,9 @@ class ConstraintBuilder:
 
         rotation_error = -q_error
         for i in range(3):
-            rotation_error[i] = cas.limit(rotation_error[i], -rotation_cap, rotation_cap)
+            rotation_error[i] = cas.limit(
+                rotation_error[i], -rotation_cap, rotation_cap
+            )
 
         return q_error[:3], rotation_error[:3]
 
