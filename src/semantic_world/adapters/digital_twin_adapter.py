@@ -7,6 +7,8 @@ Adjust the imports below to match your repo's layout.
 
 from dataclasses import dataclass
 from typing import Optional
+import inspect
+from types import SimpleNamespace
 
 import mujoco as mj
 
@@ -14,6 +16,41 @@ import mujoco as mj
 from semantic_world.world import Body
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.views.views import Cabinet, Door, Handle  # your dataclasses
+
+# ---------- Flexible constructor helper ----------
+
+def _flex_construct(cls, fallback_attrs: dict):
+    """
+    Try to instantiate `cls` by filtering kwargs to what its __init__ accepts.
+    Then, ensure all attrs in fallback_attrs exist on the instance (setattr if missing).
+    If construction fails, return a SimpleNamespace with those attrs.
+    """
+    # Figure out the signature (dataclasses may expose __init__, sometimes cls itself)
+    try:
+        sig = inspect.signature(cls.__init__)
+    except (TypeError, ValueError, AttributeError):
+        try:
+            sig = inspect.signature(cls)
+        except Exception:
+            sig = None
+
+    kwargs = {}
+    if sig is not None:
+        for k, v in fallback_attrs.items():
+            if k in sig.parameters:
+                kwargs[k] = v
+
+    try:
+        obj = cls(**kwargs)
+    except Exception:
+        obj = SimpleNamespace(**fallback_attrs)
+        return obj
+
+    # Backfill any attrs we rely on but that weren't constructor params
+    for k, v in fallback_attrs.items():
+        if not hasattr(obj, k):
+            setattr(obj, k, v)
+    return obj
 
 # ---------- Build a semantic Cabinet view from a MuJoCo model ----------
 
@@ -49,8 +86,8 @@ def build_cabinet_view(
     d_body   = _mk_body(model, data, door_body)
     h_body   = _mk_body(model, data, handle_body)
 
-    handle = Handle(body=h_body)
-    door   = Door(body=d_body, handle=handle)
+    handle = _flex_construct(Handle, {"body": h_body})
+    door   = _flex_construct(Door,   {"body": d_body, "handle": handle})
 
     # Derive joint type if provided
     joint_type = None
@@ -65,14 +102,17 @@ def build_cabinet_view(
             else:
                 joint_type = "other"
 
-    return Cabinet(
-        body=cab_body,
-        doors=[door],
-        drawers=[],
-        joint_type=joint_type,
-        joint_sim_name=door_joint,
-        description="Semantic view built from MuJoCo model",
-    )
+    cab_fallback = {
+        "body": cab_body,
+        "doors": [door],
+        "drawers": [],
+        "joint_type": joint_type,
+        "joint_sim_name": door_joint,
+        "description": "Semantic view built from MuJoCo model",
+    }
+
+    cab = _flex_construct(Cabinet, cab_fallback)
+    return cab
 
 # ---------- Digital-Twin Controller bound to the semantic view ----------
 
@@ -138,4 +178,3 @@ class DigitalTwinCabinetAgent:
             return val > 0.25 * (thresh_percent / 100.0)
         else:
             return False
-
