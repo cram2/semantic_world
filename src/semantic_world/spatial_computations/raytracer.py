@@ -110,12 +110,12 @@ class RayTracer:
         self, camera_pose: NpMatrix4x4, resolution: int = 512
     ) -> np.ndarray:
         """
-                Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
-                in the mask corresponds to the index of a  body in the scene or -1 if no body is hit at that pixel.
-        <
-                :param camera_pose: The position of the camera.
-                :param resolution: The resolution of the segmentation mask.
-                :return: A segmentation mask as a numpy array.
+        Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
+        in the mask corresponds to the index of a body in the scene or -1 if no body is hit at that pixel.
+
+        :param camera_pose: The position of the camera.
+        :param resolution: The resolution of the segmentation mask.
+        :return: A segmentation mask as a numpy array.
         """
         self.update_scene()
         ray_origins, ray_directions, pixels = self.create_camera_rays(
