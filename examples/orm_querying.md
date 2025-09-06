@@ -31,6 +31,7 @@ from ormatic.dao import to_dao
 from semantic_world.adapters.urdf import URDFParser
 from semantic_world.orm.ormatic_interface import *
 from semantic_world.views.views import Table
+from semantic_world.utils import get_semantic_world_directory_root
 
 # setup ros 2
 rclpy.init()
@@ -41,7 +42,7 @@ session = Session(engine)
 Base.metadata.create_all(bind=session.bind)
 
 # load the table world from urdf
-urdf_dir = os.path.join(os.getcwd(), "..",  "resources", "urdf")
+urdf_dir = os.path.join(get_semantic_world_directory_root(os.getcwd()), "resources", "urdf")
 table = os.path.join(urdf_dir, "table.urdf")
 world = URDFParser.from_file(table).parse()
 ```

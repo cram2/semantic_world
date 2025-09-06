@@ -1,71 +1,54 @@
 name: Jupyter Notebook Examples
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
-# ----------------------------------------------------------------------------------------------------------------------
-
 defaults:
   run:
-    shell: bash
-    working-directory: .
+    shell: bash -ieo pipefail {0}
+
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
 
 jobs:
-  test-and-build:
-    name: Test Jupyter Notebooks
+  test:
     runs-on: ubuntu-latest
     container:
       image: "pycram/semantic_world:jazzy"
-
     steps:
+    - uses: actions/checkout@v4
+      with:
+        path: "ros/src/semantic_world"
+        repository: ${{ github.repository }}
+        ref: ${{ github.ref }}
+        submodules: 'false'
+    - name: Update semantic_world source files
+      run: |
+        rm -rf /opt/ros/semantic_world/* 
+        cd /opt/ros//semantic_world
+        rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/
 
-      - name: Checkout semantic_world
-        uses: actions/checkout@v3
-        with:
-          path: "ros/src/semantic_world"
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-          submodules: "false"
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt install python3-cffi -y
+        cd /opt/ros/semantic_world
+        source /opt/ros/semantic_world-venv/bin/activate
+        git submodule init
+        git submodule update
+        pip install -U pip && pip install -U -r requirements.txt && pip install -e . && pip install pytest
+        pip install -r doc/requirements.txt && pip install treon jupytext
+        pip install -e ./src/ripple_down_rules_meta
+#        echo "PATH=/opt/ros/overlay_ws/src/Multiverse-Parser/ext/blender:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV
+#        echo "PYTHONPATH=/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/src" >> $GITHUB_ENV
 
-      # For debugging
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
 
-      - name: Update semantic_world source files
-        run: |
-          rm -rf /opt/ros/semantic_world/* 
-          cd /opt/ros/semantic_world
-          rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-          cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros
-
-      # ----------------------------------------------------------------------------------------------------------------
-
-      - name: Install python dependencies
-        run: |
-          source /opt/ros/semantic_world-venv/bin/activate
-          pip install --upgrade pip --root-user-action=ignore
-          cd /opt/ros/semantic_world
-          pip install -r requirements.txt
-          pip install jupytext treon
-          pip install -e .
-
-      # ----------------------------------------------------------------------------------------------------------------
-      - name: Convert Notebooks
-        run: |
-          cd /opt/ros/semantic_world/examples
-          source /opt/ros/semantic_world-venv/bin/activate
-          python -m jupytext --to notebook *.md
-
-      - name: Run tests
-        run: |
-          source /opt/ros/overlay_ws/install/setup.bash
-          source /opt/ros/semantic_world-venv/bin/activate
-          cd /opt/ros/semantic_world/examples/
-          python -m treon --thread 1 -v
-          rm *.ipynb
+    - name: Run tests
+      run: |
+        source /opt/ros/overlay_ws/install/setup.bash
+        source /opt/ros/semantic_world-venv/bin/activate
+        cd /opt/ros/semantic_world/scripts
+        /bin/bash test_notebook_examples.sh
