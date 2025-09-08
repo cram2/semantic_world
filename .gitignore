@@ -6,3 +6,5 @@ _build
 *.egg-info
 build
 resources/procthor_environments
+examples/tmp
+test/file::memory:

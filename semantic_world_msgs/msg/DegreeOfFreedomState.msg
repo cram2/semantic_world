@@ -1,2 +1,0 @@
-semantic_world_msgs/PrefixedName name
-float64 position

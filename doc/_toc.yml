@@ -4,6 +4,18 @@
 format: jb-book
 root: intro
 parts:
+- caption: User Guide
+  chapters:
+    - file: user_guide
+      sections:
+        - file: examples/creating_custom_bodies
+        - file: examples/loading_worlds
+        - file: examples/visualizing_worlds
+        - file: examples/world_state_manipulation
+        - file: examples/world_structure_manipulation
+        - file: examples/regions
+        - file: examples/views
+        - file: examples/persistence_of_annotated_worlds
 - caption: Concepts
   chapters:
     - file: kinematic_world
@@ -14,7 +26,6 @@ parts:
 - caption: Examples
   chapters:
     - file: examples/graph_of_convex_sets
-    - file: examples/orm_querying
 - caption: References
   chapters:
     - file: autoapi/index

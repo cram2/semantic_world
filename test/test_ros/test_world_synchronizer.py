@@ -18,8 +18,11 @@ from semantic_world.world_description.world_entity import Body
 if rclpy_installed():
     import rclpy
     from rclpy.executors import SingleThreadedExecutor
-    from semantic_world.adapters.ros.world_synchronizer import StateSynchronizer, ModelReloadSynchronizer, \
-        ModelSynchronizer
+    from semantic_world.adapters.ros.world_synchronizer import (
+        StateSynchronizer,
+        ModelReloadSynchronizer,
+        ModelSynchronizer,
+    )
 
 
 @skipUnless(rclpy_installed(), "rclpy required")

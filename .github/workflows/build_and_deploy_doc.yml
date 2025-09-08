@@ -38,16 +38,16 @@ jobs:
 
     - name: Update semantic_world source files
       run: |
-        rm -rf /opt/ros/overlay_ws/src/semantic_world/* 
-        cd /opt/ros/overlay_ws/src/semantic_world
+        rm -rf /opt/ros/semantic_world/* 
+        cd /opt/ros/semantic_world
         rm -rf .git .github .gitignore .gitmodules .readthedocs.yaml
-        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros/overlay_ws/src
+        cp -r /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/ros/src/semantic_world /opt/ros
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        cd /opt/ros/overlay_ws/src/semantic_world
-        source /opt/ros/semantic_world-venv/bin/activate    
+        cd /opt/ros/semantic_world
+        source /opt/ros/semantic_world-venv/bin/activate
         pip install -U pip && pip install -r requirements.txt && pip install . && pip install -r doc/requirements.txt
 
     # (optional) Cache your executed notebooks between runs
@@ -63,8 +63,8 @@ jobs:
     # Build the book
     - name: Build the book
       run: |
-        cd /opt/ros/overlay_ws/src/semantic_world
-        source /opt/ros/semantic_world-venv/bin/activate 
+        cd /opt/ros/semantic_world
+        source /opt/ros/semantic_world-venv/bin/activate
         jupyter-book build doc
 
     # Upload the book's HTML as an artifact
@@ -72,7 +72,7 @@ jobs:
       if: github.event_name == 'push'
       uses: actions/upload-pages-artifact@v3
       with:
-        path: "/opt/ros/overlay_ws/src/semantic_world/doc/_build/html"
+        path: "/opt/ros/semantic_world/doc/_build/html"
 
     # Deploy the book's HTML to GitHub Pages
     - name: Deploy to GitHub Pages

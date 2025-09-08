@@ -2,31 +2,15 @@ Synchronizing Worlds
 ====================
 
 This document explains how worlds are synchronized across multiple instances, threads, or processes. 
-It answers the question: 
-    How can I synchronize worlds when I do not have access to the concrete memory pointer?
+It answers the question:
+
+    How can I synchronize worlds across multiple processes when I do not have access to the other processes memory?
 
 For all synchronizations, ROS2 topics are used to communicate changes in a peer-2-peer like network.
-The following ROS messages are relevant to understand the synchronization:
-
-- `MetaData.msg`
-- `WorldState.msg`
-- `WorldModelModificationBlock.msg`
-- `WorldModelReload.msg`
-
-You can build the messages for ROS2 by linking it to your ROS2 workspace.
-
-.. code-block:: bash
-
-    cd /your/ros2/workspace/src
-    ln -s /path/to/semantic_world/semantic_world_msgs
-    cd ..
-    colcon build --symlink-install
-    source install/setup.bash
-
 In the semantic world package, the following classes and modules are needed to understand this document:
 
 Modules:
-
+- :mod:`semantic_world.adapters.ros.messages`
 - :mod:`semantic_world.adapters.ros.world_synchronizer`
 - :mod:`semantic_world.world_modification`
 
@@ -66,4 +50,7 @@ Why JSON?
 Due to the limited capabilities of ROS2 communication, it is not trivial to reflect the definitions and mechanisms of 
 the classes of semantic world in ROS2 messages. If you choose a dedicated message for each class, you get issues with
 polymorphism, many-to-one references and back-references. Furthermore, maintaining the ROS2 messages when the
-datastructures change is complicated. JSON provides an easy fix to some of these problems. 
+datastructures change is complicated. JSON provides an easy fix to some of these problems.
+
+Finally, fully functional shipping ofthis package via PyPi is only possible if you don't need to build custom
+ros messages.
