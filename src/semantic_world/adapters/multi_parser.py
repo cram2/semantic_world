@@ -1,15 +1,19 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing_extensions import Optional, Set
+
+from typing_extensions import Optional, Set, List
 
 import numpy
 from multiverse_parser import (Factory,
                                InertiaSource,
                                UsdImporter, MjcfImporter, UrdfImporter,
                                BodyBuilder,
-                               JointBuilder, JointType)
-from pxr import UsdUrdf, UsdGeom, UsdPhysics  # type: ignore
+                               JointBuilder, JointType, GeomType)
+from pxr import UsdUrdf, UsdGeom, UsdPhysics, Gf  # type: ignore
+
+from ..world_description.geometry import Box, Sphere, Cylinder, Scale, Shape, Color, TriangleMesh
+from ..spatial_types.spatial_types import TransformationMatrix
 
 try:
     from multiverse_parser import (
@@ -68,6 +72,76 @@ def get_free_body_names(factory: Factory) -> Set[str]:
         free_body_names.add(xform_prim.GetName())
 
     return free_body_names
+
+
+def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]:
+    """
+    Parses the visual and collision geometry from a BodyBuilder instance.
+
+    :param body_builder: The BodyBuilder instance to parse.
+    :return: A tuple containing two lists: the first list contains the visual shapes, and the second list contains the collision shapes.
+    """
+
+    visuals = []
+    collisions = []
+    for geom_builder in body_builder.geom_builders:
+        gprim = geom_builder.gprim
+        gprim_prim = gprim.GetPrim()
+        local_transformation: Gf.Matrix4d = gprim.GetLocalTransformation().RemoveScaleShear()
+        translation: Gf.Vec3d = local_transformation.ExtractTranslation()
+        rotation: Gf.Rotation = local_transformation.ExtractRotation()
+        quat: Gf.Quatd = rotation.GetQuat()
+        origin_transform = TransformationMatrix.from_xyz_quat(pos_x=translation[0],
+                                                              pos_y=translation[1],
+                                                              pos_z=translation[2],
+                                                                quat_x=quat.GetImaginary()[0],
+                                                                quat_y=quat.GetImaginary()[1],
+                                                                quat_z=quat.GetImaginary()[2],
+                                                                quat_w=quat.GetReal())
+        color = (Color(*geom_builder.rgba))
+        if geom_builder.type == GeomType.CUBE:  # type: ignore
+            size = numpy.array([gprim.GetLocalTransformation().GetRow(i).GetLength() for i in range(3)]) * 2
+            shape = Box(
+                origin=origin_transform,
+                scale=Scale(*size),
+                color=color,
+            )
+        elif geom_builder.type == GeomType.SPHERE:
+            sphere = UsdGeom.Sphere(gprim_prim)
+            shape = Sphere(
+                origin=origin_transform,
+                radius=sphere.GetRadiusAttr().Get(),
+                color=color,
+            )
+        elif geom_builder.type == GeomType.CYLINDER:
+            cylinder = UsdGeom.Cylinder(gprim_prim)
+            shape = Cylinder(
+                origin=origin_transform,
+                width=cylinder.GetRadiusAttr().Get()*2,
+                height=cylinder.GetHeightAttr().Get(),
+                color=color,
+            )
+        elif geom_builder.type == GeomType.MESH:
+            scale = [local_transformation.GetRow(i).GetLength() for i in range(3)]
+            data = {"mesh": {}, "origin": {}, "scale": {}}
+            data["mesh"]["vertices"] = gprim.GetVertices()
+            data["mesh"]["faces"] = gprim.GetFaceVertexCounts()
+            data["origin"]["position"] = [translation[0], translation[1], translation[2]]
+            data["origin"]["quaternion"] =[quat.GetReal(), quat.GetImaginary()[0], quat.GetImaginary()[1], quat.GetImaginary()[2]]
+            data["scale"]["x"] = scale[0]
+            data["scale"]["y"] = scale[1]
+            data["scale"]["z"] = scale[2]
+            TriangleMesh.from_json(data=data)
+            shape = TriangleMesh.from_json(data=data)
+        else:
+            logging.warning(f"Geometry type {geom_builder.type} is not supported yet.")
+            continue
+        if gprim_prim.HasAPI(UsdPhysics.CollisionAPI):
+            collisions.append(shape)
+        else:
+            visuals.append(shape)
+    return visuals, collisions
+
 
 @dataclass
 class MultiParser:
@@ -324,4 +398,5 @@ class MultiParser:
         name = PrefixedName(
             prefix=self.prefix, name=body_builder.xform.GetPrim().GetName()
         )
-        return Body(name=name)
+        visuals, collisions = parse_geometry(body_builder)
+        return Body(name=name, visual=visuals, collision=collisions)
