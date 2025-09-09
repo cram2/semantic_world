@@ -1,9 +1,15 @@
-from typing import Dict, List
-import numpy
+import os
 import time
+from typing import Dict, List, Optional
+
+import numpy
 from mujoco_connector import MultiverseMujocoConnector
 from multiverse_simulator import MultiverseSimulator, MultiverseSimulatorState, MultiverseViewer, MultiverseAttribute
+
 from ..world import World
+from ..world_description.connections import RevoluteConnection, PrismaticConnection
+from ..world_description.geometry import Box, Cylinder, Sphere
+
 
 class MultiSim:
     """
@@ -13,25 +19,95 @@ class MultiSim:
     simulator: MultiverseSimulator
 
     def __init__(self,
-                 file_path: str,
                  world: World,
                  viewer: MultiverseViewer,
+                 file_path: Optional[str] = None,
                  headless: bool = False,
                  step_size: float = 1E-3,
                  simulator: str = "mujoco",
                  real_time_factor: float = 1.0):
+        self.world = world
         if simulator == "mujoco":
             Simulator = MultiverseMujocoConnector
+            if file_path is None:
+                file_path = "/tmp/scene.xml"
+                self.build_world(file_path=file_path)
         else:
             raise NotImplementedError(f"Simulator {simulator} is not implemented yet.")
 
-        self.world = world
         self._viewer = viewer
         self.simulator = Simulator(file_path=file_path,
                                    viewer=viewer,
                                    headless=headless,
                                    step_size=step_size,
                                    real_time_factor=real_time_factor)
+
+    def build_world(self, file_path: str):
+        file_ext = os.path.splitext(file_path)[1]
+        if file_ext == ".xml":
+            import mujoco
+            spec = mujoco.MjSpec()
+            spec.modelname = "scene"
+            body_map = {"world": spec.worldbody}
+            for body in self.world.bodies:
+                if body.name.name == "world":
+                    continue
+                body_name = body.name.name
+                parent_body_name = body.parent_connection.parent.name.name
+                body_pos = body.parent_connection.origin.to_position().to_np().tolist()[:3]
+                body_quat = body.parent_connection.origin.to_quaternion().to_np().tolist()[:4]
+                body_quat = [body_quat[3], body_quat[0], body_quat[1], body_quat[2]]
+                body_spec = body_map[parent_body_name].add_body(name=body.name.name,
+                                                                pos=body_pos,
+                                                                quat=body_quat)
+                body_map[body_name] = body_spec
+                for geom in {id(s): s for s in body.visual + body.collision}.values():
+                    geom_pos = geom.origin.to_position().to_np().tolist()[:3]
+                    geom_quat = geom.origin.to_quaternion().to_np().tolist()[:4]
+                    geom_quat = [geom_quat[3], geom_quat[0], geom_quat[1], geom_quat[2]]
+                    if isinstance(geom, Box):
+                        size = [geom.scale.x / 2, geom.scale.y / 2, geom.scale.z / 2]
+                        geom_spec = body_spec.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX,
+                                                       pos=geom_pos,
+                                                       quat=geom_quat,
+                                                       size=size)
+                    elif isinstance(geom, Cylinder):
+                        size = [geom.width/2, geom.height, 0.0]
+                        geom_spec = body_spec.add_geom(type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                                                       pos=geom_pos,
+                                                       quat=geom_quat,
+                                                       size=size)
+                    elif isinstance(geom, Sphere):
+                        size = [geom.radius, geom.radius, geom.radius]
+                        geom_spec = body_spec.add_geom(type=mujoco.mjtGeom.mjGEOM_SPHERE,
+                                                       pos=geom_pos,
+                                                       quat=geom_quat,
+                                                       size=size)
+            for connection in self.world.connections:
+                add_prefix = len(connection.dofs) == 1
+                joint_name = connection.name.name
+                child_body_name = connection.child.name.name
+                child_body_spec = body_map[child_body_name]
+                for i, dof in enumerate(connection.dofs):
+                    if isinstance(connection, RevoluteConnection):
+                        joint_axis = connection.axis.to_np().tolist()[:3]
+                        joint_range = [dof.lower_limits.position, dof.upper_limits.position]
+                        child_body_spec.add_joint(name=joint_name if add_prefix else f"{joint_name}_{i}",
+                                                  type=mujoco.mjtJoint.mjJNT_HINGE,
+                                                  axis=joint_axis,
+                                                  range=joint_range)
+                    elif isinstance(connection, PrismaticConnection):
+                        joint_axis = connection.axis.to_np().tolist()[:3]
+                        joint_range = [dof.lower_limits.position, dof.upper_limits.position]
+                        child_body_spec.add_joint(name=joint_name if add_prefix else f"{joint_name}_{i}",
+                                                  type=mujoco.mjtJoint.mjJNT_SLIDE,
+                                                  axis=joint_axis,
+                                                  range=joint_range)
+                    else:
+                        raise NotImplementedError(f"Connection type {type(connection)} is not implemented yet.")
+            spec.compile()
+            spec.to_file(file_path)
+        return file_path
 
     def start_simulation(self):
         """
@@ -156,7 +232,7 @@ class MultiSim:
         origin_state = self.simulator.state
 
         self.pause_simulation()
-        self.set_read_objects(read_objects = {body_name: {
+        self.set_read_objects(read_objects={body_name: {
             "position": [0.0, 0.0, 0.0],
             "quaternion": [1.0, 0.0, 0.0, 0.0]
         } for body_name in body_names})

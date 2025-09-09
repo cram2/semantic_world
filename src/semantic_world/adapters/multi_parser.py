@@ -10,6 +10,7 @@ from multiverse_parser import (Factory,
                                UsdImporter, MjcfImporter, UrdfImporter,
                                BodyBuilder,
                                JointBuilder, JointType, GeomType)
+from multiverse_parser.utils import get_relative_transform
 from pxr import UsdUrdf, UsdGeom, UsdPhysics, Gf  # type: ignore
 
 from ..world_description.geometry import Box, Sphere, Cylinder, Scale, Shape, Color, TriangleMesh
@@ -261,7 +262,21 @@ class MultiParser:
             child_body = world.get_kinematic_structure_entity_by_name(
                 joint_builder.child_prim.GetName()
             )
-            connection = self.parse_joint(joint_builder, parent_body, child_body, world)
+            transform = get_relative_transform(from_prim=joint_builder.parent_prim,
+                                               to_prim=joint_builder.child_prim)
+            pos = transform.ExtractTranslation()
+            quat = transform.ExtractRotationQuat()
+            point_expr = cas.Point3(pos[0], pos[1], pos[2])
+            quaternion_expr = cas.Quaternion(
+                quat.GetImaginary()[0],
+                quat.GetImaginary()[1],
+                quat.GetImaginary()[2],
+                quat.GetReal(),
+            )
+            origin = cas.TransformationMatrix.from_point_rotation_matrix(
+                point=point_expr, rotation_matrix=quaternion_expr.to_rotation_matrix()
+            )
+            connection = self.parse_joint(joint_builder, parent_body, child_body, origin, world)
             connections.append(connection)
         if (
             len(body_builder.joint_builders) == 0
@@ -298,22 +313,11 @@ class MultiParser:
         joint_builder: JointBuilder,
         parent_body: Body,
         child_body: Body,
+        origin: TransformationMatrix,
         world: World,
     ) -> Connection:
         joint_prim = joint_builder.joint.GetPrim()
         joint_name = joint_prim.GetName()
-        joint_pos = joint_builder.pos
-        joint_quat = joint_builder.quat
-        point_expr = cas.Point3(joint_pos[0], joint_pos[1], joint_pos[2])
-        quaternion_expr = cas.Quaternion(
-            joint_quat.GetImaginary()[0],
-            joint_quat.GetImaginary()[1],
-            joint_quat.GetImaginary()[2],
-            joint_quat.GetReal(),
-        )
-        origin = cas.TransformationMatrix.from_point_rotation_matrix(
-            point=point_expr, rotation_matrix=quaternion_expr.to_rotation_matrix()
-        )
         free_variable_name = joint_name
         offset = None
         multiplier = None
@@ -344,6 +348,11 @@ class MultiParser:
                 dof = world.get_degree_of_freedom_by_name(free_variable_name)
             except KeyError:
                 if joint_builder.type == JointType.CONTINUOUS:
+                    dof = DegreeOfFreedom(
+                        name=PrefixedName(joint_name),
+                    )
+                    world.add_degree_of_freedom(dof)
+                else:
                     lower_limits = DerivativeMap()
                     lower_limits.position = (
                         joint_builder.joint.GetLowerLimitAttr().Get()
@@ -358,11 +367,7 @@ class MultiParser:
                         upper_limits=upper_limits,
                     )
                     world.add_degree_of_freedom(dof)
-                else:
-                    dof = DegreeOfFreedom(
-                        name=PrefixedName(joint_name),
-                    )
-                    world.add_degree_of_freedom(dof)
+
             if joint_builder.type in [JointType.REVOLUTE, JointType.CONTINUOUS]:
                 connection = RevoluteConnection(
                     parent=parent_body,

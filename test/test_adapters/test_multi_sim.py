@@ -4,6 +4,7 @@ import time
 from mujoco_connector import MultiverseMujocoConnector
 from multiverse_simulator import MultiverseSimulatorState, MultiverseViewer
 from semantic_world.adapters.multi_sim import MultiSim
+from semantic_world.adapters.multi_parser import MultiParser
 from semantic_world.world import World
 
 mjcf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "mjcf")
@@ -121,9 +122,44 @@ class MultiverseMujocoConnectorTestCase(unittest.TestCase):
 
 
 class MultiSimTestCase(unittest.TestCase):
+    urdf_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
+    )
+    test_urdf = os.path.join(urdf_dir, "simple_two_arm_robot.urdf")
     file_path = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
     headless = False
     step_size = 1E-3
+
+    def setUp(self):
+        self.test_urdf_parser = MultiParser(self.test_urdf)
+
+    def test_empty_multi_sim_in_5s(self):
+        world = World()
+        viewer = MultiverseViewer()
+        multi_sim = MultiSim(viewer=viewer, world=world)
+        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
+        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertEqual(multi_sim.simulator.step_size, self.step_size)
+        multi_sim.start_simulation()
+        start_time = time.time()
+        time.sleep(5.0)
+        multi_sim.stop_simulation()
+        self.assertAlmostEqual(time.time() - start_time, 5.0, delta=0.5)
+
+    def test_world_multi_sim_in_5s(self):
+        world = self.test_urdf_parser.parse()
+        viewer = MultiverseViewer()
+        multi_sim = MultiSim(viewer=viewer, world=world)
+        self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
+        self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
+        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertEqual(multi_sim.simulator.step_size, self.step_size)
+        multi_sim.start_simulation()
+        start_time = time.time()
+        time.sleep(5.0)
+        multi_sim.stop_simulation()
+        self.assertAlmostEqual(time.time() - start_time, 5.0, delta=0.5)
 
     def test_multi_sim_in_5s(self):
         world = World()
