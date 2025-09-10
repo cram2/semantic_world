@@ -59,9 +59,10 @@ def get_free_body_names(factory: Factory) -> Set[str]:
         for child_body_path in joint.GetBody1Rel().GetTargets():
             child_body_prim = stage.GetPrimAtPath(child_body_path)
             constrained_body_names.add(child_body_prim.GetName())
-            for each_child_body_prim in child_body_prim.GetAllChildren():
-                if each_child_body_prim.IsA(UsdGeom.Xform):  # type: ignore
-                    constrained_body_names.add(each_child_body_prim.GetName())
+            constrained_body_names.update(
+                child.GetName() for child in child_body_prim.GetAllChildren()
+                if child.IsA(UsdGeom.Xform)  # type: ignore
+            )
 
     free_body_names = set()
     for xform_prim in [prim for prim in stage.TraverseAll() if

@@ -1,10 +1,13 @@
 import os
-import unittest
 import time
+import unittest
+
+import numpy
 from mujoco_connector import MultiverseMujocoConnector
 from multiverse_simulator import MultiverseSimulatorState, MultiverseViewer
-from semantic_world.adapters.multi_sim import MultiSim
+
 from semantic_world.adapters.multi_parser import MultiParser
+from semantic_world.adapters.multi_sim import MultiSim
 from semantic_world.world import World
 
 mjcf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "mjcf")
@@ -97,24 +100,22 @@ class MultiverseMujocoConnectorTestCase(unittest.TestCase):
                 self.assertEqual(viewer.write_data.shape, (1, 9))
                 self.assertEqual(viewer.write_objects["joint1"]["joint_angular_position"].values[0], (1.0,))
                 self.assertEqual(viewer.write_objects["actuator2"]["cmd_joint_angular_position"].values[0], (2.0,))
-                self.assertEqual(viewer.write_objects["box"]["position"].values[0][0], 1.1)
-                self.assertEqual(viewer.write_objects["box"]["position"].values[0][1], 2.2)
-                self.assertEqual(viewer.write_objects["box"]["position"].values[0][2], 3.3)
-                self.assertEqual(viewer.write_objects["box"]["quaternion"].values[0][0], 0.707)
-                self.assertEqual(viewer.write_objects["box"]["quaternion"].values[0][1], 0.0)
-                self.assertEqual(viewer.write_objects["box"]["quaternion"].values[0][2], 0.707)
-                self.assertEqual(viewer.write_objects["box"]["quaternion"].values[0][3], 0.0)
+                numpy.testing.assert_allclose(viewer.write_objects["box"]["position"].values[0],
+                                              [1.1, 2.2, 3.3],
+                                              rtol=1E-5, atol=1E-5)
+                numpy.testing.assert_allclose(viewer.write_objects["box"]["quaternion"].values[0],
+                                              [0.707, 0.0, 0.707, 0.0],
+                                              rtol=1E-5, atol=1E-5)
                 self.assertEqual(viewer.read_data.shape, (1, 10))
                 self.assertAlmostEqual(viewer.read_objects["joint1"]["joint_angular_position"].values[0][0], 1.0,
                                        places=3)
                 self.assertEqual(viewer.read_objects["actuator2"]["cmd_joint_angular_position"].values[0][0], 2.0)
-                self.assertEqual(viewer.read_objects["box"]["position"].values[0][0], 1.1)
-                self.assertEqual(viewer.read_objects["box"]["position"].values[0][1], 2.2)
-                self.assertAlmostEqual(viewer.read_objects["box"]["position"].values[0][2], 3.3, places=3)
-                self.assertAlmostEqual(viewer.read_objects["box"]["quaternion"].values[0][0], 0.7071067811865475)
-                self.assertAlmostEqual(viewer.read_objects["box"]["quaternion"].values[0][1], 0.0)
-                self.assertAlmostEqual(viewer.read_objects["box"]["quaternion"].values[0][2], 0.7071067811865475)
-                self.assertAlmostEqual(viewer.read_objects["box"]["quaternion"].values[0][3], 0.0)
+                numpy.testing.assert_allclose(viewer.read_objects["box"]["position"].values[0],
+                                              [1.1, 2.2, 3.3],
+                                              rtol=1E-5, atol=1E-5)
+                numpy.testing.assert_allclose(viewer.read_objects["box"]["quaternion"].values[0],
+                                              [0.7071067811865475, 0.0, 0.7071067811865475, 0.0],
+                                              rtol=1E-5, atol=1E-5)
             else:
                 self.assertEqual(viewer.read_data.shape, (1, 0))
         simulator.stop()
@@ -297,9 +298,9 @@ class MultiSimTestCase(unittest.TestCase):
         multi_sim.start_simulation()
         time.sleep(1)  # Ensure the simulation is running before setting objects
         stable_box_poses = [[[0.0, 0.0, 0.03], [1.0, 0.0, 0.0, 0.0]],
-                             [[1.0, 0.0, 0.02], [0.707, 0.0, 0.707, 0.0]],
-                             [[1.0, 1.0, 0.02], [0.5, 0.5, 0.5, 0.5]],
-                             [[0.0, 1.0, 0.03], [0.0, 0.707, 0.707, 0.0]]]
+                            [[1.0, 0.0, 0.02], [0.707, 0.0, 0.707, 0.0]],
+                            [[1.0, 1.0, 0.02], [0.5, 0.5, 0.5, 0.5]],
+                            [[0.0, 1.0, 0.03], [0.0, 0.707, 0.707, 0.0]]]
         for _ in range(100):
             for stable_box_pose in stable_box_poses:
                 write_objects["box"]["position"] = stable_box_pose[0]
@@ -311,10 +312,10 @@ class MultiSimTestCase(unittest.TestCase):
                 self.assertTrue(multi_sim.is_stable(body_names=["box"], max_simulation_steps=1000, atol=1E-3))
 
         unstable_box_poses = [[[0.0, 0.0, 1.03], [1.0, 0.0, 0.0, 0.0]],
-                            [[1.0, 0.0, 1.03], [0.707, 0.0, 0.707, 0.0]],
-                            [[1.0, 1.0, 1.03], [0.5, 0.5, 0.5, 0.5]],
-                            [[0.0, 1.0, 1.03], [0.0, 0.707, 0.707, 0.0]],
-                            [[0.0, 0.0, 1.03], [1.0, 0.0, 0.0, 0.0]]]
+                              [[1.0, 0.0, 1.03], [0.707, 0.0, 0.707, 0.0]],
+                              [[1.0, 1.0, 1.03], [0.5, 0.5, 0.5, 0.5]],
+                              [[0.0, 1.0, 1.03], [0.0, 0.707, 0.707, 0.0]],
+                              [[0.0, 0.0, 1.03], [1.0, 0.0, 0.0, 0.0]]]
         for _ in range(100):
             for unstable_box_pose in unstable_box_poses:
                 write_objects["box"]["position"] = unstable_box_pose[0]
