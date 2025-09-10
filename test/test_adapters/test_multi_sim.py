@@ -11,22 +11,22 @@ from semantic_world.adapters.multi_sim import MultiSim
 from semantic_world.world import World
 
 mjcf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "mjcf")
+headless = os.environ.get("CI", "false").lower() == "true"
 
 
 class MultiverseMujocoConnectorTestCase(unittest.TestCase):
     file_path = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
     Simulator = MultiverseMujocoConnector
-    headless = False
     step_size = 5E-4
 
     def test_read_and_write_data_in_the_loop(self):
         viewer = MultiverseViewer()
         simulator = self.Simulator(viewer=viewer,
                                    file_path=self.file_path,
-                                   headless=self.headless,
+                                   headless=headless,
                                    step_size=self.step_size)
         self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
-        self.assertIs(simulator.headless, self.headless)
+        self.assertIs(simulator.headless, headless)
         self.assertIsNone(simulator.stop_reason)
         self.assertIsNone(simulator.simulation_thread)
         simulator.start(simulate_in_thread=False)
@@ -128,7 +128,6 @@ class MultiSimTestCase(unittest.TestCase):
     )
     test_urdf = os.path.join(urdf_dir, "simple_two_arm_robot.urdf")
     file_path = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
-    headless = False
     step_size = 1E-3
 
     def setUp(self):
@@ -140,7 +139,7 @@ class MultiSimTestCase(unittest.TestCase):
         multi_sim = MultiSim(viewer=viewer, world=world)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
-        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
         start_time = time.time()
@@ -154,7 +153,7 @@ class MultiSimTestCase(unittest.TestCase):
         multi_sim = MultiSim(viewer=viewer, world=world)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
-        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
         start_time = time.time()
@@ -165,11 +164,11 @@ class MultiSimTestCase(unittest.TestCase):
     def test_multi_sim_in_5s(self):
         world = World()
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=self.headless,
+        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=headless,
                              step_size=self.step_size)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, self.file_path)
-        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
         start_time = time.time()
@@ -203,11 +202,11 @@ class MultiSimTestCase(unittest.TestCase):
             }
         }
         viewer = MultiverseViewer(read_objects=read_objects)
-        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=self.headless,
+        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=headless,
                              step_size=self.step_size)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, self.file_path)
-        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
         start_time = time.time()
@@ -225,11 +224,11 @@ class MultiSimTestCase(unittest.TestCase):
             }
         }
         viewer = MultiverseViewer(write_objects=write_objects)
-        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=self.headless,
+        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=headless,
                              step_size=self.step_size)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, self.file_path)
-        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
         box_positions = [[0.0, 0.0, 1.0],
@@ -255,11 +254,11 @@ class MultiSimTestCase(unittest.TestCase):
             }
         }
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=self.headless,
+        multi_sim = MultiSim(file_path=self.file_path, viewer=viewer, world=world, headless=headless,
                              step_size=self.step_size)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, self.file_path)
-        self.assertIs(multi_sim.simulator.headless, self.headless)
+        self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
         time.sleep(1)  # Ensure the simulation is running before setting objects
@@ -292,7 +291,7 @@ class MultiSimTestCase(unittest.TestCase):
         multi_sim = MultiSim(file_path=self.file_path,
                              viewer=viewer,
                              world=world,
-                             headless=self.headless,
+                             headless=headless,
                              step_size=self.step_size,
                              real_time_factor=-1.0)
         multi_sim.start_simulation()
