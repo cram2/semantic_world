@@ -2,19 +2,15 @@ import logging
 import os
 from dataclasses import dataclass
 
-from typing_extensions import Optional, Set, List
-
 import numpy
 from multiverse_parser import (Factory,
-                               InertiaSource,
-                               UsdImporter, MjcfImporter, UrdfImporter,
-                               BodyBuilder,
-                               JointBuilder, JointType, GeomType)
+                               GeomType)
 from multiverse_parser.utils import get_relative_transform
 from pxr import UsdUrdf, UsdGeom, UsdPhysics, Gf  # type: ignore
+from typing_extensions import Optional, Set, List
 
-from ..world_description.geometry import Box, Sphere, Cylinder, Scale, Shape, Color, TriangleMesh
 from ..spatial_types.spatial_types import TransformationMatrix
+from ..world_description.geometry import Box, Sphere, Cylinder, Scale, Shape, Color, TriangleMesh
 
 try:
     from multiverse_parser import (
@@ -44,6 +40,19 @@ from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import DerivativeMap
 from ..world import World, Body, Connection
+
+
+def usd_pose_to_cas_pose(usd_transform: Gf.Matrix4d) -> cas.TransformationMatrix:
+    translation: Gf.Vec3d = usd_transform.ExtractTranslation()
+    rotation: Gf.Rotation = usd_transform.ExtractRotation()
+    quat: Gf.Quatd = rotation.GetQuat()
+    return cas.TransformationMatrix.from_xyz_quat(pos_x=translation[0],
+                                                 pos_y=translation[1],
+                                                 pos_z=translation[2],
+                                                 quat_x=quat.GetImaginary()[0],
+                                                 quat_y=quat.GetImaginary()[1],
+                                                 quat_z=quat.GetImaginary()[2],
+                                                 quat_w=quat.GetReal())
 
 
 def get_free_body_names(factory: Factory) -> Set[str]:
@@ -96,10 +105,10 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
         origin_transform = TransformationMatrix.from_xyz_quat(pos_x=translation[0],
                                                               pos_y=translation[1],
                                                               pos_z=translation[2],
-                                                                quat_x=quat.GetImaginary()[0],
-                                                                quat_y=quat.GetImaginary()[1],
-                                                                quat_z=quat.GetImaginary()[2],
-                                                                quat_w=quat.GetReal())
+                                                              quat_x=quat.GetImaginary()[0],
+                                                              quat_y=quat.GetImaginary()[1],
+                                                              quat_z=quat.GetImaginary()[2],
+                                                              quat_w=quat.GetReal())
         color = (Color(*geom_builder.rgba))
         if geom_builder.type == GeomType.CUBE:  # type: ignore
             size = numpy.array([gprim.GetLocalTransformation().GetRow(i).GetLength() for i in range(3)]) * 2
@@ -119,7 +128,7 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
             cylinder = UsdGeom.Cylinder(gprim_prim)
             shape = Cylinder(
                 origin=origin_transform,
-                width=cylinder.GetRadiusAttr().Get()*2,
+                width=cylinder.GetRadiusAttr().Get() * 2,
                 height=cylinder.GetHeightAttr().Get(),
                 color=color,
             )
@@ -129,7 +138,8 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
             data["mesh"]["vertices"] = gprim.GetVertices()
             data["mesh"]["faces"] = gprim.GetFaceVertexCounts()
             data["origin"]["position"] = [translation[0], translation[1], translation[2]]
-            data["origin"]["quaternion"] =[quat.GetReal(), quat.GetImaginary()[0], quat.GetImaginary()[1], quat.GetImaginary()[2]]
+            data["origin"]["quaternion"] = [quat.GetReal(), quat.GetImaginary()[0], quat.GetImaginary()[1],
+                                            quat.GetImaginary()[2]]
             data["scale"]["x"] = scale[0]
             data["scale"]["y"] = scale[1]
             data["scale"]["z"] = scale[2]
@@ -265,23 +275,12 @@ class MultiParser:
             )
             transform = get_relative_transform(from_prim=joint_builder.parent_prim,
                                                to_prim=joint_builder.child_prim)
-            pos = transform.ExtractTranslation()
-            quat = transform.ExtractRotationQuat()
-            point_expr = cas.Point3(pos[0], pos[1], pos[2])
-            quaternion_expr = cas.Quaternion(
-                quat.GetImaginary()[0],
-                quat.GetImaginary()[1],
-                quat.GetImaginary()[2],
-                quat.GetReal(),
-            )
-            origin = cas.TransformationMatrix.from_point_rotation_matrix(
-                point=point_expr, rotation_matrix=quaternion_expr.to_rotation_matrix()
-            )
+            origin = usd_pose_to_cas_pose(transform)
             connection = self.parse_joint(joint_builder, parent_body, child_body, origin, world)
             connections.append(connection)
         if (
-            len(body_builder.joint_builders) == 0
-            and not body_builder.xform.GetPrim().GetParent().IsPseudoRoot()
+                len(body_builder.joint_builders) == 0
+                and not body_builder.xform.GetPrim().GetParent().IsPseudoRoot()
         ):
             parent_body = world.get_kinematic_structure_entity_by_name(
                 body_builder.xform.GetPrim().GetParent().GetName()
@@ -290,18 +289,7 @@ class MultiParser:
                 body_builder.xform.GetPrim().GetName()
             )
             transform = body_builder.xform.GetLocalTransformation()
-            pos = transform.ExtractTranslation()
-            quat = transform.ExtractRotationQuat()
-            point_expr = cas.Point3(pos[0], pos[1], pos[2])
-            quaternion_expr = cas.Quaternion(
-                quat.GetImaginary()[0],
-                quat.GetImaginary()[1],
-                quat.GetImaginary()[2],
-                quat.GetReal(),
-            )
-            origin = cas.TransformationMatrix.from_point_rotation_matrix(
-                point=point_expr, rotation_matrix=quaternion_expr.to_rotation_matrix()
-            )
+            origin = usd_pose_to_cas_pose(transform)
             connection = FixedConnection(
                 parent=parent_body, child=child_body, origin_expression=origin
             )
@@ -310,12 +298,12 @@ class MultiParser:
         return connections
 
     def parse_joint(
-        self,
-        joint_builder: JointBuilder,
-        parent_body: Body,
-        child_body: Body,
-        origin: TransformationMatrix,
-        world: World,
+            self,
+            joint_builder: JointBuilder,
+            parent_body: Body,
+            child_body: Body,
+            origin: TransformationMatrix,
+            world: World,
     ) -> Connection:
         joint_prim = joint_builder.joint.GetPrim()
         joint_name = joint_prim.GetName()
@@ -398,6 +386,7 @@ class MultiParser:
     def parse_body(self, body_builder: BodyBuilder) -> Body:
         """
         Parses a body from a BodyBuilder instance.
+
         :param body_builder: The BodyBuilder instance to parse.
         :return: A Body instance representing the parsed body.
         """
