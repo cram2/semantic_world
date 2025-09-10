@@ -14,7 +14,10 @@ from multiverse_simulator import (
 from ..world import World
 from ..world_description.connections import RevoluteConnection, PrismaticConnection
 from ..world_description.geometry import Box, Cylinder, Sphere
-from ..world_description.world_modification import WorldModelModificationBlock
+from ..world_description.world_modification import (
+    WorldModelModificationBlock,
+    AddDegreeOfFreedomModification,
+)
 
 
 class MultiSim:
@@ -306,4 +309,6 @@ class MultiSim:
         print(latest_changes)
 
     def update_world(self, latest_changes: WorldModelModificationBlock):
-        pass
+        for modification in latest_changes.modifications:
+            if isinstance(modification, AddDegreeOfFreedomModification):
+                joint_name = modification.dof.name.name
