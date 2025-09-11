@@ -24,7 +24,8 @@ from semantic_world.reasoning.predicates import (
     reachable,
     blocking,
 )
-from semantic_world.robots import PR2, Camera, ParallelGripper
+from semantic_world.robots.robot import Camera, ParallelGripper
+from semantic_world.robots.pr2 import PR2
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.testing import pr2_world
 from semantic_world.world import World

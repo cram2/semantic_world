@@ -86,7 +86,7 @@ def hacky_urdf_parser_fix(
 
 def robot_name_from_urdf_string(urdf_string: str) -> str:
     """
-    Returns the name defined in the robot tag, e.g., 'pr2' from <robot name="pr2"> ... </robot>.
+    Returns the name defined in the robots tag, e.g., 'pr2' from <robots name="pr2"> ... </robots>.
     :param urdf_string: URDF string
     :return: Extracted name
     """

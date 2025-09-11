@@ -94,7 +94,7 @@ class FixedConnection(Connection):
 @dataclass
 class ActiveConnection(Connection):
     """
-    Has one or more degrees of freedom that can be actively controlled, e.g., robot joints.
+    Has one or more degrees of freedom that can be actively controlled, e.g., robots joints.
     """
 
     is_controlled: bool = False
@@ -131,7 +131,7 @@ class ActiveConnection(Connection):
 class PassiveConnection(Connection):
     """
     Has one or more degrees of freedom that cannot be actively controlled.
-    Useful if a transformation is only tracked, e.g., the robot's localization.
+    Useful if a transformation is only tracked, e.g., the robots's localization.
     """
 
     @property

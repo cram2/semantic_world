@@ -6,7 +6,7 @@ from ormatic.ormatic import ORMatic
 from ormatic.utils import classes_of_module, recursive_subclasses
 
 import semantic_world.world_description.degree_of_freedom
-import semantic_world.robots
+import semantic_world.robots.robot
 import semantic_world.views.views
 import semantic_world.world_description.world_entity
 from semantic_world.world import (
@@ -39,7 +39,7 @@ classes |= set(classes_of_module(semantic_world.world_description.world_entity))
 classes |= set(classes_of_module(semantic_world.world_description.connections))
 classes |= set(classes_of_module(semantic_world.views.views))
 classes |= set(classes_of_module(semantic_world.world_description.degree_of_freedom))
-classes |= set(classes_of_module(semantic_world.robots))
+classes |= set(classes_of_module(semantic_world.robots.robot))
 # classes |= set(recursive_subclasses(ViewFactory))
 
 # remove classes that should not be mapped

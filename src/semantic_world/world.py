@@ -38,7 +38,7 @@ from .exceptions import (
     ViewNotFoundError,
     AlreadyBelongsToAWorldError,
 )
-from .robots import AbstractRobot
+from semantic_world.robots.robot import AbstractRobot
 from .spatial_computations.ik_solver import InverseKinematicsSolver
 from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives
@@ -1752,7 +1752,7 @@ class World:
     @property
     def controlled_connections(self) -> Set[ActiveConnection]:
         """
-        A subset of the robot's connections that are controlled by a controller.
+        A subset of the robots's connections that are controlled by a controller.
         """
         return set(
             c
@@ -1926,7 +1926,7 @@ class World:
 
     def disable_non_robot_collisions(self) -> None:
         """
-        Disables collision checks between bodies that do not belong to a robot.
+        Disables collision checks between bodies that do not belong to a robots.
         """
         robot_bodies = set()
         robot: AbstractRobot

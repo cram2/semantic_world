@@ -5,31 +5,33 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing_extensions import Iterable, Set, TYPE_CHECKING, Optional, Self
 
-from .world_description.connections import ActiveConnection, OmniDrive
-from .datastructures.prefixed_name import PrefixedName
-from .spatial_types.spatial_types import Vector3
-from .world_description.world_entity import (
+from semantic_world.world_description.connections import ActiveConnection, OmniDrive
+from semantic_world.spatial_types.spatial_types import Vector3
+from semantic_world.world_description.world_entity import (
     Body,
     RootedView,
     Connection,
     CollisionCheckingConfig,
 )
-from .world_description.world_entity import KinematicStructureEntity, Region
+from semantic_world.world_description.world_entity import (
+    KinematicStructureEntity,
+    Region,
+)
 
 if TYPE_CHECKING:
-    from .world import World
+    from semantic_world.world import World
 
 
 @dataclass
 class RobotView(RootedView, ABC):
     """
-    Represents a collection of connected robot bodies, starting from a root body, and ending in a unspecified collection
+    Represents a collection of connected robots bodies, starting from a root body, and ending in a unspecified collection
     of tip bodies.
     """
 
     _robot: AbstractRobot = field(default=None)
     """
-    The robot this view belongs to
+    The robots this view belongs to
     """
 
     def __post_init__(self):
@@ -39,10 +41,10 @@ class RobotView(RootedView, ABC):
     @abstractmethod
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        This method assigns the robot to the current view, and then iterates through its own fields to call the
-        appropriate methods to att them to the robot.
+        This method assigns the robots to the current view, and then iterates through its own fields to call the
+        appropriate methods to att them to the robots.
 
-        :param robot: The robot to which this view should be assigned.
+        :param robot: The robots to which this view should be assigned.
         """
         ...
 
@@ -50,7 +52,7 @@ class RobotView(RootedView, ABC):
 @dataclass
 class KinematicChain(RobotView, ABC):
     """
-    Abstract base class for kinematic chain in a robot, starting from a root body, and ending in a specific tip body.
+    Abstract base class for kinematic chain in a robots, starting from a root body, and ending in a specific tip body.
     A kinematic chain can contain both a manipulator and sensors at the same time. There are no assumptions about the
     position of the manipulator or sensors in the kinematic chain
     """
@@ -115,12 +117,12 @@ class KinematicChain(RobotView, ABC):
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the kinematic chain to the given robot. This method ensures that the kinematic chain is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
+        Assigns the kinematic chain to the given robots. This method ensures that the kinematic chain is only assigned
+        to one robots at a time, and raises an error if it is already assigned to another robots.
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
-                f"Kinematic chain {self.name} is already part of another robot: {self._robot.name}."
+                f"Kinematic chain {self.name} is already part of another robots: {self._robot.name}."
             )
         if self._robot is not None:
             return
@@ -141,7 +143,7 @@ class KinematicChain(RobotView, ABC):
 @dataclass
 class Arm(KinematicChain):
     """
-    Represents an arm of a robot, which is a kinematic chain with a specific tip body.
+    Represents an arm of a robots, which is a kinematic chain with a specific tip body.
     An arm has a manipulators and potentially sensors.
     """
 
@@ -156,19 +158,19 @@ class Arm(KinematicChain):
 @dataclass
 class Manipulator(RobotView, ABC):
     """
-    Abstract base class of robot manipulators. Always has a tool frame.
+    Abstract base class of robots manipulators. Always has a tool frame.
     """
 
     tool_frame: Body = field(default=None)
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the manipulator to the given robot. This method ensures that the manipulator is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
+        Assigns the manipulator to the given robots. This method ensures that the manipulator is only assigned
+        to one robots at a time, and raises an error if it is already assigned to another robots.
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
-                f"Manipulator {self.name} is already part of another robot: {self._robot.name}."
+                f"Manipulator {self.name} is already part of another robots: {self._robot.name}."
             )
         if self._robot is not None:
             return
@@ -199,7 +201,7 @@ class Finger(KinematicChain):
 @dataclass
 class ParallelGripper(Manipulator):
     """
-    Represents a gripper of a robot. Contains a collection of fingers and a thumb. The thumb is a specific finger
+    Represents a gripper of a robots. Contains a collection of fingers and a thumb. The thumb is a specific finger
     that always needs to touch an object when grasping it, ensuring a stable grasp.
     """
 
@@ -208,13 +210,13 @@ class ParallelGripper(Manipulator):
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the parallel gripper to the given robot and calls the appropriate methods for the its finger and thumb.
-         This method ensures that the parallel gripper is only assigned to one robot at a time, and raises an error if
+        Assigns the parallel gripper to the given robots and calls the appropriate methods for the its finger and thumb.
+         This method ensures that the parallel gripper is only assigned to one robots at a time, and raises an error if
          it is already assigned to another
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
-                f"ParallelGripper {self.name} is already part of another robot: {self._robot.name}."
+                f"ParallelGripper {self.name} is already part of another robots: {self._robot.name}."
             )
         if self._robot is not None:
             return
@@ -233,17 +235,17 @@ class ParallelGripper(Manipulator):
 @dataclass
 class Sensor(RobotView, ABC):
     """
-    Abstract base class for any kind of sensor in a robot.
+    Abstract base class for any kind of sensor in a robots.
     """
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the sensor to the given robot. This method ensures that the sensor is only assigned
-        to one robot at a time, and raises an error if it is already assigned to another robot.
+        Assigns the sensor to the given robots. This method ensures that the sensor is only assigned
+        to one robots at a time, and raises an error if it is already assigned to another robots.
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
-                f"Sensor {self.name} is already part of another robot: {self._robot.name}."
+                f"Sensor {self.name} is already part of another robots: {self._robot.name}."
             )
         if self._robot is not None:
             return
@@ -263,7 +265,7 @@ class FieldOfView:
 @dataclass
 class Camera(Sensor):
     """
-    Represents a camera sensor in a robot.
+    Represents a camera sensor in a robots.
     """
 
     forward_facing_axis: Vector3 = field(default=None)
@@ -282,7 +284,7 @@ class Camera(Sensor):
 @dataclass
 class Neck(KinematicChain):
     """
-    Represents a special kinematic chain that connects the head of a robot with a collection of sensors, such as cameras
+    Represents a special kinematic chain that connects the head of a robots with a collection of sensors, such as cameras
     and which does not have a manipulator.
     """
 
@@ -297,18 +299,18 @@ class Neck(KinematicChain):
 @dataclass
 class Torso(KinematicChain):
     """
-    A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
+    A Torso is a kinematic chain connecting the base of the robots with a collection of other kinematic chains.
     """
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
-        Assigns the torso to the given robot and calls the appropriate method for each of its attached kinematic chains.
-         This method ensures that the torso is only assigned to one robot at a time, and raises an error if it is
-         already assigned to another robot.
+        Assigns the torso to the given robots and calls the appropriate method for each of its attached kinematic chains.
+         This method ensures that the torso is only assigned to one robots at a time, and raises an error if it is
+         already assigned to another robots.
         """
         if self._robot is not None and self._robot != robot:
             raise ValueError(
-                f"Torso {self.name} is already part of another robot: {self._robot.name}."
+                f"Torso {self.name} is already part of another robots: {self._robot.name}."
             )
         if self._robot is not None:
             return
@@ -325,8 +327,8 @@ class Torso(KinematicChain):
 @dataclass
 class AbstractRobot(RootedView, ABC):
     """
-    Specification of an abstract robot. A robot consists of:
-    - a root body, which is the base of the robot
+    Specification of an abstract robots. A robots consists of:
+    - a root body, which is the base of the robots
     - an optional torso, which is a kinematic chain (usually without a manipulator) connecting the base with a collection
         of other kinematic chains
     - an optional collection of manipulator chains, each containing a manipulator, such as a gripper
@@ -336,17 +338,17 @@ class AbstractRobot(RootedView, ABC):
 
     torso: Optional[Torso] = None
     """
-    The torso of the robot, which is a kinematic chain connecting the base with a collection of other kinematic chains.
+    The torso of the robots, which is a kinematic chain connecting the base with a collection of other kinematic chains.
     """
 
     manipulators: Set[Manipulator] = field(default_factory=set)
     """
-    A collection of manipulators in the robot, such as grippers.
+    A collection of manipulators in the robots, such as grippers.
     """
 
     sensors: Set[Sensor] = field(default_factory=set)
     """
-    A collection of sensors in the robot, such as cameras.
+    A collection of sensors in the robots, such as cameras.
     """
 
     manipulator_chains: Set[KinematicChain] = field(default_factory=set)
@@ -367,7 +369,7 @@ class AbstractRobot(RootedView, ABC):
     @property
     def controlled_connections(self) -> Set[ActiveConnection]:
         """
-        A subset of the robot's connections that are controlled by a controller.
+        A subset of the robots's connections that are controlled by a controller.
         """
         return self._world.controlled_connections & set(self.connections)
 
@@ -375,20 +377,20 @@ class AbstractRobot(RootedView, ABC):
     @abstractmethod
     def from_world(cls, world: World) -> Self:
         """
-        Creates a robot view from the given world.
-        This method constructs the robot view by identifying and organizing the various semantic components of the robot,
+        Creates a robots view from the given world.
+        This method constructs the robots view by identifying and organizing the various semantic components of the robots,
         such as manipulators, sensors, and kinematic chains. It is expected to be implemented in subclasses.
 
-        :param world: The world from which to create the robot view.
+        :param world: The world from which to create the robots view.
 
-        :return: A robot view.
+        :return: A robots view.
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
 
     @property
     def drive(self) -> Optional[OmniDrive]:
         """
-        The connection which the robot uses for driving.
+        The connection which the robots uses for driving.
         """
         try:
             parent_connection = self.root.parent_connection
@@ -399,7 +401,7 @@ class AbstractRobot(RootedView, ABC):
 
     def add_manipulator(self, manipulator: Manipulator):
         """
-        Adds a manipulator to the robot's collection of manipulators.
+        Adds a manipulator to the robots's collection of manipulators.
         """
         self.manipulators.add(manipulator)
         self._views.add(manipulator)
@@ -407,7 +409,7 @@ class AbstractRobot(RootedView, ABC):
 
     def add_sensor(self, sensor: Sensor):
         """
-        Adds a sensor to the robot's collection of sensors.
+        Adds a sensor to the robots's collection of sensors.
         """
         self.sensors.add(sensor)
         self._views.add(sensor)
@@ -415,7 +417,7 @@ class AbstractRobot(RootedView, ABC):
 
     def add_torso(self, torso: Torso):
         """
-        Adds a torso to the robot's collection of kinematic chains.
+        Adds a torso to the robots's collection of kinematic chains.
         """
         if self.torso is not None:
             raise ValueError(
@@ -427,7 +429,7 @@ class AbstractRobot(RootedView, ABC):
 
     def add_kinematic_chain(self, kinematic_chain: KinematicChain):
         """
-        Adds a kinematic chain to the robot's collection of kinematic chains.
+        Adds a kinematic chain to the robots's collection of kinematic chains.
         This can be either a manipulator chain or a sensor chain.
         """
         if kinematic_chain.manipulator is None and not kinematic_chain.sensors:
@@ -441,203 +443,3 @@ class AbstractRobot(RootedView, ABC):
             self.sensor_chains.add(kinematic_chain)
         self._views.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
-
-
-@dataclass
-class PR2(AbstractRobot):
-    """
-    Represents the Personal Robot 2 (PR2), which was originally created by Willow Garage.
-    The PR2 robot consists of two arms, each with a parallel gripper, a head with a camera, and a prismatic torso
-    """
-
-    neck: Neck = field(default=None)
-    left_arm: KinematicChain = field(default=None)
-    right_arm: KinematicChain = field(default=None)
-
-    def __hash__(self):
-        return hash(self.name)
-
-    def _add_arm(self, arm: KinematicChain, arm_side: str):
-        """
-        Adds a kinematic chain to the PR2 robot's collection of kinematic chains.
-        If the kinematic chain is an arm, it will be added to the left or right arm accordingly.
-
-        :param arm: The kinematic chain to add to the PR2 robot.
-        """
-        if arm.manipulator is None:
-            raise ValueError(f"Arm kinematic chain {arm.name} must have a manipulator.")
-
-        if arm_side == "left":
-            self.left_arm = arm
-        elif arm_side == "right":
-            self.right_arm = arm
-        else:
-            raise ValueError(
-                f"Invalid arm side: {arm_side}. Must be 'left' or 'right'."
-            )
-
-        super().add_kinematic_chain(arm)
-
-    def add_left_arm(self, kinematic_chain: KinematicChain):
-        """
-        Adds a left arm kinematic chain to the PR2 robot.
-
-        :param kinematic_chain: The kinematic chain representing the left arm.
-        """
-        self._add_arm(kinematic_chain, "left")
-
-    def add_right_arm(self, kinematic_chain: KinematicChain):
-        """
-        Adds a right arm kinematic chain to the PR2 robot.
-
-        :param kinematic_chain: The kinematic chain representing the right arm.
-        """
-        self._add_arm(kinematic_chain, "right")
-
-    def add_neck(self, neck: Neck):
-        """
-        Adds a neck kinematic chain to the PR2 robot.
-
-        :param neck: The neck kinematic chain to add.
-        """
-        if not neck.sensors:
-            raise ValueError(
-                f"Neck kinematic chain {neck.name} must have at least one sensor."
-            )
-        self.neck = neck
-        super().add_kinematic_chain(neck)
-
-    @classmethod
-    def from_world(cls, world: World) -> Self:
-        """
-        Creates a PR2 robot view from the given world.
-
-        :param world: The world from which to create the robot view.
-
-        :return: A PR2 robot view.
-        """
-
-        robot = cls(
-            name=PrefixedName(name="pr2", prefix=world.name),
-            root=world.get_kinematic_structure_entity_by_name("base_footprint"),
-            _world=world,
-        )
-
-        # Create left arm
-        left_gripper_thumb = Finger(
-            name=PrefixedName("left_gripper_thumb", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name(
-                "l_gripper_l_finger_link"
-            ),
-            tip=world.get_kinematic_structure_entity_by_name(
-                "l_gripper_l_finger_tip_link"
-            ),
-            _world=world,
-        )
-
-        left_gripper_finger = Finger(
-            name=PrefixedName("left_gripper_finger", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name(
-                "l_gripper_r_finger_link"
-            ),
-            tip=world.get_kinematic_structure_entity_by_name(
-                "l_gripper_r_finger_tip_link"
-            ),
-            _world=world,
-        )
-
-        left_gripper = ParallelGripper(
-            name=PrefixedName("left_gripper", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name("l_gripper_palm_link"),
-            tool_frame=world.get_kinematic_structure_entity_by_name(
-                "l_gripper_tool_frame"
-            ),
-            thumb=left_gripper_thumb,
-            finger=left_gripper_finger,
-            _world=world,
-        )
-        left_arm = Arm(
-            name=PrefixedName("left_arm", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name("torso_lift_link"),
-            tip=world.get_kinematic_structure_entity_by_name("l_wrist_roll_link"),
-            manipulator=left_gripper,
-            _world=world,
-        )
-
-        robot.add_left_arm(left_arm)
-
-        # Create right arm
-        right_gripper_thumb = Finger(
-            name=PrefixedName("right_gripper_thumb", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name(
-                "r_gripper_l_finger_link"
-            ),
-            tip=world.get_kinematic_structure_entity_by_name(
-                "r_gripper_l_finger_tip_link"
-            ),
-            _world=world,
-        )
-        right_gripper_finger = Finger(
-            name=PrefixedName("right_gripper_finger", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name(
-                "r_gripper_r_finger_link"
-            ),
-            tip=world.get_kinematic_structure_entity_by_name(
-                "r_gripper_r_finger_tip_link"
-            ),
-            _world=world,
-        )
-        right_gripper = ParallelGripper(
-            name=PrefixedName("right_gripper", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name("r_gripper_palm_link"),
-            tool_frame=world.get_kinematic_structure_entity_by_name(
-                "r_gripper_tool_frame"
-            ),
-            thumb=right_gripper_thumb,
-            finger=right_gripper_finger,
-            _world=world,
-        )
-        right_arm = Arm(
-            name=PrefixedName("right_arm", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name("torso_lift_link"),
-            tip=world.get_kinematic_structure_entity_by_name("r_wrist_roll_link"),
-            manipulator=right_gripper,
-            _world=world,
-        )
-
-        robot.add_right_arm(right_arm)
-
-        # Create camera and neck
-        camera = Camera(
-            name=PrefixedName("wide_stereo_optical_frame", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name(
-                "wide_stereo_optical_frame"
-            ),
-            forward_facing_axis=Vector3(0, 0, 1),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
-            minimal_height=1.27,
-            maximal_height=1.60,
-            _world=world,
-        )
-
-        neck = Neck(
-            name=PrefixedName("neck", prefix=robot.name.name),
-            sensors={camera},
-            root=world.get_kinematic_structure_entity_by_name("head_pan_link"),
-            tip=world.get_kinematic_structure_entity_by_name("head_tilt_link"),
-            _world=world,
-        )
-        robot.add_neck(neck)
-
-        # Create torso
-        torso = Torso(
-            name=PrefixedName("torso", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name("torso_lift_link"),
-            tip=world.get_kinematic_structure_entity_by_name("torso_lift_link"),
-            _world=world,
-        )
-        robot.add_torso(torso)
-
-        world.add_view(robot, exists_ok=True)
-
-        return robot

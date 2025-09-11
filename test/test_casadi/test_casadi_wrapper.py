@@ -2103,13 +2103,13 @@ class TestTransformationMatrix:
 
     def test_coordinate_transformations(self):
         """Test coordinate frame transformations"""
-        # Transform from world to robot base
+        # Transform from world to robots base
         world_T_robot = cas.TransformationMatrix.from_xyz_rpy(2, 3, 0, 0, 0, np.pi / 2)
 
         # Point in world coordinates
         world_point = cas.Point3(1, 0, 1)
 
-        # Transform to robot coordinates
+        # Transform to robots coordinates
         robot_point = world_T_robot.inverse() @ world_point
         assert isinstance(robot_point, cas.Point3)
 
