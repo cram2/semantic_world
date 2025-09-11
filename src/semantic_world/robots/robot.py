@@ -5,21 +5,21 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing_extensions import Iterable, Set, TYPE_CHECKING, Optional, Self
 
-from semantic_world.world_description.connections import ActiveConnection, OmniDrive
-from semantic_world.spatial_types.spatial_types import Vector3
-from semantic_world.world_description.world_entity import (
+from ..world_description.connections import ActiveConnection, OmniDrive
+from ..spatial_types.spatial_types import Vector3
+from ..world_description.world_entity import (
     Body,
     RootedView,
     Connection,
     CollisionCheckingConfig,
 )
-from semantic_world.world_description.world_entity import (
+from ..world_description.world_entity import (
     KinematicStructureEntity,
     Region,
 )
 
 if TYPE_CHECKING:
-    from semantic_world.world import World
+    from ..world import World
 
 
 @dataclass

@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Self
 
-from semantic_world.datastructures.prefixed_name import PrefixedName
-from semantic_world.robots.robot import (
+from ..datastructures.prefixed_name import PrefixedName
+from .robot import (
     AbstractRobot,
     Neck,
     KinematicChain,
