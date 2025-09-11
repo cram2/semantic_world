@@ -9,6 +9,7 @@ from multiverse_simulator import (
     MultiverseSimulatorState,
     MultiverseViewer,
     MultiverseAttribute,
+    MultiverseCallbackResult,
 )
 
 from ..world import World
@@ -17,7 +18,9 @@ from ..world_description.geometry import Box, Cylinder, Sphere
 from ..world_description.world_modification import (
     WorldModelModificationBlock,
     AddDegreeOfFreedomModification,
+    AddBodyModification,
 )
+from ..spatial_types.symbol_manager import symbol_manager
 
 
 class MultiSim:
@@ -149,7 +152,7 @@ class MultiSim:
 
     def start_simulation(self):
         """
-        Starts the simulation. This will start two threads, one for the physics simulation and one for the rendering.
+        Starts the simulation. This will start a physics simulation thread and render it at 60Hz.
 
         :return: None
         """
@@ -310,5 +313,29 @@ class MultiSim:
 
     def update_world(self, latest_changes: WorldModelModificationBlock):
         for modification in latest_changes.modifications:
-            if isinstance(modification, AddDegreeOfFreedomModification):
-                joint_name = modification.dof.name.name
+            if isinstance(modification, AddBodyModification):
+                body = modification.body
+                parent_body_name = body.parent_connection.parent.name.name
+                body_name = body.name.name
+                body_pose = body.parent_connection.origin_expression
+                body_pos = body_pose.to_position()
+                px, py, pz, _ = symbol_manager.evaluate_expr(body_pos).tolist()
+                body_quat = body_pose.to_quaternion()
+                qx, qy, qz, qw = symbol_manager.evaluate_expr(body_quat).tolist()
+                if isinstance(self.simulator, MultiverseMujocoConnector):
+                    body_props = {
+                        "pos": [px, py, pz],
+                        "quat": [qw, qx, qy, qz],
+                    }
+                    add_body_result = self.simulator.add_entity_to_body(
+                        entity_name=body_name,
+                        entity_type="body",
+                        entity_properties=body_props,
+                        body_name=parent_body_name,
+                    )
+                    assert (
+                        add_body_result.type
+                        == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+                    )
+                else:
+                    continue

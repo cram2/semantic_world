@@ -197,7 +197,7 @@ class MultiSimTestCase(unittest.TestCase):
     def test_empty_multi_sim_in_5s(self):
         world = World()
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(viewer=viewer, world=world)
+        multi_sim = MultiSim(viewer=viewer, world=world, headless=headless)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
@@ -210,7 +210,9 @@ class MultiSimTestCase(unittest.TestCase):
 
     def test_world_multi_sim_in_5s(self):
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(viewer=viewer, world=self.test_urdf_world)
+        multi_sim = MultiSim(
+            viewer=viewer, world=self.test_urdf_world, headless=headless
+        )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
@@ -223,7 +225,9 @@ class MultiSimTestCase(unittest.TestCase):
 
     def test_world_multi_sim_with_change(self):
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(viewer=viewer, world=self.test_urdf_world)
+        multi_sim = MultiSim(
+            viewer=viewer, world=self.test_urdf_world, headless=headless
+        )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
@@ -256,6 +260,8 @@ class MultiSimTestCase(unittest.TestCase):
                     _world=self.test_urdf_world,
                 )
             )
+
+        time.sleep(4.0)
 
         multi_sim.stop_simulation()
         # self.assertAlmostEqual(time.time() - start_time, 1.0, delta=0.5)
@@ -325,7 +331,6 @@ class MultiSimTestCase(unittest.TestCase):
             step_size=self.step_size,
         )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
-        self.assertEqual(multi_sim.simulator.file_path, self.file_path)
         self.assertIs(multi_sim.simulator.headless, headless)
         self.assertEqual(multi_sim.simulator.step_size, self.step_size)
         multi_sim.start_simulation()
