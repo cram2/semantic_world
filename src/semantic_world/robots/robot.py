@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
+
 from typing_extensions import Iterable, Set, TYPE_CHECKING, Optional, Self
 
-from ..world_description.connections import ActiveConnection, OmniDrive
 from ..spatial_types.spatial_types import Vector3
+from ..world_description.connections import ActiveConnection, OmniDrive
 from ..world_description.world_entity import (
     Body,
     RootedView,
@@ -259,7 +260,14 @@ class FieldOfView:
     """
 
     vertical_angle: float
+    """
+    The vertical angle of the camera's view in radians.
+    """
+
     horizontal_angle: float
+    """
+    The horizontal angle of the camera's view in radians.
+    """
 
 
 @dataclass
@@ -327,7 +335,13 @@ class Torso(KinematicChain):
 @dataclass
 class AbstractRobot(RootedView, ABC):
     """
-    Specification of an abstract robots. A robots consists of:
+    Abstract base class for robots.
+    Robots should be generally inferred from the world and not created directly.
+    This is due to the fact that most of the time there exist files that describe the kinematics
+    of the robot and the semantic can be inferred from these files.
+    Hence, first load a world from a file, then infer the robot from the world.
+
+     A robots consists of:
     - a root body, which is the base of the robots
     - an optional torso, which is a kinematic chain (usually without a manipulator) connecting the base with a collection
         of other kinematic chains
@@ -377,13 +391,14 @@ class AbstractRobot(RootedView, ABC):
     @abstractmethod
     def from_world(cls, world: World) -> Self:
         """
-        Creates a robots view from the given world.
-        This method constructs the robots view by identifying and organizing the various semantic components of the robots,
-        such as manipulators, sensors, and kinematic chains. It is expected to be implemented in subclasses.
+        Creates a robot view from the given world.
+        This method constructs the robot view by identifying and organizing the various
+        semantic components of the robots,
+        such as manipulators, sensors, and kinematic chains.
 
         :param world: The world from which to create the robots view.
 
-        :return: A robots view.
+        :return: The inferred robtot.
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
 

@@ -15,8 +15,8 @@ from .robot import (
     FieldOfView,
     Torso,
 )
-from semantic_world.spatial_types import Vector3
-from semantic_world.world import World
+from ..spatial_types import Vector3
+from ..world import World
 
 
 @dataclass

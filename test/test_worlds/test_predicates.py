@@ -1,8 +1,5 @@
-import threading
-
 import numpy as np
 import pytest
-import rclpy
 
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.reasoning.predicates import (
@@ -32,19 +29,6 @@ from semantic_world.world import World
 from semantic_world.world_description.connections import Connection6DoF, FixedConnection
 from semantic_world.world_description.geometry import Box, Scale, Color
 from semantic_world.world_description.world_entity import Body, Region
-
-
-@pytest.fixture(scope="session")
-def rclpy_node():
-    rclpy.init()
-    node = rclpy.create_node("test_node")
-    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
-    thread.start()
-    try:
-        yield node
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
 
 
 @pytest.fixture(scope="session")
