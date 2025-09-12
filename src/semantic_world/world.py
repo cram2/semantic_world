@@ -29,20 +29,22 @@ from typing_extensions import (
 from typing_extensions import List
 from typing_extensions import Type, Set
 
+from .world_description.connection_factories import ConnectionFactory
 from .callbacks.callback import StateChangeCallback, ModelChangeCallback
 from .datastructures.prefixed_name import PrefixedName
-from .datastructures.types import NpMatrix4x4
 from .exceptions import (
     DuplicateViewError,
     AddingAnExistingViewError,
     ViewNotFoundError,
-    AlreadyBelongsToAWorldError,
+    AlreadyBelongsToAWorldError, DuplicateKinematicStructureEntityError,
 )
 from .robots import AbstractRobot
 from .spatial_computations.forward_kinematics import ForwardKinematicsVisitor
 from .spatial_computations.ik_solver import InverseKinematicsSolver
 from .spatial_types import spatial_types as cas
 from .spatial_types.derivatives import Derivatives
+from .spatial_types.math import inverse_frame
+from .datastructures.types import NpMatrix4x4
 from .utils import IDGenerator, copy_lru_cache
 from .world_description.connections import (
     ActiveConnection,
@@ -314,7 +316,7 @@ class World:
         Tuple[KinematicStructureEntity, KinematicStructureEntity]
     ] = field(default_factory=set, repr=False)
     """
-    Collisions for these Body pairs is disabled.
+    Collisions for these Body pairs is disabled.f
     """
 
     _temp_disabled_collision_pairs: Set[
@@ -589,9 +591,7 @@ class World:
             ke.name for ke in self.kinematic_structure_entities
         ]:
             if not handle_duplicates:
-                raise AttributeError(
-                    f"A kinematic structure entity with the name {kinematic_structure_entity.name} already exists in the world."
-                )
+                raise DuplicateKinematicStructureEntityError([kinematic_structure_entity.name])
             kinematic_structure_entity.name.name = (
                 kinematic_structure_entity.name.name
                 + f"_{id_generator(kinematic_structure_entity)}"
@@ -1477,7 +1477,7 @@ class World:
         :param tip: Tip KinematicStructureEntity to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
-        return cas.TransformationMatrix(self.compute_forward_kinematics_np(root, tip))
+        return cas.TransformationMatrix(self.compute_forward_kinematics_np(root, tip), reference_frame=root)
 
     def compute_forward_kinematics_np(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
@@ -1608,6 +1608,26 @@ class World:
             connection.position = value
         self.notify_state_change()
 
+    def __deepcopy__(self, memo):
+        new_world = World(name=self.name)
+        body_mapping = {}
+        dof_mapping = {}
+        with new_world.modify_world():
+            for body in self.bodies:
+                new_body = Body(visual=body.visual, collision=body.collision, name=body.name, )
+                new_world.add_kinematic_structure_entity(new_body)
+                body_mapping[body] = new_body
+            for dof in self.degrees_of_freedom:
+                new_dof = DegreeOfFreedom(name=dof.name, lower_limits=dof.lower_limits, upper_limits=dof.upper_limits)
+                new_world.add_degree_of_freedom(new_dof)
+                dof_mapping[dof] = new_dof
+            for connection in self.connections:
+                con_factory = ConnectionFactory.from_connection(connection)
+                new_world.add_connection(con_factory.create(new_world))
+            for dof in self.degrees_of_freedom:
+                new_world.state[dof.name] = self.state[dof.name].data
+        return new_world
+
     def load_collision_srdf(self, file_path: str):
         """
         Creates a CollisionConfig instance from an SRDF file.
@@ -1716,6 +1736,14 @@ class World:
         self,
     ) -> Set[Tuple[KinematicStructureEntity, KinematicStructureEntity]]:
         return self._disabled_collision_pairs | self._temp_disabled_collision_pairs
+
+    @property
+    def enabled_collision_pairs(self) -> Set[Tuple[Body, Body]]:
+        """
+        The complement of disabled_collision_pairs with respect to all possible body combinations with enabled collision.
+        """
+        all_combinations = set(combinations_with_replacement(self.bodies_with_enabled_collision, 2))
+        return all_combinations - self.disabled_collision_pairs
 
     def add_disabled_collision_pair(
         self, body_a: KinematicStructureEntity, body_b: KinematicStructureEntity

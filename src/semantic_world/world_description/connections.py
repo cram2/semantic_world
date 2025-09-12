@@ -182,7 +182,7 @@ class ActiveConnection1DOF(ActiveConnection, Has1DOFState, ABC):
     def _post_init_with_world(self):
         if self.dof is None:
             self.dof = DegreeOfFreedom(
-                name=PrefixedName(str(self.name)),
+                name=self.name,
             )
             self._world.add_degree_of_freedom(self.dof)
 
@@ -470,6 +470,24 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
         state[self.x.name].position += state[self.x.name].velocity * dt
         state[self.y.name].velocity = np.sin(delta) * x_vel + np.cos(delta) * y_vel
         state[self.y.name].position += state[self.y.name].velocity * dt
+
+    @property
+    def origin(self) -> cas.TransformationMatrix:
+        return super().origin
+
+    @origin.setter
+    def origin(self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]) -> None:
+        if isinstance(transformation, np.ndarray):
+            transformation = cas.TransformationMatrix(transformation)
+        position = transformation.to_position()
+        roll, pitch, yaw = transformation.to_rotation().to_rpy()
+        assert position.z.to_np() == 0.0, "OmniDrive only supports planar movement in the XY plane, z must be 0"
+        assert roll.to_np() == 0.0, "OmniDrive only supports planar movement in the XY plane, roll must be 0"
+        assert pitch.to_np() == 0.0, "OmniDrive only supports planar movement in the XY plane, pitch must be 0"
+        self._world.state[self.x.name].position = position.x.to_np()
+        self._world.state[self.y.name].position = position.y.to_np()
+        self._world.state[self.yaw.name].position = yaw.to_np()
+        self._world.notify_state_change()
 
     def get_free_variable_names(self) -> List[PrefixedName]:
         return [self.x.name, self.y.name, self.yaw.name]

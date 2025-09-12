@@ -532,6 +532,13 @@ class BoundingBox:
             }
         )
 
+    @property
+    def dimensions(self) -> List[float]:
+        """
+        :return: The dimensions of the bounding box as a list [width, height, depth].
+        """
+        return [self.width, self.height, self.depth]
+
     def bloat(
         self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
     ) -> BoundingBox:
@@ -899,3 +906,19 @@ class BoundingBoxCollection:
 
     def as_shapes(self) -> List[Box]:
         return [box.as_shape() for box in self.bounding_boxes]
+
+    def get_points(self) -> List[Point3]:
+        """
+        Get the 8 corners of a bounding box that contains all bounding boxes in the collection.
+
+        :return: A list of Point3 objects representing the corners of the bounding box.
+        """
+        all_x = [bb.min_x for bb in self.bounding_boxes] + [bb.max_x for bb in self.bounding_boxes]
+        all_y = [bb.min_y for bb in self.bounding_boxes] + [bb.max_y for bb in self.bounding_boxes]
+        all_z = [bb.min_z for bb in self.bounding_boxes] + [bb.max_z for bb in self.bounding_boxes]
+        return [
+            Point3(x, y, z)
+            for x in [min(all_x), max(all_x)]
+            for y in [min(all_y), max(all_y)]
+            for z in [min(all_z), max(all_z)]
+        ]

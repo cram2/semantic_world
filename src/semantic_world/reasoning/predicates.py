@@ -129,10 +129,11 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     rt = RayTracer(camera._world)
     rt.update_scene()
 
+    # This ignores the camera orientation and sets it to identity
     cam_pose = np.eye(4, dtype=float)
     cam_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
 
-    seg = rt.create_segmentation_mask(cam_pose, resolution=256)
+    seg = rt.create_segmentation_mask(TransformationMatrix(cam_pose, camera._world.root), resolution=256)
     indices = np.unique(seg)
     indices = indices[indices > -1]
     bodies = [camera._world.kinematic_structure[i] for i in indices]
@@ -162,6 +163,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
     camera_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
+    camera_pose = TransformationMatrix(camera_pose, camera._world.root)
 
     # create a world only containing the target body
     world_without_occlusion = World()

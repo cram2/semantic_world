@@ -36,6 +36,11 @@ class DuplicateViewError(UsageError):
         msg = f"Views {views} are duplicates, while views elements should be unique."
         super().__init__(msg)
 
+class DuplicateKinematicStructureEntityError(UsageError):
+    def __init__(self, names: List[PrefixedName]):
+        msg = f"Kinematic structure entities with names {names} are duplicates, while kinematic structure entity names should be unique."
+        super().__init__(msg)
+
 
 class ParsingError(Exception):
     """

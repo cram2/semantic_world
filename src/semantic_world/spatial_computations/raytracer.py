@@ -8,6 +8,7 @@ from trimesh import Scene
 
 from ..datastructures.types import NpMatrix4x4
 from ..world_description.world_entity import Body
+from ..spatial_types.spatial_types import SpatialType
 
 if TYPE_CHECKING:
     from ..world import World
@@ -106,9 +107,8 @@ class RayTracer:
                 )
                 self.scene.graph[body.name.name + f"_collision_{i}"] = transform
 
-    def create_segmentation_mask(
-        self, camera_pose: NpMatrix4x4, resolution: int = 512
-    ) -> np.ndarray:
+    def create_segmentation_mask(self, camera_pose: SpatialType,
+                                 resolution: int = 512) -> np.ndarray:
         """
         Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
         in the mask corresponds to the index of a body in the scene or -1 if no body is hit at that pixel.
@@ -141,20 +141,20 @@ class RayTracer:
         return a
 
     def create_depth_map(
-        self, camera_position: NpMatrix4x4, resolution: int = 512
+        self, camera_pose: SpatialType, resolution: int = 512
     ) -> np.ndarray:
         """
         Creates a depth map for the ray tracer scene from the camera position to the target position. Each pixel in the
         depth map corresponds to the distance from the camera to the closest point on the surface of the scene or -1 if
         no point is hit.
 
-        :param camera_position: The position of the camera.
+        :param camera_pose: The position of the camera.
         :param resolution: The resolution of the depth map.
         :return: A depth map as a numpy array.
         """
         self.update_scene()
         ray_origins, ray_directions, pixels = self.create_camera_rays(
-            camera_position, resolution=resolution
+            camera_pose, resolution=resolution
         )
         # Code from the example in trimesh repo: examples/raytrace.py
         points, index_ray, index_tri = self.scene.to_mesh().ray.intersects_location(
@@ -175,7 +175,7 @@ class RayTracer:
         return a
 
     def create_camera_rays(
-        self, camera_pose: NpMatrix4x4, resolution: int = 512, fov=90
+        self, camera_pose: SpatialType, resolution: int = 512, fov=90
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Creates camera rays for the ray tracer scene from the camera position to the target position. Places the camera
@@ -186,6 +186,7 @@ class RayTracer:
         :param fov: The field of view of the camera in degrees.
         :return: The origin points of the rays, the direction vectors of the rays, and the pixel coordinates.
         """
+        camera_pose = camera_pose.to_np()
         self.update_scene()
         self.scene.camera.resolution = (resolution, resolution)
         # By default, the camera is looking along the -z axis, so we need to rotate it to look along the x-axis.
