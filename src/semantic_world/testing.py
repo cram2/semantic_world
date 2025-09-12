@@ -1,4 +1,6 @@
 import os
+import threading
+
 from typing_extensions import Tuple
 
 import pytest
@@ -150,3 +152,18 @@ def pr2_world():
         world.merge_world(world_with_pr2, c_root_bf)
 
     return world
+
+
+@pytest.fixture(scope="session")
+def rclpy_node():
+    import rclpy
+
+    rclpy.init()
+    node = rclpy.create_node("test_node")
+    thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    thread.start()
+    try:
+        yield node
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()

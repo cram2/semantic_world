@@ -2,13 +2,17 @@ import os.path
 import unittest
 
 from semantic_world.adapters.urdf import URDFParser
+from semantic_world.utils import get_semantic_world_directory_root
 from semantic_world.world_description.connections import FixedConnection
 
 
 class URDFParserTestCase(unittest.TestCase):
     urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
+        get_semantic_world_directory_root(os.path.abspath(__file__)),
+        "resources",
+        "urdf",
     )
+    print(urdf_dir)
     table = os.path.join(urdf_dir, "table.urdf")
     kitchen = os.path.join(urdf_dir, "kitchen-small.urdf")
     apartment = os.path.join(urdf_dir, "apartment.urdf")

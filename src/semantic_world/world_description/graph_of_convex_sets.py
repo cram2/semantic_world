@@ -359,7 +359,7 @@ class GraphOfConvexSets:
         bloat_walls: float = 0.0,
     ) -> Self:
         """
-        Create a connectivity graph from the free space in the belief state of the robot.
+        Create a connectivity graph from the free space in the belief state of the robots.
 
         :param search_space: The search space for the connectivity graph.
         :param obstacle_view: The view containing the obstacles.
@@ -420,7 +420,7 @@ class GraphOfConvexSets:
         bloat_obstacles: float = 0.0,
     ) -> Self:
         """
-        Create a connectivity graph from the free space in the belief state of the robot.
+        Create a connectivity graph from the free space in the belief state of the robots.
 
         :param world: The belief state.
         :param search_space: The search space for the connectivity graph.
@@ -450,10 +450,10 @@ class GraphOfConvexSets:
         bloat_walls: float = 0.0,
     ) -> Self:
         """
-        Create a GCS from the free space in the belief state of the robot for navigation.
+        Create a GCS from the free space in the belief state of the robots for navigation.
         The resulting GCS describes the paths for navigation, meaning that changing the z-axis position is not
         possible.
-        Furthermore, it is taken into account that the robot has to fit through the entire space and not just
+        Furthermore, it is taken into account that the robots has to fit through the entire space and not just
         through the floor level obstacles.
 
         :param search_space: The search space for the connectivity graph.
@@ -516,10 +516,10 @@ class GraphOfConvexSets:
         bloat_obstacles: float = 0.0,
     ) -> Self:
         """
-        Create a GCS from the free space in the belief state of the robot for navigation.
+        Create a GCS from the free space in the belief state of the robots for navigation.
         The resulting GCS describes the paths for navigation, meaning that changing the z-axis position is not
         possible.
-        Furthermore, it is taken into account that the robot has to fit through the entire space and not just
+        Furthermore, it is taken into account that the robots has to fit through the entire space and not just
         through the floor level obstacles.
 
         :param world: The belief state.

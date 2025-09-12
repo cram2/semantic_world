@@ -10,12 +10,10 @@ from ..collision_checking.collision_detector import CollisionCheck, Collision
 from ..collision_checking.trimesh_collision_detector import TrimeshCollisionDetector
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
-from ..robots import (
+from semantic_world.robots.robot import (
     Camera,
-    Manipulator,
     AbstractRobot,
     ParallelGripper,
-    Arm,
 )
 from ..spatial_computations.ik_solver import (
     MaxIterationsException,
@@ -67,12 +65,12 @@ def robot_in_collision(
     threshold: float = 0.001,
 ) -> List[Collision]:
     """
-    Check if the robot collides with any object in the world at the given pose.
+    Check if the robots collides with any object in the world at the given pose.
 
-    :param robot: The robot object
+    :param robot: The robots object
     :param ignore_collision_with: A list of objects to ignore collision with
     :param threshold: The threshold for contact detection
-    :return: True if the robot collides with any object, False otherwise
+    :return: True if the robots collides with any object, False otherwise
     """
 
     if ignore_collision_with is None:
@@ -104,11 +102,11 @@ def robot_in_collision(
 
 def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
     """
-    Check if a robot is holding an object.
+    Check if a robots is holding an object.
 
-    :param robot: The robot object
+    :param robot: The robots object
     :param body: The body to check if it is picked
-    :return: True if the robot is holding the object, False otherwise
+    :return: True if the robots is holding the object, False otherwise
     """
     grippers = an(
         entity(
@@ -233,13 +231,13 @@ def blocking(
     tip: Body,
 ) -> List[Collision]:
     """
-    Get the bodies that are blocking the robot from reaching a given position.
-    The blocking are all bodies that are in collision with the robot when reaching for the pose.
+    Get the bodies that are blocking the robots from reaching a given position.
+    The blocking are all bodies that are in collision with the robots when reaching for the pose.
 
     :param pose: The pose to reach
     :param root: The root of the kinematic chain.
     :param tip: The threshold between the end effector and the position.
-    :return: A list of bodies the robot is in collision with when reaching for the specified object or None if the pose or object is not reachable.
+    :return: A list of bodies the robots is in collision with when reaching for the specified object or None if the pose or object is not reachable.
     """
     result = root._world.compute_inverse_kinematics(
         root=root, tip=tip, target=pose, max_iterations=1000
@@ -249,7 +247,7 @@ def blocking(
             root._world.state[dof.name].position = state
 
     robot = the(
-        entity(r := let("robot", AbstractRobot, root._world.views), tip in r.bodies)
+        entity(r := let("robots", AbstractRobot, root._world.views), tip in r.bodies)
     ).evaluate()
     return robot_in_collision(robot, [])
 
