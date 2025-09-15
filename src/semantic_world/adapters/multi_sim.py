@@ -1,7 +1,5 @@
-import os
 import time
 from dataclasses import dataclass
-from html.parser import entityref
 from typing import Dict, List, Any
 
 import numpy
@@ -16,10 +14,11 @@ from multiverse_simulator import (
 )
 
 from ..callbacks.callback import ModelChangeCallback
+from ..spatial_types.spatial_types import TransformationMatrix
 from ..world import World
 from ..world_description.connections import RevoluteConnection, PrismaticConnection
 from ..world_description.geometry import Box, Cylinder, Sphere, Shape
-from ..world_description.world_entity import Region, Body
+from ..world_description.world_entity import Region, Body, KinematicStructureEntity
 from ..world_description.world_modification import (
     WorldModelModificationBlock,
     AddDegreeOfFreedomModification,
@@ -28,36 +27,22 @@ from ..world_description.world_modification import (
 from ..spatial_types.symbol_manager import symbol_manager
 
 
-def shape_to_geom_props(shape: Shape) -> Dict[str, Any]:
-    shape_pos = shape.origin.to_position()
-    sx, sy, sz, _ = symbol_manager.evaluate_expr(shape_pos).tolist()
-    shape_quat = shape.origin.to_quaternion()
-    sqx, sqy, sqz, sqw = symbol_manager.evaluate_expr(shape_quat).tolist()
-    r, g, b, a = (
-        shape.color.R,
-        shape.color.G,
-        shape.color.B,
-        shape.color.A,
-    )
-    if isinstance(shape, Box):
-        size = [
-            symbol_manager.evaluate_expr(shape.scale.x) / 2,
-            symbol_manager.evaluate_expr(shape.scale.y) / 2,
-            symbol_manager.evaluate_expr(shape.scale.z) / 2,
-        ]
-        return {
-            "type": mujoco.mjtGeom.mjGEOM_BOX,
-            "pos": [sx, sy, sz],
-            "quat": [sqw, sqx, sqy, sqz],
-            "size": size,
-            "rgba": [r, g, b, a],
-        }
-    else:
-        raise NotImplementedError(f"Shape type {type(shape)} is not implemented yet.")
+def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
+    """
+    Converts a CAS TransformationMatrix to a list of 7 floats (position + quaternion).
+
+    :param pose: The CAS TransformationMatrix to convert.
+    :return: A list of 7 floats ([px, py, pz, qw, qx, qy, qz]) representing the position and quaternion.
+    """
+    pos = pose.to_position()
+    quat = pose.to_quaternion()
+    px, py, pz, _ = symbol_manager.evaluate_expr(pos).tolist()
+    qx, qy, qz, qw = symbol_manager.evaluate_expr(quat).tolist()
+    return [px, py, pz, qw, qx, qy, qz]
 
 
 @dataclass
-class MultiverseModelSynchronizer(ModelChangeCallback):
+class MultiverseSynchronizer(ModelChangeCallback):
     """
     A callback to synchronize the world model with the Multiverse simulator.
     This callback will listen to the world model changes and update the Multiverse simulator accordingly.
@@ -70,68 +55,253 @@ class MultiverseModelSynchronizer(ModelChangeCallback):
         for modification in self.world._model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity
-                parent_body_name = entity.parent_connection.parent.name.name
-                entity_name = entity.name.name
-                entity_pose = entity.parent_connection.origin_expression
-                entity_pos = entity_pose.to_position()
-                px, py, pz, _ = symbol_manager.evaluate_expr(entity_pos).tolist()
-                entity_quat = entity_pose.to_quaternion()
-                qx, qy, qz, qw = symbol_manager.evaluate_expr(entity_quat).tolist()
-                if isinstance(self.simulator, MultiverseMujocoConnector):
-                    body_props = {
-                        "pos": [px, py, pz],
-                        "quat": [qw, qx, qy, qz],
-                    }
-                    add_body_result = self.simulator.add_entity(
-                        entity_name=entity_name,
-                        entity_type="body",
-                        entity_properties=body_props,
-                        parent_name=parent_body_name,
+                if not self.spawn_kinematic_structure_entity(entity):
+                    raise RuntimeError(
+                        f"Failed to spawn kinematic structure entity {entity.name.name}."
                     )
-                    assert (
-                        add_body_result.type
-                        == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
-                    )
-                    if isinstance(entity, Region):
-                        for shape in entity.area:
-                            site_props = shape_to_geom_props(shape)
-                            add_site_result = self.simulator.add_entity(
-                                entity_name=f"{entity_name}_{id(shape)}",
-                                entity_type="site",
-                                entity_properties=site_props,
-                                parent_name=entity_name,
+                if isinstance(entity, Region):
+                    for shape in entity.area:
+                        if not self.spawn_geometry(
+                            entity=entity,
+                            shape=shape,
+                        ):
+                            raise RuntimeError(
+                                f"Failed to spawn geometry {shape} for region {entity.name.name}."
                             )
-                            assert (
-                                add_site_result.type
-                                == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+                elif isinstance(entity, Body):
+                    for shape in {
+                        id(s): s for s in entity.visual + entity.collision
+                    }.values():
+                        if not self.spawn_geometry(
+                            entity=entity,
+                            shape=shape,
+                        ):
+                            raise RuntimeError(
+                                f"Failed to spawn geometry {shape} for body {entity.name.name}."
                             )
-                    elif isinstance(entity, Body):
-                        for shape in {
-                            id(s): s for s in entity.visual + entity.collision
-                        }.values():
-                            geom_props = shape_to_geom_props(shape)
-                            if shape in entity.collision and entity.visual:
-                                geom_props["rgba"][3] = 0.0
-                            add_geom_result = self.simulator.add_entity(
-                                entity_name=f"{entity_name}_{id(shape)}",
-                                entity_type="geom",
-                                entity_properties=geom_props,
-                                parent_name=entity_name,
-                            )
-                            assert (
-                                add_geom_result.type
-                                == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
-                            )
-                    else:
-                        raise NotImplementedError(
-                            f"Can't parse entity type {type(entity)}."
-                        )
                 else:
-                    continue
+                    raise NotImplementedError(
+                        f"Can't parse entity type {type(entity)}."
+                    )
 
     def stop(self):
         self.world.model_change_callbacks.remove(self)
 
+    def build_world(self, file_path: str):
+        """
+        Builds the world in the simulator from the given file path.
+
+        :param file_path: The file path to the world file.
+        """
+        raise NotImplementedError
+
+    def spawn_kinematic_structure_entity(self, entity: KinematicStructureEntity) -> bool:
+        """
+        Spawns a kinematic structure entity in the simulator.
+
+        :param entity: The kinematic structure entity to spawn.
+        :return: True if the entity was spawned successfully, False otherwise.
+        """
+        raise NotImplementedError
+
+    def spawn_geometry(self, entity: KinematicStructureEntity, shape: Shape) -> bool:
+        """
+        Spawns a geometry in the simulator.
+
+        :param entity: The parent entity of the geometry to spawn.
+        :param shape: The shape of the geometry to spawn.
+        :return: True if the geometry was spawned successfully, False otherwise.
+        """
+        raise NotImplementedError
+
+
+class MujocoSynchronizer(MultiverseSynchronizer):
+    simulator: MultiverseMujocoConnector
+
+    def build_world(self, file_path: str):
+        spec = mujoco.MjSpec()
+        spec.modelname = "scene"
+        body_map = {"world": spec.worldbody}
+        for body in self.world.bodies:
+            if body.name.name == "world":
+                continue
+            body_name = body.name.name
+            parent_body_name = body.parent_connection.parent.name.name
+            px, py, pz, qw, qx, qy, qz = cas_pose_to_list(body.parent_connection.origin)
+            body_pos = [px, py, pz]
+            body_quat = [qw, qx, qy, qz]
+            body_spec = body_map[parent_body_name].add_body(
+                name=body.name.name, pos=body_pos, quat=body_quat
+            )
+            body_map[body_name] = body_spec
+            for geom in {id(s): s for s in body.visual + body.collision}.values():
+                px, py, pz, qw, qx, qy, qz = cas_pose_to_list(geom.origin)
+                geom_pos = [px, py, pz]
+                geom_quat = [qw, qx, qy, qz]
+                if isinstance(geom, Box):
+                    size = [geom.scale.x / 2, geom.scale.y / 2, geom.scale.z / 2]
+                    geom_spec = body_spec.add_geom(
+                        type=mujoco.mjtGeom.mjGEOM_BOX,
+                        pos=geom_pos,
+                        quat=geom_quat,
+                        size=size,
+                    )
+                elif isinstance(geom, Cylinder):
+                    size = [geom.width / 2, geom.height, 0.0]
+                    geom_spec = body_spec.add_geom(
+                        type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                        pos=geom_pos,
+                        quat=geom_quat,
+                        size=size,
+                    )
+                elif isinstance(geom, Sphere):
+                    size = [geom.radius, geom.radius, geom.radius]
+                    geom_spec = body_spec.add_geom(
+                        type=mujoco.mjtGeom.mjGEOM_SPHERE,
+                        pos=geom_pos,
+                        quat=geom_quat,
+                        size=size,
+                    )
+        for connection in self.world.connections:
+            add_prefix = len(connection.dofs) == 1
+            joint_name = connection.name.name
+            child_body_name = connection.child.name.name
+            child_body_spec = body_map[child_body_name]
+            for i, dof in enumerate(connection.dofs):
+                if isinstance(connection, RevoluteConnection):
+                    joint_axis = connection.axis.to_np().tolist()[:3]
+                    joint_range = [
+                        dof.lower_limits.position,
+                        dof.upper_limits.position,
+                    ]
+                    child_body_spec.add_joint(
+                        name=joint_name if add_prefix else f"{joint_name}_{i}",
+                        type=mujoco.mjtJoint.mjJNT_HINGE,
+                        axis=joint_axis,
+                        range=joint_range,
+                    )
+                elif isinstance(connection, PrismaticConnection):
+                    joint_axis = connection.axis.to_np().tolist()[:3]
+                    joint_range = [
+                        dof.lower_limits.position,
+                        dof.upper_limits.position,
+                    ]
+                    child_body_spec.add_joint(
+                        name=joint_name if add_prefix else f"{joint_name}_{i}",
+                        type=mujoco.mjtJoint.mjJNT_SLIDE,
+                        axis=joint_axis,
+                        range=joint_range,
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Connection type {type(connection)} is not implemented yet."
+                    )
+        spec.compile()
+        spec.to_file(file_path)
+
+    def spawn_kinematic_structure_entity(self, entity: Body) -> bool:
+        parent_body_name = entity.parent_connection.parent.name.name
+        entity_name = entity.name.name
+        entity_pose = entity.parent_connection.origin_expression
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity_pose)
+        body_pos = [px, py, pz]
+        body_quat = [qw, qx, qy, qz]
+        body_props = {
+            "pos": body_pos,
+            "quat": body_quat,
+        }
+        add_body_result = self.simulator.add_entity(
+            entity_name=entity_name,
+            entity_type="body",
+            entity_properties=body_props,
+            parent_name=parent_body_name,
+        )
+        return add_body_result.type == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+
+    def spawn_geometry(self, entity: KinematicStructureEntity, shape: Shape) -> bool:
+        parent_name = entity.name.name
+        if isinstance(entity, Region):
+            site_props = self.shape_to_geom_props(shape)
+            add_site_result = self.simulator.add_entity(
+                entity_name=f"{parent_name}_{id(shape)}",
+                entity_type="site",
+                entity_properties=site_props,
+                parent_name=parent_name,
+            )
+            return add_site_result.type == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+        elif isinstance(entity, Body):
+            geom_props = self.shape_to_geom_props(shape)
+            if shape in entity.collision and entity.visual:
+                geom_props["rgba"][3] = 0.0
+            add_geom_result = self.simulator.add_entity(
+                entity_name=f"{parent_name}_{id(shape)}",
+                entity_type="geom",
+                entity_properties=geom_props,
+                parent_name=parent_name,
+            )
+            return add_geom_result.type == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+        else:
+            raise NotImplementedError(f"Can't parse entity type {type(entity)}.")
+
+    @staticmethod
+    def shape_to_geom_props(shape: Shape) -> Dict[str, Any]:
+        """
+        Converts a Shape object to a dictionary of geometry properties for Multiverse.
+
+        :param shape: The Shape object to convert.
+        :return: A dictionary of geometry properties.
+        """
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(shape.origin)
+        geom_pos = [px, py, pz]
+        geom_quat = [qw, qx, qy, qz]
+        r, g, b, a = (
+            shape.color.R,
+            shape.color.G,
+            shape.color.B,
+            shape.color.A,
+        )
+        geom_color = [r, g, b, a]
+        if isinstance(shape, Box):
+            size = [
+                symbol_manager.evaluate_expr(shape.scale.x) / 2,
+                symbol_manager.evaluate_expr(shape.scale.y) / 2,
+                symbol_manager.evaluate_expr(shape.scale.z) / 2,
+            ]
+            return {
+                "type": mujoco.mjtGeom.mjGEOM_BOX,
+                "pos": geom_pos,
+                "quat": geom_quat,
+                "size": size,
+                "rgba": geom_color,
+            }
+        elif isinstance(shape, Cylinder):
+            size = [
+                symbol_manager.evaluate_expr(shape.width) / 2,
+                symbol_manager.evaluate_expr(shape.height),
+                0.0,
+            ]
+            return {
+                "type": mujoco.mjtGeom.mjGEOM_CYLINDER,
+                "pos": geom_pos,
+                "quat": geom_quat,
+                "size": size,
+                "rgba": geom_color,
+            }
+        elif isinstance(shape, Sphere):
+            size = [
+                symbol_manager.evaluate_expr(shape.radius),
+                symbol_manager.evaluate_expr(shape.radius),
+                symbol_manager.evaluate_expr(shape.radius),
+            ]
+            return {
+                "type": mujoco.mjtGeom.mjGEOM_SPHERE,
+                "pos": geom_pos,
+                "quat": geom_quat,
+                "size": size,
+                "rgba": geom_color,
+            }
+        else:
+            raise NotImplementedError(f"Shape type {type(shape)} is not implemented yet.")
 
 class MultiSim:
     """
@@ -139,7 +309,7 @@ class MultiSim:
     """
 
     simulator: MultiverseSimulator
-    model_updater: MultiverseModelSynchronizer
+    synchronizer: MultiverseSynchronizer
 
     def __init__(
         self,
@@ -163,107 +333,19 @@ class MultiSim:
         if simulator == "mujoco":
             Simulator = MultiverseMujocoConnector
             file_path = "/tmp/scene.xml"
-            self.build_world(world=world, file_path=file_path)
+            self.simulator = Simulator(
+                file_path=file_path,
+                viewer=viewer,
+                headless=headless,
+                step_size=step_size,
+                real_time_factor=real_time_factor,
+            )
+            self.synchronizer = MujocoSynchronizer(world, self.simulator)
         else:
             raise NotImplementedError(f"Simulator {simulator} is not implemented yet.")
 
         self._viewer = viewer
-        self.simulator = Simulator(
-            file_path=file_path,
-            viewer=viewer,
-            headless=headless,
-            step_size=step_size,
-            real_time_factor=real_time_factor,
-        )
-        self.model_updater = MultiverseModelSynchronizer(world, self.simulator)
-
-    def build_world(self, world: World, file_path: str):
-        file_ext = os.path.splitext(file_path)[1]
-        if file_ext == ".xml":
-            spec = mujoco.MjSpec()
-            spec.modelname = "scene"
-            body_map = {"world": spec.worldbody}
-            for body in world.bodies:
-                if body.name.name == "world":
-                    continue
-                body_name = body.name.name
-                parent_body_name = body.parent_connection.parent.name.name
-                body_pos = (
-                    body.parent_connection.origin.to_position().to_np().tolist()[:3]
-                )
-                body_quat = (
-                    body.parent_connection.origin.to_quaternion().to_np().tolist()[:4]
-                )
-                body_quat = [body_quat[3], body_quat[0], body_quat[1], body_quat[2]]
-                body_spec = body_map[parent_body_name].add_body(
-                    name=body.name.name, pos=body_pos, quat=body_quat
-                )
-                body_map[body_name] = body_spec
-                for geom in {id(s): s for s in body.visual + body.collision}.values():
-                    geom_pos = geom.origin.to_position().to_np().tolist()[:3]
-                    geom_quat = geom.origin.to_quaternion().to_np().tolist()[:4]
-                    geom_quat = [geom_quat[3], geom_quat[0], geom_quat[1], geom_quat[2]]
-                    if isinstance(geom, Box):
-                        size = [geom.scale.x / 2, geom.scale.y / 2, geom.scale.z / 2]
-                        geom_spec = body_spec.add_geom(
-                            type=mujoco.mjtGeom.mjGEOM_BOX,
-                            pos=geom_pos,
-                            quat=geom_quat,
-                            size=size,
-                        )
-                    elif isinstance(geom, Cylinder):
-                        size = [geom.width / 2, geom.height, 0.0]
-                        geom_spec = body_spec.add_geom(
-                            type=mujoco.mjtGeom.mjGEOM_CYLINDER,
-                            pos=geom_pos,
-                            quat=geom_quat,
-                            size=size,
-                        )
-                    elif isinstance(geom, Sphere):
-                        size = [geom.radius, geom.radius, geom.radius]
-                        geom_spec = body_spec.add_geom(
-                            type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                            pos=geom_pos,
-                            quat=geom_quat,
-                            size=size,
-                        )
-            for connection in world.connections:
-                add_prefix = len(connection.dofs) == 1
-                joint_name = connection.name.name
-                child_body_name = connection.child.name.name
-                child_body_spec = body_map[child_body_name]
-                for i, dof in enumerate(connection.dofs):
-                    if isinstance(connection, RevoluteConnection):
-                        joint_axis = connection.axis.to_np().tolist()[:3]
-                        joint_range = [
-                            dof.lower_limits.position,
-                            dof.upper_limits.position,
-                        ]
-                        child_body_spec.add_joint(
-                            name=joint_name if add_prefix else f"{joint_name}_{i}",
-                            type=mujoco.mjtJoint.mjJNT_HINGE,
-                            axis=joint_axis,
-                            range=joint_range,
-                        )
-                    elif isinstance(connection, PrismaticConnection):
-                        joint_axis = connection.axis.to_np().tolist()[:3]
-                        joint_range = [
-                            dof.lower_limits.position,
-                            dof.upper_limits.position,
-                        ]
-                        child_body_spec.add_joint(
-                            name=joint_name if add_prefix else f"{joint_name}_{i}",
-                            type=mujoco.mjtJoint.mjJNT_SLIDE,
-                            axis=joint_axis,
-                            range=joint_range,
-                        )
-                    else:
-                        raise NotImplementedError(
-                            f"Connection type {type(connection)} is not implemented yet."
-                        )
-            spec.compile()
-            spec.to_file(file_path)
-        return file_path
+        self.synchronizer.build_world(file_path=file_path)
 
     def start_simulation(self):
         """
@@ -282,7 +364,7 @@ class MultiSim:
 
         :return: None
         """
-        self.model_updater.stop()
+        self.synchronizer.stop()
         self.simulator.stop()
 
     def pause_simulation(self):
