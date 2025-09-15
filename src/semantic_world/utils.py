@@ -139,7 +139,7 @@ def get_semantic_world_directory_root(file_path: str) -> str:
     if not os.path.exists(file_path):
         raise ValueError(f"File {file_path} does not exist")
 
-    current_dir = os.path.dirname(os.path.abspath(file_path))
+    current_dir = os.path.abspath(file_path)
 
     # Loop until we reach the root directory (cross-platform)
     while True:

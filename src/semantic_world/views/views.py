@@ -11,7 +11,7 @@ from ..world_description.geometry import BoundingBoxCollection
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import Point3
 from ..datastructures.variables import SpatialVariables
-from ..world_description.world_entity import View, Body
+from ..world_description.world_entity import View, Body, Region
 
 
 @dataclass
@@ -40,6 +40,7 @@ class Handle(View):
     def __post_init__(self):
         if self.name is None:
             self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
 
 @symbol
 @dataclass(unsafe_hash=True)
@@ -122,6 +123,22 @@ class Components(View): ...
 class Furniture(View): ...
 
 
+@dataclass
+class SupportingSurface(View):
+    """
+    A view that represents a supporting surface.
+    """
+
+    region: Region
+    """
+    The region that represents the supporting surface.
+    """
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.region.name
+
+
 #################### subclasses von Components
 
 
@@ -160,6 +177,7 @@ class DoubleDoor(EntryWay):
     def __post_init__(self):
         if self.name is None:
             self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
+
 
 @symbol
 @dataclass(unsafe_hash=True)
@@ -201,6 +219,25 @@ class Cabinet(Cupboard):
 @dataclass
 class Wardrobe(Cupboard):
     doors: List[Door] = field(default_factory=list)
+
+
+class Floor(SupportingSurface): ...
+
+
+@dataclass
+class Room(View):
+    """
+    A view that represents a closed area with a specific purpose
+    """
+
+    floor: Floor
+    """
+    The room's floor.
+    """
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.floor.name
 
 
 @dataclass

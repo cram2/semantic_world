@@ -20,10 +20,19 @@ If you are interested in contributing, you can check out the source code from Gi
 git clone https://github.com/cram2/semantic_world.git
 ```
 
-# Tests
-The tests can be run using `pytest` after installing the package.
+### Development Dependencies
 
 ```bash
+sudo apt install -y graphviz graphviz-dev
+pip install -r requirements.txt
+```
+
+
+# Tests
+The tests can be run with `pytest` directly in PyCharm or from the terminal after installing Semantic World as a python package.
+
+```bash
+pip install -e .
 pytest test/
 ```
 

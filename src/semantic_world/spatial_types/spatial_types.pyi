@@ -2,8 +2,19 @@ from __future__ import annotations
 
 import functools
 from enum import IntEnum
-from typing_extensions import overload, Union, Iterable, Tuple, Optional, Callable, List, Sequence, Dict, TypeVar, \
-    TYPE_CHECKING
+from typing_extensions import (
+    overload,
+    Union,
+    Iterable,
+    Tuple,
+    Optional,
+    Callable,
+    List,
+    Sequence,
+    Dict,
+    TypeVar,
+    TYPE_CHECKING,
+)
 import numpy as np
 import casadi as ca
 

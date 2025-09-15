@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from dataclasses import dataclass, field
 from itertools import chain
-from typing_extensions import Tuple, Set, List, Optional
+from typing_extensions import Tuple, Set, List, Optional, Iterable
 
 import numpy as np
 
@@ -174,7 +174,7 @@ class CollisionDetector(abc.ABC):
 
     @abc.abstractmethod
     def check_collisions(
-        self, collision_matrix: Optional[Set[CollisionCheck]] = None
+        self, collision_matrix: Optional[Iterable[CollisionCheck]] = None
     ) -> List[Collision]:
         """
         Computes the collisions for all checks in the collision matrix.

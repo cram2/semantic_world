@@ -309,7 +309,6 @@ class MultiSim:
             self.world._atomic_modifications[-1]
         )
         self.update_world(latest_changes)
-        print(latest_changes)
 
     def update_world(self, latest_changes: WorldModelModificationBlock):
         for modification in latest_changes.modifications:

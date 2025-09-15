@@ -24,12 +24,12 @@ Let's load a world first to get started.
 import logging
 import os
 
-from semantic_world.adapters.multi_parser import MultiParser
+from semantic_world.adapters.urdf import URDFParser 
 from semantic_world.utils import get_semantic_world_directory_root
 
 logging.disable(logging.CRITICAL)
 apartment = os.path.join(get_semantic_world_directory_root(os.getcwd()), "resources", "urdf", "apartment.urdf")
-world = MultiParser(apartment).parse()
+world = URDFParser.from_file(apartment).parse()
 
 ```
 
@@ -52,7 +52,6 @@ viz = VizMarkerPublisher(world=world, node=node)
 When you want to stop visualizing, you have to stop the visualizer and afterwards clean up ROS2.
 
 ```python
-viz._stop_publishing()
 node.destroy_node()
 rclpy.shutdown()
 ```

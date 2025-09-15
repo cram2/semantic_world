@@ -15,7 +15,7 @@ jupyter:
 (loading-worlds)=
 # Loading worlds from files
 
-This tutorial shows how to load a world description from a file into a `World` object using the `MultiParser`.
+This tutorial shows how to load a world description from a file into a `World` object using the `URDFParser`.
 
 First, we need to compose the path to your world file.
 
@@ -30,13 +30,13 @@ apartment = os.path.join(get_semantic_world_directory_root(os.getcwd()), "resour
 
 ```
 
-Next we need to initialize a parser that reads this file. There are many parsers available. We will use the most capable one, the MultiParser.
+Next we need to initialize a parser that reads this file. There are many parsers available.
 
 ```python
-from semantic_world.adapters.multi_parser import MultiParser
-
-parser = MultiParser(apartment)
-world = parser.parse()
+from semantic_world.adapters.urdf import URDFParser  
+  
+parser = URDFParser.from_file(apartment)  
+world = parser.parse()  
 print(world)
 ```
 

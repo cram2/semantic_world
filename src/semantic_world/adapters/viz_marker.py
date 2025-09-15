@@ -5,6 +5,7 @@ import time
 import numpy as np
 
 from .. import logger
+from ..callbacks.callback import StateChangeCallback
 
 try:
     from builtin_interfaces.msg import Duration
@@ -20,7 +21,7 @@ except ImportError as e:
 from scipy.spatial.transform import Rotation
 
 from ..world_description.geometry import (
-    Mesh,
+    FileMesh,
     Box,
     Sphere,
     Cylinder,
@@ -30,7 +31,7 @@ from ..world_description.geometry import (
 from ..world import World
 
 
-class VizMarkerPublisher:
+class VizMarkerPublisher(StateChangeCallback):
     """
     Publishes an Array of visualization marker which represent the situation in the World
     """
@@ -61,20 +62,12 @@ class VizMarkerPublisher:
 
         self.pub = self.node.create_publisher(MarkerArray, topic_name, 10)
 
-        self.thread = threading.Thread(target=self._publish, name="VizMarkerPublisher")
-        self.kill_event = threading.Event()
-
-        self.thread.start()
-        atexit.register(self._stop_publishing)
-
-    def _publish(self) -> None:
+    def notify(self):
         """
-        Constantly publishes the Marker Array. To the given topic name at a fixed rate.
+        Publishes the Marker Array on world changes.
         """
-        while not self.kill_event.is_set():
-            marker_array = self._make_marker_array()
-            self.pub.publish(marker_array)
-            time.sleep(self.interval)
+        marker_array = self._make_marker_array()
+        self.pub.publish(marker_array)
 
     def _make_marker_array(self) -> MarkerArray:
         """
@@ -99,13 +92,18 @@ class VizMarkerPublisher:
                     ).to_np()
                 )
                 msg.color = (
-                    body.color
-                    if isinstance(body, Primitive)
+                    ColorRGBA(
+                        r=float(collision.color.R),
+                        g=float(collision.color.G),
+                        b=float(collision.color.B),
+                        a=float(collision.color.A),
+                    )
+                    if isinstance(collision, Primitive)
                     else ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
                 )
                 msg.lifetime = Duration(sec=1)
 
-                if isinstance(collision, Mesh):
+                if isinstance(collision, FileMesh):
                     msg.type = Marker.MESH_RESOURCE
                     msg.mesh_resource = "file://" + collision.filename
                     msg.scale = Vector3(
@@ -148,13 +146,6 @@ class VizMarkerPublisher:
 
                 marker_array.markers.append(msg)
         return marker_array
-
-    def _stop_publishing(self) -> None:
-        """
-        Stops the publishing of the Visualization Marker update by setting the kill event and collecting the thread.
-        """
-        self.kill_event.set()
-        self.thread.join()
 
     @staticmethod
     def transform_to_pose(transform: np.ndarray) -> Pose:

@@ -8,3 +8,4 @@ build
 resources/procthor_environments
 examples/tmp
 test/file::memory:
+resources/fbx

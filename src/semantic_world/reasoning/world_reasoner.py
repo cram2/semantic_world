@@ -13,6 +13,7 @@ class WorldReasoner:
     """
     A utility class that uses CaseReasoner for reasoning on the world concepts.
     """
+
     world: World
     """
     The world instance to reason on.
@@ -41,7 +42,7 @@ class WorldReasoner:
         :return: The inferred views of the world.
         """
         result = self.reason()
-        return result.get('views', [])
+        return result.get("views", [])
 
     def reason(self) -> Dict[str, Any]:
         """
@@ -62,16 +63,19 @@ class WorldReasoner:
         for attr_name, attr_value in self.reasoner.result.items():
             if isinstance(getattr(self.world, attr_name), list):
                 attr_value = list(attr_value)
-            if attr_name == 'views':
+            if attr_name == "views":
                 for view in attr_value:
                     self.world.add_view(view, exists_ok=True)
             else:
                 setattr(self.world, attr_name, attr_value)
 
-    def fit_views(self, required_views: List[Type[View]],
-                  update_existing_views: bool = False,
-                  world_factory: Optional[Callable] = None,
-                  scenario: Optional[Callable] = None) -> None:
+    def fit_views(
+        self,
+        required_views: List[Type[View]],
+        update_existing_views: bool = False,
+        world_factory: Optional[Callable] = None,
+        scenario: Optional[Callable] = None,
+    ) -> None:
         """
         Fit the world RDR to the required view types.
 
@@ -80,6 +84,11 @@ class WorldReasoner:
         :param world_factory: Optional callable that can be used to recreate the world object.
         :param scenario: Optional callable that represents the test method or scenario that is being executed.
         """
-        self.reasoner.fit_attribute("views", required_views, False,
-                           update_existing_rules=update_existing_views,
-                           case_factory=world_factory, scenario=scenario)
+        self.reasoner.fit_attribute(
+            "views",
+            required_views,
+            False,
+            update_existing_rules=update_existing_views,
+            case_factory=world_factory,
+            scenario=scenario,
+        )

@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 import matplotlib.pyplot as plt
-
 from .geometry import BoundingBox, BoundingBoxCollection
 from ..datastructures.variables import SpatialVariables
 from ..world import World
@@ -15,6 +14,7 @@ import time
 from functools import reduce
 from operator import or_
 from typing_extensions import List, Optional, Dict
+
 # typing.Self is available starting with Python 3.11
 from typing_extensions import Self
 
@@ -26,7 +26,7 @@ from random_events.product_algebra import SimpleEvent, Event
 from rtree import index
 from sortedcontainers import SortedSet
 
-from ..spatial_types import Point3
+from ..spatial_types import Point3, TransformationMatrix
 
 
 class PoseOccupiedError(Exception):
@@ -108,7 +108,7 @@ class GraphOfConvexSets:
                 min(a_max[0], b_max[0]),
                 min(a_max[1], b_max[1]),
                 min(a_max[2], b_max[2]),
-                self.world.root,
+                TransformationMatrix(reference_frame=self.world.root),
             )
 
         # Build a 3-D R-tree
@@ -241,7 +241,13 @@ class GraphOfConvexSets:
         """
         if search_space is None:
             search_space = BoundingBox(
-                -np.inf, -np.inf, -np.inf, np.inf, np.inf, np.inf, world.root
+                min_x=-np.inf,
+                min_y=-np.inf,
+                min_z=-np.inf,
+                max_x=np.inf,
+                max_y=np.inf,
+                max_z=np.inf,
+                origin=TransformationMatrix(reference_frame=world.root),
             ).as_collection()
         return search_space
 
@@ -283,7 +289,9 @@ class GraphOfConvexSets:
             world_root,
             [
                 bloat_obstacle(bb)
-                for bb in obstacle_view.as_bounding_box_collection_in_frame(world_root)
+                for bb in obstacle_view.as_bounding_box_collection_at_origin(
+                    TransformationMatrix(reference_frame=world_root)
+                )
             ],
         )
 
@@ -292,7 +300,9 @@ class GraphOfConvexSets:
                 world_root,
                 [
                     bloat_wall(bb)
-                    for bb in wall_view.as_bounding_box_collection_in_frame(world_root)
+                    for bb in wall_view.as_bounding_box_collection_at_origin(
+                        TransformationMatrix(reference_frame=world_root)
+                    )
                 ],
             )
             bloated_obstacles.merge(bloated_walls)

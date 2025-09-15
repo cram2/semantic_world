@@ -145,7 +145,6 @@ time.sleep(1.)
 ```
 
 ```python
-viz._stop_publishing()
 node.destroy_node()
 rclpy.shutdown()
 ```

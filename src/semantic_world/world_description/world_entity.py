@@ -2,11 +2,23 @@ from __future__ import annotations
 
 import inspect
 import itertools
+from abc import abstractmethod, ABC
 from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import lru_cache, cached_property
+
+import numpy as np
+import trimesh
+from random_events.utils import SubclassJSONSerializer
+from scipy.stats import geom
+from trimesh import Trimesh
+from trimesh.proximity import closest_point, nearby_faces
+from trimesh.sample import sample_surface
+from trimesh.util import concatenate
+
+import trimesh.boolean
 from typing_extensions import (
     Deque,
     Type,
@@ -18,21 +30,15 @@ from typing_extensions import (
 from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
 from typing_extensions import Set
 
-import numpy as np
-from random_events.utils import SubclassJSONSerializer
-from scipy.stats import geom
-from trimesh import Trimesh
-from trimesh.proximity import closest_point, nearby_faces
-from trimesh.sample import sample_surface
-from trimesh.util import concatenate
-
-from .geometry import BoundingBoxCollection, BoundingBox, Shape
+from .geometry import BoundingBoxCollection, BoundingBox, TriangleMesh
+from .geometry import Shape
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
-from ..spatial_types.spatial_types import TransformationMatrix, Expression
+from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
 from ..utils import IDGenerator
 
 if TYPE_CHECKING:
+
     from ..world_description.degree_of_freedom import DegreeOfFreedom
     from ..world import World
 
@@ -92,7 +98,7 @@ class CollisionCheckingConfig:
 
 
 @dataclass(unsafe_hash=True)
-class KinematicStructureEntity(WorldEntity):
+class KinematicStructureEntity(WorldEntity, SubclassJSONSerializer, ABC):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -130,6 +136,29 @@ class KinematicStructureEntity(WorldEntity):
         Returns the parent KinematicStructureEntity of this entity.
         """
         return self._world.compute_parent_kinematic_structure_entity(self)
+
+    @abstractmethod
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
+    ) -> BoundingBoxCollection:
+        """
+        Provides the bounding box collection for this entity given a transformation matrix as origin.
+        :param origin: The origin to express the bounding boxes from.
+        :returns: A collection of bounding boxes in world-space coordinates.
+        """
+        pass
+
+    def as_bounding_box_collection_in_frame(
+        self, reference_frame: KinematicStructureEntity
+    ) -> BoundingBoxCollection:
+        """
+        Provides the bounding box collection for this entity in the given reference frame.
+        :param reference_frame: The reference frame to express the bounding boxes in.
+        :returns: A collection of bounding boxes in world-space coordinates.
+        """
+        return self.as_bounding_box_collection_at_origin(
+            TransformationMatrix(reference_frame=reference_frame)
+        )
 
 
 @dataclass
@@ -328,12 +357,12 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
         ]
         return points_min_self, points_min_other, dist_min
 
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
     ) -> BoundingBoxCollection:
         """
-        Provides the bounding box collection for this entity in the given reference frame.
-        :param reference_frame: The reference frame to express the bounding boxes in.
+        Provides the bounding box collection for this entity given a transformation matrix as origin.
+        :param origin: The origin to express the bounding boxes from.
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         world_bboxes = []
@@ -342,10 +371,10 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
             if shape.origin.reference_frame is None:
                 continue
             local_bb: BoundingBox = shape.local_frame_bounding_box
-            world_bb = local_bb.transform_to_frame(reference_frame)
+            world_bb = local_bb.transform_to_origin(origin)
             world_bboxes.append(world_bb)
 
-        return BoundingBoxCollection(reference_frame, world_bboxes)
+        return BoundingBoxCollection(origin.reference_frame, world_bboxes)
 
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
@@ -385,15 +414,104 @@ class Region(KinematicStructureEntity):
     def __hash__(self):
         return id(self)
 
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all areas in this region.
         """
         bbs = [shape.local_frame_bounding_box for shape in self.area]
-        bbs = [bb.transform_to_frame(reference_frame) for bb in bbs]
-        return BoundingBoxCollection(reference_frame, bbs)
+        bbs = [bb.transform_to_origin(origin) for bb in bbs]
+        return BoundingBoxCollection(origin.reference_frame, bbs)
+
+    @classmethod
+    def from_3d_points(
+        cls,
+        name: PrefixedName,
+        points_3d: List[Point3],
+        reference_frame: Optional[Body] = None,
+        minimum_thickness: float = 0.005,
+        sv_ratio_tol: float = 1e-7,
+    ) -> Self:
+        """
+        Constructs a Region from a list of 3D points by creating a convex hull around them.
+        The points are analyzed to determine if they are approximately planar. If they are,
+        a minimum thickness is added to ensure the region has a non-zero volume.
+
+        :param name: Prefixed name for the region.
+        :param points_3d: List of 3D points.
+        :param reference_frame: Optional reference frame.
+        :param minimum_thickness: Minimum thickness to add if points are near-planar.
+        :param sv_ratio_tol: Tolerance for determining planarity based on singular value ratio.
+
+        :return: Region object.
+        """
+        points = np.asarray([point.to_np()[:3] for point in points_3d], dtype=float)
+        points = np.unique(points, axis=0)
+        assert (
+            len(points) >= 3
+        ), "At least 4 unique points are required to define a 3D region."
+
+        centered_points = points - points.mean(axis=0, keepdims=True)
+        assert np.any(centered_points), "Points must not be all identical."
+
+        # We compute the principal axes of the point cloud using SVD.
+        # This allows us to reason about the geometric thickness of our point cloud.
+        # The axis with the smallest variance, located at the last index if our `principal_axis` is our `normal`
+        # indicating the direction of the region's thickness.
+        _, variance, principal_axis = np.linalg.svd(
+            centered_points, full_matrices=False
+        )
+        smallest_variance_axis = principal_axis[-1]  # this is our normal
+        unit_vector_normal = smallest_variance_axis / np.linalg.norm(
+            smallest_variance_axis
+        )
+
+        # We compute the thickness, peak-to-peak (max - min), along the normal direction, to get the thickness of
+        # the region.
+        thickness_in_normal_direction = np.ptp(centered_points @ unit_vector_normal)
+        is_near_planar = variance[0] > 0 and variance[-1] / variance[0] < sv_ratio_tol
+        thickness_padding = (
+            minimum_thickness / 2
+            if thickness_in_normal_direction < minimum_thickness or is_near_planar
+            else 0.0
+        )
+
+        # We do not provide any 2d shapes, since they would be very weird to handle with raytracing etc.
+        # Thus we decided that in near-planar cases we add a minimum thickness to ensure we get a 3d shape.
+        if thickness_padding > 0:
+            P_aug = np.vstack(
+                [
+                    points + thickness_padding * unit_vector_normal,
+                    points - thickness_padding * unit_vector_normal,
+                ]
+            )
+        else:
+            P_aug = points
+
+        hull = trimesh.points.PointCloud(P_aug).convex_hull
+        hull.remove_unreferenced_vertices()
+        hull.remove_degenerate_faces()
+        hull.process()
+
+        area_mesh = TriangleMesh(
+            mesh=hull, origin=TransformationMatrix(reference_frame=reference_frame)
+        )
+        return cls(name=name, area=[area_mesh])
+
+    @cached_property
+    def combined_area_mesh(self) -> Trimesh:
+        """
+        Combines all collision meshes into a single mesh, applying the respective transformations.
+        :return: A single Trimesh representing the combined collision geometry.
+        """
+        transformed_meshes = []
+        for shape in self.area:
+            transform = shape.origin.to_np()
+            mesh = shape.mesh.copy()
+            mesh.apply_transform(transform)
+            transformed_meshes.append(mesh)
+        return trimesh.boolean.union(transformed_meshes)
 
 
 GenericKinematicStructureEntity = TypeVar(
@@ -475,8 +593,8 @@ class View(WorldEntity):
         """
         return self._kinematic_structure_entities(set(), Region)
 
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
+    def as_bounding_box_collection_at_origin(
+        self, origin: TransformationMatrix
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies in this view.
@@ -485,11 +603,11 @@ class View(WorldEntity):
         """
 
         collections = iter(
-            entity.as_bounding_box_collection_in_frame(reference_frame)
+            entity.as_bounding_box_collection_at_origin(origin)
             for entity in self.kinematic_structure_entities
             if isinstance(entity, Body) and entity.has_collision()
         )
-        bbs = BoundingBoxCollection(reference_frame, [])
+        bbs = BoundingBoxCollection(origin.reference_frame, [])
 
         for bb_collection in collections:
             bbs = bbs.merge(bb_collection)
@@ -503,7 +621,7 @@ class RootedView(View):
     Represents a view that is rooted in a specific KinematicStructureEntity.
     """
 
-    root: KinematicStructureEntity = field(default=None)
+    root: Body = field(default=None)
 
     @property
     def connections(self) -> List[Connection]:

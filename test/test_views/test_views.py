@@ -7,7 +7,10 @@ import pytest
 from entity_query_language import an, entity, let, symbolic_mode, in_
 from numpy.ma.testutils import assert_equal
 
-from semantic_world.world_description.connections import FixedConnection, PrismaticConnection
+from semantic_world.world_description.connections import (
+    FixedConnection,
+    PrismaticConnection,
+)
 from semantic_world.reasoning.world_reasoner import WorldReasoner
 from semantic_world.world_description.world_entity import KinematicStructureEntity
 
@@ -191,13 +194,24 @@ class ViewTestCase(unittest.TestCase):
             cabinet_body = let("cabinet_body", type_=Body, domain=world.bodies)
             drawer_body = let("drawer_body", type_=Body, domain=world.bodies)
             handle_body = let("handle_body", type_=Body, domain=world.bodies)
-            fixed_conn = let("fixed_conn", type_=FixedConnection, domain=world.connections)
-            prismatic_conn = let("prismatic_conn", type_=PrismaticConnection, domain=world.connections)
-            query = an(entity(Drawer(handle=Handle(body=handle_body), container=Container(body=drawer_body)),
-                              cabinet_body == prismatic_conn.parent,
-                              drawer_body == prismatic_conn.child,
-                              handle_body == fixed_conn.child,
-                              drawer_body == fixed_conn.parent))
+            fixed_conn = let(
+                "fixed_conn", type_=FixedConnection, domain=world.connections
+            )
+            prismatic_conn = let(
+                "prismatic_conn", type_=PrismaticConnection, domain=world.connections
+            )
+            query = an(
+                entity(
+                    Drawer(
+                        handle=Handle(body=handle_body),
+                        container=Container(body=drawer_body),
+                    ),
+                    cabinet_body == prismatic_conn.parent,
+                    drawer_body == prismatic_conn.child,
+                    handle_body == fixed_conn.child,
+                    drawer_body == fixed_conn.parent,
+                )
+            )
         drawers = list(query.evaluate())
         assert len(drawers) > 0
 
@@ -358,4 +372,5 @@ class ViewTestCase(unittest.TestCase):
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main(["-s", "-k", "test_drawer_view"])

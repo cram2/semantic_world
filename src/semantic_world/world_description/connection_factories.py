@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing_extensions import Self, Dict, Any, TypeVar
+from dataclasses import dataclass, field
+from typing_extensions import Self, Dict, Any, TypeVar, TYPE_CHECKING
 
 from ormatic.dao import HasGeneric
 from random_events.utils import SubclassJSONSerializer, recursive_subclasses
@@ -10,14 +12,18 @@ from .connections import (
     PrismaticConnection,
     RevoluteConnection,
     Connection6DoF,
+    OmniDrive,
 )
 from .geometry import transformation_from_json, transformation_to_json
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.spatial_types import TransformationMatrix
 from ..spatial_types.symbol_manager import symbol_manager
-from ..world import World
+
 from .world_entity import Connection
 from .. import spatial_types as cas
+
+if TYPE_CHECKING:
+    from ..world import World
 
 T = TypeVar("T")
 
@@ -143,7 +149,7 @@ class ActiveConnection1DOFFactory(ConnectionFactory[T]):
             axis=self.axis,
             multiplier=self.multiplier,
             offset=self.offset,
-            dof=world.get_degree_of_freedom_by_name(self.dof_name.name),
+            dof=world.get_degree_of_freedom_by_name(self.dof_name),
             origin_expression=self.origin_expression,
             _world=world,
         )
@@ -212,13 +218,13 @@ class Connection6DoFFactory(ConnectionFactory[Connection6DoF]):
             parent=parent,
             child=child,
             name=self.name,
-            x=world.get_degree_of_freedom_by_name(self.x_name.name),
-            y=world.get_degree_of_freedom_by_name(self.y_name.name),
-            z=world.get_degree_of_freedom_by_name(self.z_name.name),
-            qx=world.get_degree_of_freedom_by_name(self.qx_name.name),
-            qy=world.get_degree_of_freedom_by_name(self.qy_name.name),
-            qz=world.get_degree_of_freedom_by_name(self.qz_name.name),
-            qw=world.get_degree_of_freedom_by_name(self.qw_name.name),
+            x=world.get_degree_of_freedom_by_name(self.x_name),
+            y=world.get_degree_of_freedom_by_name(self.y_name),
+            z=world.get_degree_of_freedom_by_name(self.z_name),
+            qx=world.get_degree_of_freedom_by_name(self.qx_name),
+            qy=world.get_degree_of_freedom_by_name(self.qy_name),
+            qz=world.get_degree_of_freedom_by_name(self.qz_name),
+            qw=world.get_degree_of_freedom_by_name(self.qw_name),
             origin_expression=self.origin_expression,
             _world=world,
         )
@@ -248,5 +254,94 @@ class Connection6DoFFactory(ConnectionFactory[Connection6DoF]):
             qy_name=PrefixedName.from_json(data["qy"]),
             qz_name=PrefixedName.from_json(data["qz"]),
             qw_name=PrefixedName.from_json(data["qw"]),
+            origin_expression=transformation_from_json(data["origin_expression"]),
+        )
+
+
+@dataclass
+class OmniDriveFactory(ConnectionFactory[OmniDrive]):
+
+    x_name: PrefixedName
+    y_name: PrefixedName
+    z_name: PrefixedName
+    roll_name: PrefixedName
+    pitch_name: PrefixedName
+    yaw_name: PrefixedName
+    x_velocity_name: PrefixedName
+    y_velocity_name: PrefixedName
+    translation_velocity_limits: float = field(default=0.6)
+    rotation_velocity_limits: float = field(default=0.5)
+
+    @classmethod
+    def _from_connection(cls, connection: OmniDrive) -> Self:
+        return cls(
+            name=connection.name,
+            parent_name=connection.parent.name,
+            child_name=connection.child.name,
+            x_name=connection.x.name,
+            y_name=connection.y.name,
+            z_name=connection.z.name,
+            roll_name=connection.roll.name,
+            pitch_name=connection.pitch.name,
+            yaw_name=connection.yaw.name,
+            x_velocity_name=connection.x_vel.name,
+            y_velocity_name=connection.y_vel.name,
+            translation_velocity_limits=connection.translation_velocity_limits,
+            rotation_velocity_limits=connection.rotation_velocity_limits,
+            origin_expression=connection.origin_expression,
+        )
+
+    def create(self, world: World) -> Connection:
+        parent = world.get_kinematic_structure_entity_by_name(self.parent_name)
+        child = world.get_kinematic_structure_entity_by_name(self.child_name)
+        return self.original_class()(
+            parent=parent,
+            child=child,
+            name=self.name,
+            x=world.get_degree_of_freedom_by_name(self.x_name),
+            y=world.get_degree_of_freedom_by_name(self.y_name),
+            z=world.get_degree_of_freedom_by_name(self.z_name),
+            roll=world.get_degree_of_freedom_by_name(self.roll_name),
+            pitch=world.get_degree_of_freedom_by_name(self.pitch_name),
+            yaw=world.get_degree_of_freedom_by_name(self.yaw_name),
+            x_vel=world.get_degree_of_freedom_by_name(self.x_velocity_name),
+            y_vel=world.get_degree_of_freedom_by_name(self.y_velocity_name),
+            translation_velocity_limits=self.translation_velocity_limits,
+            rotation_velocity_limits=self.rotation_velocity_limits,
+            origin_expression=self.origin_expression,
+            _world=world,
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            **super().to_json(),
+            "x": self.x_name.to_json(),
+            "y": self.y_name.to_json(),
+            "z": self.z_name.to_json(),
+            "roll": self.roll_name.to_json(),
+            "pitch": self.pitch_name.to_json(),
+            "yaw": self.yaw_name.to_json(),
+            "x_velocity": self.x_velocity_name.to_json(),
+            "y_velocity": self.y_velocity_name.to_json(),
+            "translation_velocity_limits": self.translation_velocity_limits,
+            "rotation_velocity_limits": self.rotation_velocity_limits,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(
+            name=PrefixedName.from_json(data["name"]),
+            parent_name=PrefixedName.from_json(data["parent_name"]),
+            child_name=PrefixedName.from_json(data["child_name"]),
+            x_name=PrefixedName.from_json(data["x"]),
+            y_name=PrefixedName.from_json(data["y"]),
+            z_name=PrefixedName.from_json(data["z"]),
+            roll_name=PrefixedName.from_json(data["roll"]),
+            pitch_name=PrefixedName.from_json(data["pitch"]),
+            yaw_name=PrefixedName.from_json(data["yaw"]),
+            x_velocity_name=PrefixedName.from_json(data["x_velocity"]),
+            y_velocity_name=PrefixedName.from_json(data["y_velocity"]),
+            translation_velocity_limits=data["translation_velocity_limits"],
+            rotation_velocity_limits=data["rotation_velocity_limits"],
             origin_expression=transformation_from_json(data["origin_expression"]),
         )

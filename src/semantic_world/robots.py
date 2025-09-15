@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import logging
+import os
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing_extensions import Iterable, Set, TYPE_CHECKING, Optional, Self
 
 from .world_description.connections import ActiveConnection, OmniDrive
 from .datastructures.prefixed_name import PrefixedName
-from .spatial_types.spatial_types import Vector3
-from .world_description.world_entity import Body, RootedView, Connection, CollisionCheckingConfig
+from .spatial_types.spatial_types import Vector3, Quaternion
+from .world_description.world_entity import (
+    Body,
+    RootedView,
+    Connection,
+    CollisionCheckingConfig,
+)
 from .world_description.world_entity import KinematicStructureEntity, Region
 
 if TYPE_CHECKING:
@@ -50,7 +56,7 @@ class KinematicChain(RobotView, ABC):
     position of the manipulator or sensors in the kinematic chain
     """
 
-    tip: KinematicStructureEntity = field(default=None)
+    tip: Body = field(default=None)
     """
     The tip body of the kinematic chain, which is the last body in the chain.
     """
@@ -154,7 +160,18 @@ class Manipulator(RobotView, ABC):
     Abstract base class of robot manipulators. Always has a tool frame.
     """
 
-    tool_frame: KinematicStructureEntity = field(default=None)
+    tool_frame: Body = field(default=None)
+
+    front_facing_orientation: Quaternion = field(default=None)
+    """
+    The orientation of the manipulator's tool frame, which is usually the front-facing orientation.
+    """
+
+    front_facing_axis: Vector3 = field(default=None)
+    """
+    The axis of the manipulator's tool frame that is facing forward.
+    """
+
 
     def assign_to_robot(self, robot: AbstractRobot):
         """
@@ -175,6 +192,8 @@ class Manipulator(RobotView, ABC):
         This allows for proper comparison and storage in sets or dictionaries.
         """
         return hash((self.name, self.root, self.tool_frame))
+
+
 
 
 @dataclass
@@ -281,6 +300,15 @@ class Neck(KinematicChain):
     and which does not have a manipulator.
     """
 
+    pitch_body: Optional[Body] = None
+    """
+    The body that allows pitch movement in the neck, if it exists.
+    """
+    yaw_body: Optional[Body] = None
+    """
+    The body that allows yaw movement in the neck, if it exists.
+    """
+
     def __hash__(self):
         """
         Returns the hash of the kinematic chain, which is based on the root and tip bodies.
@@ -358,6 +386,13 @@ class AbstractRobot(RootedView, ABC):
         kw_only=True,
         default_factory=lambda: CollisionCheckingConfig(buffer_zone_distance=0.05),
     )
+
+    @abstractmethod
+    def load_srdf(self):
+        """
+        Loads the SRDF file for the robot, if it exists. This method is expected to be implemented in subclasses.
+        """
+        ...
 
     @property
     def controlled_connections(self) -> Set[ActiveConnection]:
@@ -502,6 +537,13 @@ class PR2(AbstractRobot):
         self.neck = neck
         super().add_kinematic_chain(neck)
 
+    def load_srdf(self):
+        """
+        Loads the SRDF file for the PR2 robot, if it exists.
+        """
+        srdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "collision_configs", "pr2.srdf")
+        self._world.load_collision_srdf(srdf_path)
+
     @classmethod
     def from_world(cls, world: World) -> Self:
         """
@@ -541,16 +583,14 @@ class PR2(AbstractRobot):
             _world=world,
         )
 
-        left_gripper = ParallelGripper(
-            name=PrefixedName("left_gripper", prefix=robot.name.name),
-            root=world.get_kinematic_structure_entity_by_name("l_gripper_palm_link"),
-            tool_frame=world.get_kinematic_structure_entity_by_name(
-                "l_gripper_tool_frame"
-            ),
-            thumb=left_gripper_thumb,
-            finger=left_gripper_finger,
-            _world=world,
-        )
+        left_gripper = ParallelGripper(name=PrefixedName('left_gripper', prefix=robot.name.name),
+                                       root=world.get_kinematic_structure_entity_by_name("l_gripper_palm_link"),
+                                       tool_frame=world.get_kinematic_structure_entity_by_name("l_gripper_tool_frame"),
+                                       front_facing_orientation=Quaternion(0, 0, 0, 1),
+                                       front_facing_axis=Vector3(1, 0, 0),
+                                       thumb=left_gripper_thumb,
+                                       finger=left_gripper_finger,
+                                       _world=world)
         left_arm = Arm(
             name=PrefixedName("left_arm", prefix=robot.name.name),
             root=world.get_kinematic_structure_entity_by_name("torso_lift_link"),
@@ -588,6 +628,8 @@ class PR2(AbstractRobot):
             tool_frame=world.get_kinematic_structure_entity_by_name(
                 "r_gripper_tool_frame"
             ),
+            front_facing_orientation=Quaternion(0, 0, 0, 1),
+            front_facing_axis=Vector3(1, 0, 0),
             thumb=right_gripper_thumb,
             finger=right_gripper_finger,
             _world=world,
@@ -620,6 +662,8 @@ class PR2(AbstractRobot):
             sensors={camera},
             root=world.get_kinematic_structure_entity_by_name("head_pan_link"),
             tip=world.get_kinematic_structure_entity_by_name("head_tilt_link"),
+            pitch_body=world.get_kinematic_structure_entity_by_name("head_tilt_link"),
+            yaw_body=world.get_kinematic_structure_entity_by_name("head_pan_link"),
             _world=world,
         )
         robot.add_neck(neck)
@@ -632,6 +676,7 @@ class PR2(AbstractRobot):
             _world=world,
         )
         robot.add_torso(torso)
+        # robot.load_srdf()
 
         world.add_view(robot, exists_ok=True)
 

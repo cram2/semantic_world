@@ -6,10 +6,22 @@ from typing_extensions import Optional, Tuple, Union, List, Dict
 
 from urdf_parser_py import urdf as urdfpy
 
-from ..world_description.connections import (RevoluteConnection, PrismaticConnection, FixedConnection)
+from ..world_description.connections import (
+    RevoluteConnection,
+    PrismaticConnection,
+    FixedConnection,
+)
 from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..exceptions import ParsingError
-from ..world_description.geometry import Box, Sphere, Cylinder, Mesh, Scale, Shape, Color
+from ..world_description.geometry import (
+    Box,
+    Sphere,
+    Cylinder,
+    FileMesh,
+    Scale,
+    Shape,
+    Color,
+)
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import Derivatives, DerivativeMap
@@ -19,7 +31,8 @@ from ..utils import (
     hacky_urdf_parser_fix,
     robot_name_from_urdf_string,
 )
-from ..world import World, Body, Connection
+from ..world import World
+from ..world_description.world_entity import Body, Connection
 
 connection_type_map = {  # 'unknown': JointType.UNKNOWN,
     "revolute": RevoluteConnection,
@@ -220,9 +233,9 @@ class URDFParser:
             else:
                 offset = 0
 
-            dof_name = PrefixedName(joint.mimic.joint, prefix)
-        else:
-            dof_name = connection_name
+            # dof_name = PrefixedName(joint.mimic.joint, prefix)
+
+        dof_name = connection_name
 
         try:
             dof = world.get_degree_of_freedom_by_name(dof_name)
@@ -337,7 +350,7 @@ class URDFParser:
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
                 res.append(
-                    Mesh(
+                    FileMesh(
                         origin=origin_transform,
                         filename=self.parse_file_path(geom.geometry.filename),
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),

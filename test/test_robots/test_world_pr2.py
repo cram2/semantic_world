@@ -6,8 +6,16 @@ import pytest
 from rustworkx import NoPathFound
 
 from semantic_world.adapters.urdf import URDFParser
-from semantic_world.world_description.connections import OmniDrive, PrismaticConnection, RevoluteConnection
-from semantic_world.spatial_computations.ik_solver import MaxIterationsException, UnreachableException
+from semantic_world.spatial_types.spatial_types import TransformationMatrix
+from semantic_world.world_description.connections import (
+    OmniDrive,
+    PrismaticConnection,
+    RevoluteConnection,
+)
+from semantic_world.spatial_computations.ik_solver import (
+    MaxIterationsException,
+    UnreachableException,
+)
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.robots import PR2, KinematicChain
 from semantic_world.spatial_types.derivatives import Derivatives
@@ -183,7 +191,9 @@ def test_compute_ik(pr2_world):
     )
     fk = pr2_world.compute_forward_kinematics_np(bf, eef)
     fk[0, 3] -= 0.2
-    joint_state = pr2_world.compute_inverse_kinematics(bf, eef, fk)
+    joint_state = pr2_world.compute_inverse_kinematics(
+        bf, eef, TransformationMatrix(fk, reference_frame=bf)
+    )
     for joint, state in joint_state.items():
         pr2_world.state[joint.name].position = state
     pr2_world.notify_state_change()
@@ -199,7 +209,9 @@ def test_compute_ik_max_iter(pr2_world):
     fk = pr2_world.compute_forward_kinematics_np(bf, eef)
     fk[2, 3] = 10
     with pytest.raises(MaxIterationsException):
-        pr2_world.compute_inverse_kinematics(bf, eef, fk)
+        pr2_world.compute_inverse_kinematics(
+            bf, eef, TransformationMatrix(fk, reference_frame=bf)
+        )
 
 
 def test_compute_ik_unreachable(pr2_world):
@@ -210,7 +222,9 @@ def test_compute_ik_unreachable(pr2_world):
     fk = pr2_world.compute_forward_kinematics_np(bf, eef)
     fk[2, 3] = -1
     with pytest.raises(UnreachableException):
-        pr2_world.compute_inverse_kinematics(bf, eef, fk)
+        pr2_world.compute_inverse_kinematics(
+            bf, eef, TransformationMatrix(fk, reference_frame=bf)
+        )
 
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world):

@@ -59,8 +59,10 @@ class CaseReasoner:
 
     def __post_init__(self):
         if self.case.__class__ not in self.rdrs:
-            self.rdrs[self.case.__class__] = GeneralRDR(save_dir=self.model_directory,
-                                            model_name=f"{self.case.__class__.__name__.lower()}_rdr")
+            self.rdrs[self.case.__class__] = GeneralRDR(
+                save_dir=self.model_directory,
+                model_name=f"{self.case.__class__.__name__.lower()}_rdr",
+            )
 
     @property
     def rdr(self) -> GeneralRDR:
@@ -109,4 +111,3 @@ class CaseReasoner:
             scenario=scenario,
         )
         self.rdr.fit_case(case_query, update_existing_rules=update_existing_rules)
-

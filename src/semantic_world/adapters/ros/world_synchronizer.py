@@ -15,14 +15,11 @@ from rclpy.publisher import Publisher
 from rclpy.subscription import Subscription
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from typing_extensions import Callable
 
 from .messages import MetaData, WorldStateUpdate, Message, ModificationBlock, LoadModel
+from ...callbacks.callback import Callback, StateChangeCallback, ModelChangeCallback
 from ...orm.ormatic_interface import *
 from ...world import World
-from ...world_description.world_modification import (
-    WorldModelModificationBlock,
-)
 
 
 @dataclass
@@ -59,6 +56,9 @@ class Synchronizer(ABC):
     """
 
     message_type: ClassVar[Optional[Type[SubclassJSONSerializer]]] = None
+    """
+    The type of the message that is sent and received.
+    """
 
     def __post_init__(self):
         self.publisher = self.node.create_publisher(
@@ -80,8 +80,21 @@ class Synchronizer(ABC):
             node_name=self.node.get_name(), process_id=os.getpid(), object_id=id(self)
         )
 
+    def subscription_callback(self, msg: std_msgs.msg.String):
+        """
+        Wrap the origin subscription callback by self-skipping and disabling the next world callback.
+        """
+        msg = self.message_type.from_json(json.loads(msg.data))
+        if msg.meta_data == self.meta_data:
+            return
+        self._skip_next_world_callback = True
+        self._subscription_callback(msg)
+
     @abstractmethod
-    def subscription_callback(self, msg):
+    def _subscription_callback(self, msg):
+        """
+        Callback function called when receiving new messages from other publishers.
+        """
         raise NotImplementedError
 
     def publish(self, msg: Message):
@@ -104,15 +117,10 @@ class Synchronizer(ABC):
 
 
 @dataclass
-class SynchronizerOnCallback(Synchronizer, ABC):
+class SynchronizerOnCallback(Synchronizer, Callback, ABC):
     """
     Synchronizer that does something on callbacks by the world.
     Additionally, ensures that the callback is cleaned up on close.
-    """
-
-    _callback: Optional[Callable] = field(init=False, default=None)
-    """
-    The callback function called by the world.
     """
 
     _skip_next_world_callback: bool = False
@@ -124,28 +132,7 @@ class SynchronizerOnCallback(Synchronizer, ABC):
     If the callback is triggered by a message, this synchronizer should not republish the change.
     """
 
-    def __post_init__(self):
-        super().__post_init__()
-        self._callback = lambda: self.world_callback_handler()
-
-    def subscription_callback(self, msg: std_msgs.msg.String):
-        """
-        Wrap the origin subscription callback by self-skipping and disabling the next world callback.
-        """
-        msg = self.message_type.from_json(json.loads(msg.data))
-        if msg.meta_data == self.meta_data:
-            return
-        self._skip_next_world_callback = True
-        self._subscription_callback(msg)
-
-    @abstractmethod
-    def _subscription_callback(self, msg):
-        """
-        Callback function called when receiving new messages from other publishers.
-        """
-        raise NotImplementedError
-
-    def world_callback_handler(self):
+    def notify(self):
         """
         Wrapper method around world_callback that checks if this time the callback should be triggered.
         """
@@ -157,21 +144,13 @@ class SynchronizerOnCallback(Synchronizer, ABC):
     @abstractmethod
     def world_callback(self):
         """
-        Called when the world notifies an update.
+        Called when the world notifies and update that is not caused by this synchronizer.
         """
         raise NotImplementedError
 
-    def close(self):
-        if self._callback in self.world.state_change_callbacks:
-            self.world.state_change_callbacks.remove(self._callback)
-        if self._callback in self.world.model_change_callbacks:
-            self.world.model_change_callbacks.remove(self._callback)
-        self._callback = None
-        super().close()
-
 
 @dataclass
-class StateSynchronizer(SynchronizerOnCallback):
+class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
     """
     Synchronizes the state (values of free variables) of the semantic world with the associated ROS topic.
     """
@@ -180,15 +159,15 @@ class StateSynchronizer(SynchronizerOnCallback):
 
     topic_name: str = "/semantic_world/world_state"
 
-    previous_world_state_data: np.ndarray = field(init=False, default=None)
+    previous_world_state_data: np.ndarray = field(init=False)
     """
     The previous world state data used to check if something changed.
     """
 
     def __post_init__(self):
         super().__post_init__()
+        SynchronizerOnCallback.__post_init__(self)
         self.update_previous_world_state()
-        self.world.state_change_callbacks.append(self._callback)
 
     def update_previous_world_state(self):
         """
@@ -237,7 +216,10 @@ class StateSynchronizer(SynchronizerOnCallback):
 
 
 @dataclass
-class ModelSynchronizer(SynchronizerOnCallback):
+class ModelSynchronizer(
+    ModelChangeCallback,
+    SynchronizerOnCallback,
+):
     """
     Synchronizes the model (addition/removal of bodies/DOFs/connections) with the associated ROS topic.
     """
@@ -247,18 +229,15 @@ class ModelSynchronizer(SynchronizerOnCallback):
 
     def __post_init__(self):
         super().__post_init__()
-        self.world.model_change_callbacks.append(self._callback)
+        SynchronizerOnCallback.__post_init__(self)
 
     def _subscription_callback(self, msg: ModificationBlock):
         msg.modifications.apply(self.world)
 
     def world_callback(self):
-        latest_changes = WorldModelModificationBlock.from_modifications(
-            self.world._atomic_modifications[-1]
-        )
         msg = ModificationBlock(
             meta_data=self.meta_data,
-            modifications=latest_changes,
+            modifications=self.world._model_modification_blocks[-1],
         )
         self.publish(msg)
 
@@ -297,18 +276,12 @@ class ModelReloadSynchronizer(Synchronizer):
         message = LoadModel(primary_key=dao.id, meta_data=self.meta_data)
         self.publish(message)
 
-    def subscription_callback(self, msg: std_msgs.msg.String):
+    def _subscription_callback(self, msg: LoadModel):
         """
         Update the world with the new model by fetching it from the database.
 
         :param msg: The message containing the primary key of the model to be fetched.
         """
-
-        msg = LoadModel.from_json(json.loads(msg.data))
-
-        if msg.meta_data == self.meta_data:
-            return
-
         query = select(WorldMappingDAO).where(WorldMappingDAO.id == msg.primary_key)
         new_world = self.session.scalars(query).one().from_dao()
         self._replace_world(new_world)

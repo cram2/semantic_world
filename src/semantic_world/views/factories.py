@@ -12,7 +12,7 @@ from ..world_description.connections import (
 )
 from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..world_description.geometry import Scale, BoundingBoxCollection, Box
-from ..world_description.world_entity import Body
+from ..world_description.world_entity import Body, Region
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
 from ..spatial_types.derivatives import DerivativeMap
@@ -30,6 +30,8 @@ from ..views.views import (
     Door,
     Wall,
     DoubleDoor,
+    Room,
+    Floor,
 )
 from ..world import World
 
@@ -131,6 +133,7 @@ class ContainerFactory(ViewFactory[Container]):
 
         world.add_kinematic_structure_entity(container_body)
         world.add_view(container_view)
+        world.name = self.name.name
 
         return world
 
@@ -228,6 +231,7 @@ class HandleFactory(ViewFactory[Handle]):
 
         world.add_kinematic_structure_entity(handle)
         world.add_view(handle_view)
+        world.name = self.name.name
         return world
 
     def create_handle_event(self) -> Event:
@@ -335,6 +339,7 @@ class DoorFactory(EntryWayFactory[Door]):
 
         world.merge_world(handle_world, connection_door_T_handle)
         world.add_view(Door(name=self.name, handle=handle_view, body=body))
+        world.name = self.name.name
 
         return world
 
@@ -449,7 +454,7 @@ class DoubleDoorFactory(EntryWayFactory[DoubleDoor]):
             body=double_door_body, left_door=left_door, right_door=right_door
         )
         world.add_view(double_door_view)
-
+        world.name = self.name.name
         return world
 
     def create_door_factories(self) -> List[DoorFactory]:
@@ -542,7 +547,7 @@ class DrawerFactory(ViewFactory[Drawer]):
         handle_view: Handle = handle_world.get_views_by_type(Handle)[0]
 
         drawer_T_handle = TransformationMatrix.from_xyz_rpy(
-            (self.container_factory.scale.x / 2) + 0.03, 0, 0, 0, 0, 0
+            self.container_factory.scale.x / 2, 0, 0, 0, 0, 0
         )
         connection_drawer_T_handle = FixedConnection(
             parent=container_world.root,
@@ -555,6 +560,7 @@ class DrawerFactory(ViewFactory[Drawer]):
             name=self.name, container=container_view, handle=handle_view
         )
         container_world.add_view(drawer_view)
+        container_world.name = self.name.name
 
         return container_world
 
@@ -628,6 +634,7 @@ class DresserFactory(ViewFactory[Dresser]):
             doors=[door for door in dresser_world.get_views_by_type(Door)],
         )
         dresser_world.add_view(dresser_view, exists_ok=True)
+        dresser_world.name = self.name.name
 
         return dresser_world
 
@@ -688,8 +695,8 @@ class DresserFactory(ViewFactory[Dresser]):
         :param world: The world containing the dresser body as its root.
         """
         dresser_body: Body = world.root
-        container_event = dresser_body.as_bounding_box_collection_in_frame(
-            dresser_body
+        container_event = dresser_body.as_bounding_box_collection_at_origin(
+            TransformationMatrix(reference_frame=dresser_body)
         ).event
 
         container_footprint = self.subtract_bodies_from_container_footprint(
@@ -724,8 +731,8 @@ class DresserFactory(ViewFactory[Dresser]):
         for body in world.bodies:
             if body == dresser_body:
                 continue
-            body_footprint = body.as_bounding_box_collection_in_frame(
-                dresser_body
+            body_footprint = body.as_bounding_box_collection_at_origin(
+                TransformationMatrix(reference_frame=dresser_body)
             ).event.marginal(SpatialVariables.yz)
             container_footprint -= body_footprint
 
@@ -754,6 +761,52 @@ class DresserFactory(ViewFactory[Dresser]):
         container_event |= container_footprint & limiting_event
 
         return container_event
+
+
+@dataclass
+class RoomFactory(ViewFactory[Room]):
+    """
+    Factory for creating a room with a specific region.
+    """
+
+    name: PrefixedName
+    """
+    The name of the room.
+    """
+
+    floor_polytope: List[Point3]
+    """
+    The region that defines the room's boundaries and reference frame.
+    """
+
+    def _create(self, world: World) -> World:
+        """
+        Return a world with a room view that contains the specified region.
+        """
+        room_body = Body(name=self.name)
+        world.add_kinematic_structure_entity(room_body)
+
+        region = Region.from_3d_points(
+            points_3d=self.floor_polytope,
+            name=PrefixedName(self.name.name + "_region", self.name.prefix),
+            reference_frame=room_body,
+        )
+        connection = FixedConnection(
+            parent=room_body,
+            child=region,
+            origin_expression=TransformationMatrix(),
+        )
+        world.add_connection(connection)
+
+        floor = Floor(
+            name=PrefixedName(self.name.name + "_floor", self.name.prefix),
+            region=region,
+        )
+        world.add_view(floor)
+        room_view = Room(name=self.name, floor=floor)
+        world.add_view(room_view)
+
+        return world
 
 
 @dataclass
@@ -858,8 +911,8 @@ class WallFactory(ViewFactory[Wall]):
             door_thickness_spatial_variable = SpatialVariables.x.value
 
             for door in doors:
-                door_event = door.body.as_bounding_box_collection_in_frame(
-                    temp_world.root
+                door_event = door.body.as_bounding_box_collection_at_origin(
+                    TransformationMatrix(reference_frame=temp_world.root)
                 ).event
                 door_event = door_event.marginal(door_plane_spatial_variables)
                 door_event.fill_missing_variables([door_thickness_spatial_variable])

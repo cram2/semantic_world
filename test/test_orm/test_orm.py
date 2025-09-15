@@ -9,7 +9,7 @@ from semantic_world.adapters.urdf import URDFParser
 from semantic_world.world_description.geometry import Box, Scale, Color
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
-from semantic_world.world import Body
+from semantic_world.world_description.world_entity import Body
 from semantic_world.orm.ormatic_interface import *
 from ormatic.dao import to_dao
 

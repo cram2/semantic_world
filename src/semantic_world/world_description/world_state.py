@@ -173,3 +173,13 @@ class WorldState(MutableMapping):
         Assums that the order of the DOFs is consistent.
         """
         self.data[derivative, :] = new_state
+
+    def __deepcopy__(self, memo):
+        """
+        Create a deep copy of the WorldState.
+        """
+        new_state = WorldState()
+        new_state.data = self.data.copy()
+        new_state._names = self._names.copy()
+        new_state._index = self._index.copy()
+        return new_state

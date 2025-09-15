@@ -1,0 +1,146 @@
+{
+    "doors": [
+        {
+            "assetId": "Doorway_Double_7",
+            "assetPosition": {
+                "x": 1.0634794581954563,
+                "y": 1.0462727337144315,
+                "z": 0
+            },
+            "holePolygon": [
+                {
+                    "x": 0.25,
+                    "y": 0,
+                    "z": 0
+                },
+                {
+                    "x": 2.25,
+                    "y": 2.1,
+                    "z": 0
+                }
+            ],
+            "id": "door|1|4",
+            "openable": false,
+            "openness": 0,
+            "room0": "room|4",
+            "room1": "room|4",
+            "wall0": "wall|4|3.52|0.00|3.52|3.52",
+            "wall1": "wall|exterior|3.52|0.00|3.52|3.52"
+        }
+    ],
+    "objects": [
+        {
+            "assetId": "Dresser_218_1",
+            "id": "Dresser|3|0",
+            "kinematic": true,
+            "layer": "Procedural1",
+            "position": {
+                "x": 6.0,
+                "y": 0.5,
+                "z": 6.7
+            },
+            "rotation": {
+                "x": 0,
+                "y": 180,
+                "z": 0
+            }
+        }
+    ],
+    "rooms": [
+        {
+            "ceilings": [],
+            "children": [],
+            "floorMaterial": {
+                "name": "TexturesCom_WoodFine0038_1_seamless_S_dark"
+            },
+            "floorPolygon": [
+                {
+                    "x": 3.0,
+                    "y": 0,
+                    "z": 0.0
+                },
+                {
+                    "x": 0.0,
+                    "y": 0,
+                    "z": 0.0
+                },
+                {
+                    "x": 0.0,
+                    "y": 0,
+                    "z": 3.0
+                },
+                {
+                    "x": 3.0,
+                    "y": 0,
+                    "z": 3.0
+                }
+            ],
+            "id": "room|4",
+            "layer": "Procedural1",
+            "roomType": "Kitchen"
+        }
+    ],
+    "walls": [
+        {
+            "id": "wall|4|3.52|0.00|3.52|3.52",
+            "layer": "Procedural1",
+            "material": {
+                "name": "bathroomTilesTan5"
+            },
+            "polygon": [
+                {
+                    "x": 3.5,
+                    "y": 0,
+                    "z": 3.6
+                },
+                {
+                    "x": 3.5,
+                    "y": 0,
+                    "z": 0.0
+                },
+                {
+                    "x": 3.5,
+                    "y": 4.2,
+                    "z": 3.6
+                },
+                {
+                    "x": 3.5,
+                    "y": 4.2,
+                    "z": 0.0
+                }
+            ],
+            "roomId": "room|4"
+        },
+        {
+            "id": "wall|exterior|3.52|0.00|3.52|3.52",
+            "layer": "Procedural1",
+            "material": {
+                "name": "Walldrywall3Tiled"
+            },
+            "polygon": [
+                {
+                    "x": 3.5,
+                    "y": 4.2,
+                    "z": 0.0
+                },
+                {
+                    "x": 3.5,
+                    "y": 4.2,
+                    "z": 3.6
+                },
+                {
+                    "x": 3.5,
+                    "y": 0,
+                    "z": 0.0
+                },
+                {
+                    "x": 3.5,
+                    "y": 0,
+                    "z": 3.6
+                }
+            ],
+            "roomId": "room|4"
+        }
+    ],
+    "windows": []
+}

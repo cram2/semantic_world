@@ -1,11 +1,20 @@
 import os
+import threading
+import time
+
 from typing_extensions import Tuple
 
 import pytest
 
 from .adapters.urdf import URDFParser
-from .world_description.connections import (Connection6DoF, PrismaticConnection, RevoluteConnection,
-                                            FixedConnection, OmniDrive)
+from .utils import rclpy_installed
+from .world_description.connections import (
+    Connection6DoF,
+    PrismaticConnection,
+    RevoluteConnection,
+    FixedConnection,
+    OmniDrive,
+)
 from .world_description.degree_of_freedom import DegreeOfFreedom
 from .world_description.geometry import Box, Scale, Sphere
 from .datastructures.prefixed_name import PrefixedName
@@ -13,11 +22,18 @@ from .spatial_types import TransformationMatrix
 from .spatial_types.derivatives import DerivativeMap
 from .spatial_types.spatial_types import Vector3
 from .world import World
-from .world_description.world_entity import Body
+from .world_description.world_entity import KinematicStructureEntity, Body
 
 
 @pytest.fixture
-def world_setup() -> Tuple[World, Body, Body, Body, Body, Body]:
+def world_setup() -> Tuple[
+    World,
+    Body,
+    Body,
+    Body,
+    Body,
+    Body,
+]:
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     l1 = Body(name=PrefixedName("l1"))
@@ -145,3 +161,34 @@ def pr2_world():
         world.merge_world(world_with_pr2, c_root_bf)
 
     return world
+
+
+@pytest.fixture(scope="function")
+def rclpy_node():
+    if not rclpy_installed():
+        pytest.skip("ROS not installed")
+    import rclpy
+    from rclpy.executors import SingleThreadedExecutor
+
+    rclpy.init()
+    node = rclpy.create_node("test_node")
+
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
+
+    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
+    thread.start()
+    time.sleep(0.1)
+    try:
+        yield node
+    finally:
+        # Stop executor cleanly and wait for the thread to exit
+        executor.shutdown()
+        thread.join(timeout=2.0)
+
+        # Remove the node from the executor and destroy it
+        # (executor.shutdown() takes care of spinning; add_node is safe to keep as-is)
+        node.destroy_node()
+
+        # Shut down the ROS client library
+        rclpy.shutdown()

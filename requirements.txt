@@ -8,7 +8,7 @@ casadi~=3.7.0
 hypothesis
 pytest
 scipy
-ormatic>=1.1.10
+ormatic>=1.1.15
 sqlacodegen
 ripple_down_rules>=0.6.51
 pytest-order
@@ -24,3 +24,8 @@ probabilistic_model
 python-fcl
 manifold3d
 entity_query_language
+polytope
+ortools
+fbxloader
+coacd
+pymysql

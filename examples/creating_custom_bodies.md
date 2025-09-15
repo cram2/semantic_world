@@ -38,12 +38,12 @@ Supported Shapes are:
 - Box
 - Sphere
 - Cylinder
-- Mesh/TriangleMesh
+- FileMesh/TriangleMesh
 
 ```python
 import os
 from semantic_world.spatial_types import Point3, Vector3
-from semantic_world.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
+from semantic_world.world_description.geometry import Box, Scale, Sphere, Cylinder, FileMesh, Color
 
 box_origin = TransformationMatrix.from_xyz_rpy(x=0, y=0, z=0, roll=0, pitch=0, yaw=0, reference_frame=body)
 box = Box(origin=box_origin, scale=Scale(1., 1., 0.5), color=Color(1., 0., 0., 1., ))
@@ -58,7 +58,7 @@ cylinder_origin = TransformationMatrix.from_point_rotation_matrix(point=Point3.f
                                                                   reference_frame=body)
 cylinder = Cylinder(origin=cylinder_origin, width=0.05, height=0.5)
 
-mesh = Mesh(origin=TransformationMatrix.from_xyz_rpy(reference_frame=body),
+mesh = FileMesh(origin=TransformationMatrix.from_xyz_rpy(reference_frame=body),
             filename=os.path.join(get_semantic_world_directory_root(os.getcwd()), "resources", "stl", "milk.stl"))
 
 body.collision = [cylinder, sphere, box]

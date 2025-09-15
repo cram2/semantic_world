@@ -578,7 +578,7 @@ BinaryFalse = Expression(False)
 class TransformationMatrix(Symbol_, ReferenceFrameMixin):
 
     def __init__(
-        self, data=None, reference_frame=None, child_frame=None, sanity_check=True
+        self, data=None, reference_frame: Body = None, child_frame: Body = None, sanity_check=True
     ):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -708,13 +708,13 @@ class TransformationMatrix(Symbol_, ReferenceFrameMixin):
     @classmethod
     def from_xyz_quat(
         cls,
-        pos_x=None,
-        pos_y=None,
-        pos_z=None,
-        quat_w=None,
-        quat_x=None,
-        quat_y=None,
-        quat_z=None,
+        pos_x=0,
+        pos_y=0,
+        pos_z=0,
+        quat_w=1,
+        quat_x=0,
+        quat_y=0,
+        quat_z=0,
         reference_frame=None,
         child_frame=None,
     ):
