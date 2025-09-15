@@ -58,6 +58,11 @@ def shape_to_geom_props(shape: Shape) -> Dict[str, Any]:
 
 @dataclass
 class MultiverseModelSynchronizer(ModelChangeCallback):
+    """
+    A callback to synchronize the world model with the Multiverse simulator.
+    This callback will listen to the world model changes and update the Multiverse simulator accordingly.
+    """
+
     world: World
     simulator: MultiverseSimulator
 
@@ -145,6 +150,16 @@ class MultiSim:
         simulator: str = "mujoco",
         real_time_factor: float = 1.0,
     ):
+        """
+        Initializes the MultiSim class.
+
+        :param world: The world to simulate.
+        :param viewer: The MultiverseViewer to read/write objects.
+        :param headless: Whether to run the simulation in headless mode.
+        :param step_size: The step size for the simulation.
+        :param simulator: The simulator to use. Currently only "mujoco" is supported.
+        :param real_time_factor: The real time factor for the simulation (1.0 = real time, 2.0 = twice as fast, -1.0 = as fast as possible).
+        """
         if simulator == "mujoco":
             Simulator = MultiverseMujocoConnector
             file_path = "/tmp/scene.xml"

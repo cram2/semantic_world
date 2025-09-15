@@ -3,14 +3,21 @@ import os
 from dataclasses import dataclass
 
 import numpy
-from multiverse_parser import (Factory,
-                               GeomType)
+from multiverse_parser import Factory, GeomType
 from multiverse_parser.utils import get_relative_transform
 from pxr import UsdUrdf, UsdGeom, UsdPhysics, Gf  # type: ignore
 from typing_extensions import Optional, Set, List
 
 from ..spatial_types.spatial_types import TransformationMatrix
-from ..world_description.geometry import Box, Sphere, Cylinder, Scale, Shape, Color, TriangleMesh
+from ..world_description.geometry import (
+    Box,
+    Sphere,
+    Cylinder,
+    Scale,
+    Shape,
+    Color,
+    TriangleMesh,
+)
 
 try:
     from multiverse_parser import (
@@ -34,7 +41,12 @@ except ImportError as e:
     JointType = None
     UsdUrdf = None
 
-from ..world_description.connections import RevoluteConnection, PrismaticConnection, FixedConnection, Connection6DoF
+from ..world_description.connections import (
+    RevoluteConnection,
+    PrismaticConnection,
+    FixedConnection,
+    Connection6DoF,
+)
 from ..world_description.degree_of_freedom import DegreeOfFreedom
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
@@ -43,16 +55,24 @@ from ..world import World, Body, Connection
 
 
 def usd_pose_to_cas_pose(usd_transform: Gf.Matrix4d) -> cas.TransformationMatrix:
+    """
+    Convert a USD Gf.Matrix4d transform to a cas.TransformationMatrix. This assumes that the USD transform does not contain any scale or shear.
+
+    :param usd_transform: The USD Gf.Matrix4d transform to convert.
+    :return: A cas.TransformationMatrix representing the same transformation.
+    """
     translation: Gf.Vec3d = usd_transform.ExtractTranslation()
     rotation: Gf.Rotation = usd_transform.ExtractRotation()
     quat: Gf.Quatd = rotation.GetQuat()
-    return cas.TransformationMatrix.from_xyz_quat(pos_x=translation[0],
-                                                 pos_y=translation[1],
-                                                 pos_z=translation[2],
-                                                 quat_x=quat.GetImaginary()[0],
-                                                 quat_y=quat.GetImaginary()[1],
-                                                 quat_z=quat.GetImaginary()[2],
-                                                 quat_w=quat.GetReal())
+    return cas.TransformationMatrix.from_xyz_quat(
+        pos_x=translation[0],
+        pos_y=translation[1],
+        pos_z=translation[2],
+        quat_x=quat.GetImaginary()[0],
+        quat_y=quat.GetImaginary()[1],
+        quat_z=quat.GetImaginary()[2],
+        quat_w=quat.GetReal(),
+    )
 
 
 def get_free_body_names(factory: Factory) -> Set[str]:
@@ -63,21 +83,28 @@ def get_free_body_names(factory: Factory) -> Set[str]:
     """
     constrained_body_names = set()
     stage = factory.world_builder.stage
-    for joint in [UsdPhysics.Joint(joint_prim) for joint_prim in stage.TraverseAll() if  # type: ignore
-                  joint_prim.IsA(UsdPhysics.Joint)]:  # type: ignore
+    for joint in [
+        UsdPhysics.Joint(joint_prim)
+        for joint_prim in stage.TraverseAll()  # type: ignore
+        if joint_prim.IsA(UsdPhysics.Joint)
+    ]:  # type: ignore
         for child_body_path in joint.GetBody1Rel().GetTargets():
             child_body_prim = stage.GetPrimAtPath(child_body_path)
             constrained_body_names.add(child_body_prim.GetName())
             constrained_body_names.update(
-                child.GetName() for child in child_body_prim.GetAllChildren()
+                child.GetName()
+                for child in child_body_prim.GetAllChildren()
                 if child.IsA(UsdGeom.Xform)  # type: ignore
             )
 
     free_body_names = set()
-    for xform_prim in [prim for prim in stage.TraverseAll() if
-                       prim.IsA(UsdGeom.Xform) and  # type: ignore
-                       prim.HasAPI(UsdPhysics.MassAPI) and  # type: ignore
-                       prim.HasAPI(UsdPhysics.RigidBodyAPI)]:  # type: ignore
+    for xform_prim in [
+        prim
+        for prim in stage.TraverseAll()
+        if prim.IsA(UsdGeom.Xform)  # type: ignore
+        and prim.HasAPI(UsdPhysics.MassAPI)  # type: ignore
+        and prim.HasAPI(UsdPhysics.RigidBodyAPI)
+    ]:  # type: ignore
         if xform_prim.GetName() in constrained_body_names:
             continue
         free_body_names.add(xform_prim.GetName())
@@ -98,20 +125,32 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
     for geom_builder in body_builder.geom_builders:
         gprim = geom_builder.gprim
         gprim_prim = gprim.GetPrim()
-        local_transformation: Gf.Matrix4d = gprim.GetLocalTransformation().RemoveScaleShear()
+        local_transformation: Gf.Matrix4d = (
+            gprim.GetLocalTransformation().RemoveScaleShear()
+        )
         translation: Gf.Vec3d = local_transformation.ExtractTranslation()
         rotation: Gf.Rotation = local_transformation.ExtractRotation()
         quat: Gf.Quatd = rotation.GetQuat()
-        origin_transform = TransformationMatrix.from_xyz_quat(pos_x=translation[0],
-                                                              pos_y=translation[1],
-                                                              pos_z=translation[2],
-                                                              quat_x=quat.GetImaginary()[0],
-                                                              quat_y=quat.GetImaginary()[1],
-                                                              quat_z=quat.GetImaginary()[2],
-                                                              quat_w=quat.GetReal())
-        color = (Color(*geom_builder.rgba))
+        origin_transform = TransformationMatrix.from_xyz_quat(
+            pos_x=translation[0],
+            pos_y=translation[1],
+            pos_z=translation[2],
+            quat_x=quat.GetImaginary()[0],
+            quat_y=quat.GetImaginary()[1],
+            quat_z=quat.GetImaginary()[2],
+            quat_w=quat.GetReal(),
+        )
+        color = Color(*geom_builder.rgba)
         if geom_builder.type == GeomType.CUBE:  # type: ignore
-            size = numpy.array([gprim.GetLocalTransformation().GetRow(i).GetLength() for i in range(3)]) * 2
+            size = (
+                numpy.array(
+                    [
+                        gprim.GetLocalTransformation().GetRow(i).GetLength()
+                        for i in range(3)
+                    ]
+                )
+                * 2
+            )
             shape = Box(
                 origin=origin_transform,
                 scale=Scale(*size),
@@ -137,9 +176,17 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
             data = {"mesh": {}, "origin": {}, "scale": {}}
             data["mesh"]["vertices"] = gprim.GetVertices()
             data["mesh"]["faces"] = gprim.GetFaceVertexCounts()
-            data["origin"]["position"] = [translation[0], translation[1], translation[2]]
-            data["origin"]["quaternion"] = [quat.GetReal(), quat.GetImaginary()[0], quat.GetImaginary()[1],
-                                            quat.GetImaginary()[2]]
+            data["origin"]["position"] = [
+                translation[0],
+                translation[1],
+                translation[2],
+            ]
+            data["origin"]["quaternion"] = [
+                quat.GetReal(),
+                quat.GetImaginary()[0],
+                quat.GetImaginary()[1],
+                quat.GetImaginary()[2],
+            ]
             data["scale"]["x"] = scale[0]
             data["scale"]["y"] = scale[1]
             data["scale"]["z"] = scale[2]
@@ -185,14 +232,16 @@ class MultiParser:
 
         file_ext = os.path.splitext(self.file_path)[1]
         if file_ext in [".usd", ".usda", ".usdc"]:
-            factory = UsdImporter(file_path=self.file_path,
-                                  fixed_base=True,
-                                  root_name=root_name,
-                                  with_physics=with_physics,
-                                  with_visual=with_visual,
-                                  with_collision=with_collision,
-                                  inertia_source=inertia_source,
-                                  default_rgba=default_rgba)
+            factory = UsdImporter(
+                file_path=self.file_path,
+                fixed_base=True,
+                root_name=root_name,
+                with_physics=with_physics,
+                with_visual=with_visual,
+                with_collision=with_collision,
+                inertia_source=inertia_source,
+                default_rgba=default_rgba,
+            )
         elif file_ext == ".urdf":
             factory = UrdfImporter(
                 file_path=self.file_path,
@@ -273,14 +322,17 @@ class MultiParser:
             child_body = world.get_kinematic_structure_entity_by_name(
                 joint_builder.child_prim.GetName()
             )
-            transform = get_relative_transform(from_prim=joint_builder.parent_prim,
-                                               to_prim=joint_builder.child_prim)
+            transform = get_relative_transform(
+                from_prim=joint_builder.parent_prim, to_prim=joint_builder.child_prim
+            )
             origin = usd_pose_to_cas_pose(transform)
-            connection = self.parse_joint(joint_builder, parent_body, child_body, origin, world)
+            connection = self.parse_joint(
+                joint_builder, parent_body, child_body, origin, world
+            )
             connections.append(connection)
         if (
-                len(body_builder.joint_builders) == 0
-                and not body_builder.xform.GetPrim().GetParent().IsPseudoRoot()
+            len(body_builder.joint_builders) == 0
+            and not body_builder.xform.GetPrim().GetParent().IsPseudoRoot()
         ):
             parent_body = world.get_kinematic_structure_entity_by_name(
                 body_builder.xform.GetPrim().GetParent().GetName()
@@ -298,13 +350,23 @@ class MultiParser:
         return connections
 
     def parse_joint(
-            self,
-            joint_builder: JointBuilder,
-            parent_body: Body,
-            child_body: Body,
-            origin: TransformationMatrix,
-            world: World,
+        self,
+        joint_builder: JointBuilder,
+        parent_body: Body,
+        child_body: Body,
+        origin: TransformationMatrix,
+        world: World,
     ) -> Connection:
+        """
+        Parses a joint from a JointBuilder instance.
+
+        :param joint_builder: The JointBuilder instance to parse.
+        :param parent_body: The parent Body instance of the joint.
+        :param child_body: The child Body instance of the joint.
+        :param origin: The origin TransformationMatrix of the joint.
+        :param world: The World instance to add the connections to.
+        :return: A Connection instance representing the parsed joint.
+        """
         joint_prim = joint_builder.joint.GetPrim()
         joint_name = joint_prim.GetName()
         free_variable_name = joint_name
