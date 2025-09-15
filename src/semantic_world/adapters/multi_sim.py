@@ -1,9 +1,12 @@
 import os
 import time
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from html.parser import entityref
+from typing import Dict, List, Any
 
 import numpy
 from mujoco_connector import MultiverseMujocoConnector
+import mujoco
 from multiverse_simulator import (
     MultiverseSimulator,
     MultiverseSimulatorState,
@@ -12,15 +15,117 @@ from multiverse_simulator import (
     MultiverseCallbackResult,
 )
 
+from ..callbacks.callback import ModelChangeCallback
 from ..world import World
 from ..world_description.connections import RevoluteConnection, PrismaticConnection
-from ..world_description.geometry import Box, Cylinder, Sphere
+from ..world_description.geometry import Box, Cylinder, Sphere, Shape
+from ..world_description.world_entity import Region, Body
 from ..world_description.world_modification import (
     WorldModelModificationBlock,
     AddDegreeOfFreedomModification,
-    AddBodyModification,
+    AddKinematicStructureEntityModification,
 )
 from ..spatial_types.symbol_manager import symbol_manager
+
+
+def shape_to_geom_props(shape: Shape) -> Dict[str, Any]:
+    shape_pos = shape.origin.to_position()
+    sx, sy, sz, _ = symbol_manager.evaluate_expr(shape_pos).tolist()
+    shape_quat = shape.origin.to_quaternion()
+    sqx, sqy, sqz, sqw = symbol_manager.evaluate_expr(shape_quat).tolist()
+    r, g, b, a = (
+        shape.color.R,
+        shape.color.G,
+        shape.color.B,
+        shape.color.A,
+    )
+    if isinstance(shape, Box):
+        size = [
+            symbol_manager.evaluate_expr(shape.scale.x) / 2,
+            symbol_manager.evaluate_expr(shape.scale.y) / 2,
+            symbol_manager.evaluate_expr(shape.scale.z) / 2,
+        ]
+        return {
+            "type": mujoco.mjtGeom.mjGEOM_BOX,
+            "pos": [sx, sy, sz],
+            "quat": [sqw, sqx, sqy, sqz],
+            "size": size,
+            "rgba": [r, g, b, a],
+        }
+    else:
+        raise NotImplementedError(f"Shape type {type(shape)} is not implemented yet.")
+
+
+@dataclass
+class MultiverseModelSynchronizer(ModelChangeCallback):
+    world: World
+    simulator: MultiverseSimulator
+
+    def notify(self):
+        for modification in self.world._model_modification_blocks[-1]:
+            if isinstance(modification, AddKinematicStructureEntityModification):
+                entity = modification.kinematic_structure_entity
+                parent_body_name = entity.parent_connection.parent.name.name
+                entity_name = entity.name.name
+                entity_pose = entity.parent_connection.origin_expression
+                entity_pos = entity_pose.to_position()
+                px, py, pz, _ = symbol_manager.evaluate_expr(entity_pos).tolist()
+                entity_quat = entity_pose.to_quaternion()
+                qx, qy, qz, qw = symbol_manager.evaluate_expr(entity_quat).tolist()
+                if isinstance(self.simulator, MultiverseMujocoConnector):
+                    body_props = {
+                        "pos": [px, py, pz],
+                        "quat": [qw, qx, qy, qz],
+                    }
+                    add_body_result = self.simulator.add_entity(
+                        entity_name=entity_name,
+                        entity_type="body",
+                        entity_properties=body_props,
+                        parent_name=parent_body_name,
+                    )
+                    assert (
+                        add_body_result.type
+                        == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+                    )
+                    if isinstance(entity, Region):
+                        for shape in entity.area:
+                            site_props = shape_to_geom_props(shape)
+                            add_site_result = self.simulator.add_entity(
+                                entity_name=f"{entity_name}_{id(shape)}",
+                                entity_type="site",
+                                entity_properties=site_props,
+                                parent_name=entity_name,
+                            )
+                            assert (
+                                add_site_result.type
+                                == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+                            )
+                    elif isinstance(entity, Body):
+                        for shape in {
+                            id(s): s for s in entity.visual + entity.collision
+                        }.values():
+                            geom_props = shape_to_geom_props(shape)
+                            if shape in entity.collision and entity.visual:
+                                geom_props["rgba"][3] = 0.0
+                            add_geom_result = self.simulator.add_entity(
+                                entity_name=f"{entity_name}_{id(shape)}",
+                                entity_type="geom",
+                                entity_properties=geom_props,
+                                parent_name=entity_name,
+                            )
+                            assert (
+                                add_geom_result.type
+                                == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+                            )
+                    else:
+                        raise NotImplementedError(
+                            f"Can't parse entity type {type(entity)}."
+                        )
+                else:
+                    continue
+
+    def stop(self):
+        self.world.model_change_callbacks.remove(self)
 
 
 class MultiSim:
@@ -28,8 +133,8 @@ class MultiSim:
     Class to handle the simulation of a world using the Multiverse simulator.
     """
 
-    world: World
     simulator: MultiverseSimulator
+    model_updater: MultiverseModelSynchronizer
 
     def __init__(
         self,
@@ -40,11 +145,10 @@ class MultiSim:
         simulator: str = "mujoco",
         real_time_factor: float = 1.0,
     ):
-        self.world = world
         if simulator == "mujoco":
             Simulator = MultiverseMujocoConnector
             file_path = "/tmp/scene.xml"
-            self.build_world(file_path=file_path)
+            self.build_world(world=world, file_path=file_path)
         else:
             raise NotImplementedError(f"Simulator {simulator} is not implemented yet.")
 
@@ -56,19 +160,15 @@ class MultiSim:
             step_size=step_size,
             real_time_factor=real_time_factor,
         )
+        self.model_updater = MultiverseModelSynchronizer(world, self.simulator)
 
-        self.callback_lambda = lambda: self.model_change_callback()
-        self.world.model_change_callbacks.append(self.callback_lambda)
-
-    def build_world(self, file_path: str):
+    def build_world(self, world: World, file_path: str):
         file_ext = os.path.splitext(file_path)[1]
         if file_ext == ".xml":
-            import mujoco
-
             spec = mujoco.MjSpec()
             spec.modelname = "scene"
             body_map = {"world": spec.worldbody}
-            for body in self.world.bodies:
+            for body in world.bodies:
                 if body.name.name == "world":
                     continue
                 body_name = body.name.name
@@ -112,7 +212,7 @@ class MultiSim:
                             quat=geom_quat,
                             size=size,
                         )
-            for connection in self.world.connections:
+            for connection in world.connections:
                 add_prefix = len(connection.dofs) == 1
                 joint_name = connection.name.name
                 child_body_name = connection.child.name.name
@@ -167,7 +267,7 @@ class MultiSim:
 
         :return: None
         """
-        self.world.model_change_callbacks.remove(self.callback_lambda)
+        self.model_updater.stop()
         self.simulator.stop()
 
     def pause_simulation(self):
@@ -303,38 +403,3 @@ class MultiSim:
         if origin_state == MultiverseSimulatorState.PAUSED:
             self.pause_simulation()
         return stable
-
-    def model_change_callback(self):
-        latest_changes = WorldModelModificationBlock.from_modifications(
-            self.world._atomic_modifications[-1]
-        )
-        self.update_world(latest_changes)
-
-    def update_world(self, latest_changes: WorldModelModificationBlock):
-        for modification in latest_changes.modifications:
-            if isinstance(modification, AddBodyModification):
-                body = modification.body
-                parent_body_name = body.parent_connection.parent.name.name
-                body_name = body.name.name
-                body_pose = body.parent_connection.origin_expression
-                body_pos = body_pose.to_position()
-                px, py, pz, _ = symbol_manager.evaluate_expr(body_pos).tolist()
-                body_quat = body_pose.to_quaternion()
-                qx, qy, qz, qw = symbol_manager.evaluate_expr(body_quat).tolist()
-                if isinstance(self.simulator, MultiverseMujocoConnector):
-                    body_props = {
-                        "pos": [px, py, pz],
-                        "quat": [qw, qx, qy, qz],
-                    }
-                    add_body_result = self.simulator.add_entity_to_body(
-                        entity_name=body_name,
-                        entity_type="body",
-                        entity_properties=body_props,
-                        body_name=parent_body_name,
-                    )
-                    assert (
-                        add_body_result.type
-                        == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
-                    )
-                else:
-                    continue

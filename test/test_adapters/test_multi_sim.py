@@ -11,9 +11,9 @@ from semantic_world.adapters.multi_sim import MultiSim
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.world import World
-from semantic_world.world_description.connections import Connection6DoF
+from semantic_world.world_description.connections import Connection6DoF, FixedConnection
 from semantic_world.world_description.geometry import Box, Scale, Color
-from semantic_world.world_description.world_entity import Body
+from semantic_world.world_description.world_entity import Body, Region
 
 urdf_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
@@ -236,13 +236,14 @@ class MultiSimTestCase(unittest.TestCase):
         start_time = time.time()
         time.sleep(1.0)
 
-        new_body = Body(name=PrefixedName("giang"))
+        current_time = time.time()
+        new_body = Body(name=PrefixedName("test_body"))
         box_origin = TransformationMatrix.from_xyz_rpy(
-            x=0, y=0, z=0, roll=0, pitch=0, yaw=0, reference_frame=new_body
+            x=0.2, y=0.4, z=-0.3, roll=0, pitch=0.5, yaw=0, reference_frame=new_body
         )
         box = Box(
             origin=box_origin,
-            scale=Scale(1.0, 1.0, 0.5),
+            scale=Scale(1.0, 1.5, 0.5),
             color=Color(
                 1.0,
                 0.0,
@@ -260,6 +261,37 @@ class MultiSimTestCase(unittest.TestCase):
                     _world=self.test_urdf_world,
                 )
             )
+        print(f"Time to add new body: {time.time() - current_time}s")
+        self.assertIn(
+            new_body.name.name, multi_sim.simulator.get_all_body_names().result
+        )
+
+        time.sleep(1)
+
+        current_time = time.time()
+        region = Region(name=PrefixedName("test_region"))
+        region_box = Box(
+            scale=Scale(0.1, 0.5, 0.2),
+            origin=TransformationMatrix.from_xyz_rpy(reference_frame=region),
+            color=Color(
+                0.0,
+                1.0,
+                0.0,
+                0.8,
+            ),
+        )
+        region.area = [region_box]
+
+        with self.test_urdf_world.modify_world():
+            self.test_urdf_world.add_connection(
+                FixedConnection(
+                    parent=self.test_urdf_world.root,
+                    child=region,
+                    _world=self.test_urdf_world,
+                    origin_expression=TransformationMatrix.from_xyz_rpy(z=0.5),
+                )
+            )
+        print(f"Time to add new region: {time.time() - current_time}s")
 
         time.sleep(4.0)
 
