@@ -38,7 +38,6 @@ jobs:
         git submodule init
         git submodule update
         pip install -U pip && pip install -r requirements.txt && pip install -e . && pip install pytest
-        pip install multiverse-simulators==0.0.6
         if [[ $(python3 --version) == "Python 3.10"* ]]; then
           pip install https://nc.uni-bremen.de/public.php/dav/files/fxWQigKXPBtnXsy/?accept=zip
         elif [[ $(python3 --version) == "Python 3.12"* ]]; then

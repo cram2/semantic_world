@@ -29,3 +29,4 @@ ortools
 fbxloader
 coacd
 pymysql
+multiverse-simulators==0.0.7
