@@ -292,6 +292,7 @@ class MultiSimTestCase(unittest.TestCase):
                 )
             )
         print(f"Time to add new region: {time.time() - current_time}s")
+        self.assertIn(region.name.name, multi_sim.simulator.get_all_body_names().result)
 
         time.sleep(4.0)
 
