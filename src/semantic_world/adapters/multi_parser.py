@@ -223,6 +223,12 @@ class MultiParser:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
 
     def parse(self, fixed_base=True) -> World:
+        """
+        Parses the file at `file_path` and returns a World instance.
+
+        :param fixed_base: Whether to fix the base of the root body.
+        :return: A World instance representing the parsed scene. The root will be named "world", regardless of the original root name.
+        """
         root_name = None
         with_physics = True
         with_visual = True
