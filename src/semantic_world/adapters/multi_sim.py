@@ -1,6 +1,9 @@
+import inspect
 import time
-from dataclasses import dataclass
-from typing import Dict, List, Any
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from types import NoneType
+from typing import Dict, List, Any, ClassVar, Type, Optional, get_type_hints
 
 import numpy
 from mujoco_connector import MultiverseMujocoConnector
@@ -12,6 +15,7 @@ from multiverse_simulator import (
     MultiverseAttribute,
     MultiverseCallbackResult,
 )
+from random_events.utils import recursive_subclasses
 
 from ..callbacks.callback import ModelChangeCallback
 from ..spatial_types.spatial_types import TransformationMatrix
@@ -19,6 +23,8 @@ from ..world import World
 from ..world_description.connections import (
     RevoluteConnection,
     PrismaticConnection,
+    ActiveConnection1DOF,
+    FixedConnection,
 )
 from ..world_description.geometry import Box, Cylinder, Sphere, Shape
 from ..world_description.world_entity import (
@@ -26,6 +32,7 @@ from ..world_description.world_entity import (
     Body,
     KinematicStructureEntity,
     Connection,
+    WorldEntity,
 )
 from ..world_description.world_modification import (
     WorldModelModificationBlock,
@@ -49,8 +56,197 @@ def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
     return [px, py, pz, qw, qx, qy, qz]
 
 
+class WorldEntityConverter(ABC):
+    @classmethod
+    def convert(cls, entity: Any) -> Optional[Dict[str, Any]]:
+        if type(entity) is cls.get_type():
+            return cls()._convert(entity)
+        for subclass in recursive_subclasses(cls):
+            result = subclass.convert(entity)
+            if result is not None:
+                return result
+        return None
+
+    @abstractmethod
+    def _convert(self, entity: NoneType) -> Dict[str, Any]:
+        raise NotImplementedError
+
+    @classmethod
+    def get_type(cls) -> Optional[Type]:
+        if inspect.isabstract(cls):
+            return None
+        hints = get_type_hints(cls._convert)
+        return hints.get("entity", NoneType)
+
+
+class KinematicStructureEntityConverter(WorldEntityConverter):
+    pos: str
+    quat: str
+    shape_converter: ClassVar[Type["ShapeConverter"]]
+
+    def _convert(self, entity: KinematicStructureEntity) -> Dict[str, Any]:
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(
+            entity.parent_connection.origin_expression
+        )
+        kinematic_structure_entity_pos = [px, py, pz]
+        kinematic_structure_entity_quat = [qw, qx, qy, qz]
+        return {
+            self.pos: kinematic_structure_entity_pos,
+            self.quat: kinematic_structure_entity_quat,
+        }
+
+
+class BodyConverter(KinematicStructureEntityConverter):
+    def _convert(self, entity: Body) -> Dict[str, Any]:
+        return KinematicStructureEntityConverter._convert(self, entity)
+
+
+class RegionConverter(KinematicStructureEntityConverter):
+    def _convert(self, entity: Region) -> Dict[str, Any]:
+        return KinematicStructureEntityConverter._convert(self, entity)
+
+
+class ShapeConverter(WorldEntityConverter):
+    pos: str
+    quat: str
+    rgba: str
+    visible: bool
+
+    @abstractmethod
+    def _convert(self, entity: Shape) -> Dict[str, Any]:
+        """
+        Converts a Shape object to a dictionary of geometry properties for Multiverse.
+
+        :param entity: The Shape object to convert.
+        :return: A dictionary of geometry properties.
+        """
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity.origin)
+        geom_pos = [px, py, pz]
+        geom_quat = [qw, qx, qy, qz]
+        r, g, b, a = (
+            entity.color.R,
+            entity.color.G,
+            entity.color.B,
+            entity.color.A,
+        )
+        geom_color = [r, g, b, a]
+        return {
+            self.pos: geom_pos,
+            self.quat: geom_quat,
+            self.rgba: geom_color,
+        }
+
+
+class ConnectionConverter(WorldEntityConverter):
+    @abstractmethod
+    def _convert(self, entity: Connection) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
+class Connection1DOFConverter(ConnectionConverter):
+    axis_name: str
+    range_name: str
+
+    def _convert(self, entity: ActiveConnection1DOF) -> Dict[str, Any]:
+        assert len(entity.dofs) == 1, "ActiveConnection1DOF must have exactly one DOF."
+        dof = list(entity.dofs)[0]
+        return {
+            self.axis_name: entity.axis.to_np().tolist()[:3],
+            self.range_name: [dof.lower_limits.position, dof.upper_limits.position],
+        }
+
+
+class MujocoGeomConverter(ShapeConverter):
+    pos: str = "pos"
+    quat: str = "quat"
+    rgba: str = "rgba"
+    type: mujoco.mjtGeom
+
+    def _convert(self, entity: Shape) -> Dict[str, Any]:
+        geom_props = ShapeConverter._convert(self, entity)
+        geom_props["type"] = self.type
+        geom_props["size"] = self._get_size(entity)
+        return geom_props
+
+    @abstractmethod
+    def _get_size(self, entity: Shape) -> List[float]:
+        raise NotImplementedError
+
+
+class MujocoBoxConverter(MujocoGeomConverter):
+    type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_BOX
+
+    def _convert(self, entity: Box) -> Dict[str, Any]:
+        return MujocoGeomConverter._convert(self, entity)
+
+    def _get_size(self, entity: Box) -> List[float]:
+        return [entity.scale.x / 2, entity.scale.y / 2, entity.scale.z / 2]
+
+
+class MujocoSphereConverter(MujocoGeomConverter):
+    type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_SPHERE
+
+    def _convert(self, entity: Sphere) -> Dict[str, Any]:
+        return MujocoGeomConverter._convert(self, entity)
+
+    def _get_size(self, entity: Sphere) -> List[float]:
+        return [entity.radius, entity.radius, entity.radius]
+
+
+class MujocoCylinderConverter(MujocoGeomConverter):
+    type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_CYLINDER
+
+    def _convert(self, entity: Cylinder) -> Dict[str, Any]:
+        return MujocoGeomConverter._convert(self, entity)
+
+    def _get_size(self, entity: Cylinder) -> List[float]:
+        return [entity.width / 2, entity.height, 0.0]
+
+
+class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter):
+    pos: str = "pos"
+    quat: str = "quat"
+    shape_converter: ClassVar[Type[MujocoGeomConverter]] = MujocoGeomConverter
+
+
+class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter): ...
+
+
+class MujocoRegionConverter(
+    MujocoKinematicStructureEntityConverter, RegionConverter
+): ...
+
+
+class MujocoJointConverter(ConnectionConverter, ABC):
+    type: mujoco.mjtJoint
+
+
+class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
+    axis_name: str = "axis"
+    range_name: str = "range"
+
+    def _convert(self, entity: ActiveConnection1DOF) -> Dict[str, Any]:
+        joint_props = Connection1DOFConverter._convert(self, entity)
+        joint_props["type"] = self.type
+        return joint_props
+
+
+class MujocoRevoluteJointConverter(Mujoco1DOFJointConverter):
+    type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_HINGE
+
+    def _convert(self, entity: RevoluteConnection) -> Dict[str, Any]:
+        return Mujoco1DOFJointConverter._convert(self, entity)
+
+
+class MujocoPrismaticJointConverter(Mujoco1DOFJointConverter):
+    type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_SLIDE
+
+    def _convert(self, entity: PrismaticConnection) -> Dict[str, Any]:
+        return Mujoco1DOFJointConverter._convert(self, entity)
+
+
 @dataclass
-class MultiverseSynchronizer(ModelChangeCallback):
+class MultiverseSynchronizer(ModelChangeCallback, ABC):
     """
     A callback to synchronize the world model with the Multiverse simulator.
     This callback will listen to the world model changes and update the Multiverse simulator accordingly.
@@ -58,39 +254,15 @@ class MultiverseSynchronizer(ModelChangeCallback):
 
     world: World
     simulator: MultiverseSimulator
+    kinematic_structure_entity_converter: Type[KinematicStructureEntityConverter]
+    shape_converter: Type[ShapeConverter]
+    connection_converter: Type[ConnectionConverter]
 
     def notify(self):
         for modification in self.world._model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity
-                if not self.spawn_kinematic_structure_entity(entity):
-                    raise RuntimeError(
-                        f"Failed to spawn kinematic structure entity {entity.name.name}."
-                    )
-                if isinstance(entity, Region):
-                    for shape in entity.area:
-                        if not self.spawn_geometry(
-                            entity=entity,
-                            shape=shape,
-                        ):
-                            raise RuntimeError(
-                                f"Failed to spawn geometry {shape} for region {entity.name.name}."
-                            )
-                elif isinstance(entity, Body):
-                    for shape in {
-                        id(s): s for s in entity.visual + entity.collision
-                    }.values():
-                        if not self.spawn_geometry(
-                            entity=entity,
-                            shape=shape,
-                        ):
-                            raise RuntimeError(
-                                f"Failed to spawn geometry {shape} for body {entity.name.name}."
-                            )
-                else:
-                    raise NotImplementedError(
-                        f"Can't parse entity type {type(entity)}."
-                    )
+                self.spawn_kinematic_structure_entity(entity)
 
     def stop(self):
         self.world.model_change_callbacks.remove(self)
@@ -105,30 +277,96 @@ class MultiverseSynchronizer(ModelChangeCallback):
         """
         raise NotImplementedError
 
-    def spawn_kinematic_structure_entity(
-        self, entity: KinematicStructureEntity
-    ) -> bool:
+    def spawn_kinematic_structure_entity(self, entity: KinematicStructureEntity):
         """
         Spawns a kinematic structure entity in the simulator.
 
         :param entity: The kinematic structure entity to spawn.
-        :return: True if the entity was spawned successfully, False otherwise.
         """
+
+        kinematic_structure_entity_props = (
+            self.kinematic_structure_entity_converter.convert(entity)
+        )
+        self._spawn_kinematic_structure_entity(
+            entity=entity,
+            kinematic_structure_entity_props=kinematic_structure_entity_props,
+        )
+
+        # for shape_props in self.kinematic_structure_entity_converter.get_shapes_props(
+        #     entity
+        # ):
+        #     self._spawn_shape(entity=entity, shape_props=shape_props)
+
+    @abstractmethod
+    def _spawn_kinematic_structure_entity(
+        self,
+        entity: KinematicStructureEntity,
+        kinematic_structure_entity_props: Dict[str, Any],
+    ):
         raise NotImplementedError
 
-    def spawn_geometry(self, entity: KinematicStructureEntity, shape: Shape) -> bool:
-        """
-        Spawns a geometry in the simulator.
+    @abstractmethod
+    def _spawn_shape(
+        self, entity: KinematicStructureEntity, shape_props: Dict[str, Any]
+    ):
+        raise NotImplementedError
 
-        :param entity: The parent entity of the geometry to spawn.
-        :param shape: The shape of the geometry to spawn.
-        :return: True if the geometry was spawned successfully, False otherwise.
-        """
+    @abstractmethod
+    def _spawn_connection(
+        self, entity: KinematicStructureEntity, connection_props: Dict[str, Any]
+    ):
         raise NotImplementedError
 
 
+@dataclass
 class MujocoSynchronizer(MultiverseSynchronizer):
     simulator: MultiverseMujocoConnector
+    kinematic_structure_entity_converter: Type[KinematicStructureEntityConverter] = (
+        field(default=MujocoKinematicStructureEntityConverter)
+    )
+    shape_converter: Type[ShapeConverter] = field(default=MujocoGeomConverter)
+    connection_converter: Type[ConnectionConverter] = field(
+        default=MujocoJointConverter
+    )
+
+    def _spawn_kinematic_structure_entity(
+        self,
+        entity: KinematicStructureEntity,
+        kinematic_structure_entity_props: Dict[str, Any],
+    ):
+        result = self.simulator.add_entity(
+            entity_name=entity.name.name,
+            entity_type="body",
+            entity_properties=kinematic_structure_entity_props,
+            parent_name=entity.parent_connection.parent.name.name,
+        )
+        if (
+            result.type
+            != MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+        ):
+            raise RuntimeError(
+                f"Failed to spawn kinematic structure entity {entity.name.name}, result: {result.info}."
+            )
+
+    def _spawn_shape(
+        self, entity: KinematicStructureEntity, shape_props: Dict[str, Any]
+    ):
+        self.simulator.add_entity(
+            entity_name=entity.name.name,
+            entity_type="geom",
+            entity_properties=shape_props,
+            parent_name=entity.parent_connection.parent.name.name,
+        )
+
+    def _spawn_connection(
+        self, entity: KinematicStructureEntity, connection_props: Dict[str, Any]
+    ):
+        self.simulator.add_entity(
+            entity_name=entity.name.name,
+            entity_type="joint",
+            entity_properties=connection_props,
+            parent_name=entity.parent_connection.parent.name.name,
+        )
 
     @classmethod
     def build_world(cls, world: World, file_path: str):
@@ -140,207 +378,203 @@ class MujocoSynchronizer(MultiverseSynchronizer):
                 continue
             body_name = body.name.name
             parent_body_name = body.parent_connection.parent.name.name
-            body_props = cls.kinematic_structure_entity_to_body_props(body)
-            body_spec = body_map[parent_body_name].add_body(
-                name=body.name.name, pos=body_props["pos"], quat=body_props["quat"]
-            )
-            assert body_spec is not None, f"Failed to add body {body_name}."
+            body_props = cls.kinematic_structure_entity_converter.convert(body)
+            parent_body_spec = body_map[parent_body_name]
+            body_spec = parent_body_spec.add_body(name=body_name, **body_props)
+            assert (
+                body_spec is not None
+            ), f"Failed to add body {body_name} to parent {parent_body_name}."
             body_map[body_name] = body_spec
-            for geom in {id(s): s for s in body.visual + body.collision}.values():
-                geom_props = cls.shape_to_geom_props(geom)
+
+            for shape in {id(s): s for s in body.visual + body.collision}.values():
+                geom_id = id(shape)
+                geom_props = cls.shape_converter.convert(shape)
                 geom_spec = body_spec.add_geom(
-                    name=f"{body_name}_{id(geom)}",
-                    type=geom_props["type"],
-                    pos=geom_props["pos"],
-                    quat=geom_props["quat"],
-                    size=geom_props["size"],
-                    rgba=geom_props["rgba"],
+                    name=f"{body_name}_{geom_id}", **geom_props
                 )
                 assert (
                     geom_spec is not None
-                ), f"Failed to add geom {geom} to body {body_name}."
+                ), f"Failed to add geom {geom_id} to body {body_name}."
         for connection in world.connections:
-            add_prefix = len(connection.dofs) == 1
+            if isinstance(connection, FixedConnection):
+                continue
             joint_name = connection.name.name
             child_body_name = connection.child.name.name
             child_body_spec = body_map[child_body_name]
-            joints_props = cls.connection_to_joints_props(connection)
-            for i, joint_props in enumerate(joints_props):
-                joint_spec = child_body_spec.add_joint(
-                    name=joint_name if add_prefix else f"{joint_name}_{i}",
-                    type=joint_props["type"],
-                    axis=joint_props["axis"],
-                    range=joint_props["range"],
-                )
-                assert (
-                    joint_spec is not None
-                ), f"Failed to add joint {joint_name} to body {child_body_name}."
+            joint_props = cls.connection_converter.convert(connection)
+            joint_spec = child_body_spec.add_joint(
+                name=joint_name,
+                **joint_props,
+            )
+            assert (
+                joint_spec is not None
+            ), f"Failed to add joint {joint_name} to body {child_body_name}."
         spec.compile()
         spec.to_file(file_path)
 
-    def spawn_kinematic_structure_entity(self, entity: Body) -> bool:
-        parent_body_name = entity.parent_connection.parent.name.name
-        entity_name = entity.name.name
-        body_props = self.kinematic_structure_entity_to_body_props(entity)
-        add_body_result = self.simulator.add_entity(
-            entity_name=entity_name,
-            entity_type="body",
-            entity_properties=body_props,
-            parent_name=parent_body_name,
-        )
-        return (
-            add_body_result.type
-            == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
-        )
-
-    def spawn_geometry(self, entity: KinematicStructureEntity, shape: Shape) -> bool:
-        parent_name = entity.name.name
-        if isinstance(entity, Region):
-            site_props = self.shape_to_geom_props(shape)
-            add_site_result = self.simulator.add_entity(
-                entity_name=f"{parent_name}_{id(shape)}",
-                entity_type="site",
-                entity_properties=site_props,
-                parent_name=parent_name,
-            )
-            return (
-                add_site_result.type
-                == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
-            )
-        elif isinstance(entity, Body):
-            geom_props = self.shape_to_geom_props(shape)
-            if shape in entity.collision and entity.visual:
-                geom_props["rgba"][3] = 0.0
-            add_geom_result = self.simulator.add_entity(
-                entity_name=f"{parent_name}_{id(shape)}",
-                entity_type="geom",
-                entity_properties=geom_props,
-                parent_name=parent_name,
-            )
-            return (
-                add_geom_result.type
-                == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
-            )
-        else:
-            raise NotImplementedError(f"Can't parse entity type {type(entity)}.")
-
-    @staticmethod
-    def kinematic_structure_entity_to_body_props(entity: Body) -> Dict[str, Any]:
-        """
-        Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse.
-
-        :param entity: The KinematicStructureEntity object to convert.
-        :return: A dictionary of body properties.
-        """
-        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(
-            entity.parent_connection.origin_expression
-        )
-        body_pos = [px, py, pz]
-        body_quat = [qw, qx, qy, qz]
-        return {
-            "pos": body_pos,
-            "quat": body_quat,
-        }
-
-    @staticmethod
-    def shape_to_geom_props(shape: Shape) -> Dict[str, Any]:
-        """
-        Converts a Shape object to a dictionary of geometry properties for Multiverse.
-
-        :param shape: The Shape object to convert.
-        :return: A dictionary of geometry properties.
-        """
-        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(shape.origin)
-        geom_pos = [px, py, pz]
-        geom_quat = [qw, qx, qy, qz]
-        r, g, b, a = (
-            shape.color.R,
-            shape.color.G,
-            shape.color.B,
-            shape.color.A,
-        )
-        geom_color = [r, g, b, a]
-        if isinstance(shape, Box):
-            size = [
-                symbol_manager.evaluate_expr(shape.scale.x) / 2,
-                symbol_manager.evaluate_expr(shape.scale.y) / 2,
-                symbol_manager.evaluate_expr(shape.scale.z) / 2,
-            ]
-            return {
-                "type": mujoco.mjtGeom.mjGEOM_BOX,
-                "pos": geom_pos,
-                "quat": geom_quat,
-                "size": size,
-                "rgba": geom_color,
-            }
-        elif isinstance(shape, Cylinder):
-            size = [
-                symbol_manager.evaluate_expr(shape.width) / 2,
-                symbol_manager.evaluate_expr(shape.height),
-                0.0,
-            ]
-            return {
-                "type": mujoco.mjtGeom.mjGEOM_CYLINDER,
-                "pos": geom_pos,
-                "quat": geom_quat,
-                "size": size,
-                "rgba": geom_color,
-            }
-        elif isinstance(shape, Sphere):
-            size = [
-                symbol_manager.evaluate_expr(shape.radius),
-                symbol_manager.evaluate_expr(shape.radius),
-                symbol_manager.evaluate_expr(shape.radius),
-            ]
-            return {
-                "type": mujoco.mjtGeom.mjGEOM_SPHERE,
-                "pos": geom_pos,
-                "quat": geom_quat,
-                "size": size,
-                "rgba": geom_color,
-            }
-        else:
-            raise NotImplementedError(
-                f"Shape type {type(shape)} is not implemented yet."
-            )
-
-    @staticmethod
-    def connection_to_joints_props(connection: Connection) -> List[Dict[str, Any]]:
-        """
-        Converts a Connection object to a list of dictionaries of joint properties for Multiverse.
-
-        :param connection: The Connection object to convert.
-        :return: A list of dictionaries of joint properties.
-        """
-
-        joints_props = []
-        for i, dof in enumerate(connection.dofs):
-            if isinstance(connection, RevoluteConnection):
-                joint_type = mujoco.mjtJoint.mjJNT_HINGE
-                joint_axis = connection.axis.to_np().tolist()[:3]
-                joint_range = [
-                    dof.lower_limits.position,
-                    dof.upper_limits.position,
-                ]
-            elif isinstance(connection, PrismaticConnection):
-                joint_type = mujoco.mjtJoint.mjJNT_SLIDE
-                joint_axis = connection.axis.to_np().tolist()[:3]
-                joint_range = [
-                    dof.lower_limits.position,
-                    dof.upper_limits.position,
-                ]
-            else:
-                raise NotImplementedError(
-                    f"Connection type {type(connection)} is not implemented yet."
-                )
-            joints_props.append(
-                {
-                    "type": joint_type,
-                    "axis": joint_axis,
-                    "range": joint_range,
-                }
-            )
-        return joints_props
+    # def spawn_kinematic_structure_entity(self, entity: Body) -> bool:
+    #     parent_body_name = entity.parent_connection.parent.name.name
+    #     entity_name = entity.name.name
+    #     body_props = self.kinematic_structure_entity_to_body_props(entity)
+    #     add_body_result = self.simulator.add_entity(
+    #         entity_name=entity_name,
+    #         entity_type="body",
+    #         entity_properties=body_props,
+    #         parent_name=parent_body_name,
+    #     )
+    #     return (
+    #         add_body_result.type
+    #         == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+    #     )
+    #
+    # def spawn_geometry(self, entity: KinematicStructureEntity, shape: Shape) -> bool:
+    #     parent_name = entity.name.name
+    #     if isinstance(entity, Region):
+    #         site_props = self.shape_to_geom_props(shape)
+    #         add_site_result = self.simulator.add_entity(
+    #             entity_name=f"{parent_name}_{id(shape)}",
+    #             entity_type="site",
+    #             entity_properties=site_props,
+    #             parent_name=parent_name,
+    #         )
+    #         return (
+    #             add_site_result.type
+    #             == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+    #         )
+    #     elif isinstance(entity, Body):
+    #         geom_props = self.shape_to_geom_props(shape)
+    #         if shape in entity.collision and entity.visual:
+    #             geom_props["rgba"][3] = 0.0
+    #         add_geom_result = self.simulator.add_entity(
+    #             entity_name=f"{parent_name}_{id(shape)}",
+    #             entity_type="geom",
+    #             entity_properties=geom_props,
+    #             parent_name=parent_name,
+    #         )
+    #         return (
+    #             add_geom_result.type
+    #             == MultiverseCallbackResult.ResultType.SUCCESS_AFTER_EXECUTION_ON_MODEL
+    #         )
+    #     else:
+    #         raise NotImplementedError(f"Can't parse entity type {type(entity)}.")
+    #
+    # @staticmethod
+    # def kinematic_structure_entity_to_body_props(entity: Body) -> Dict[str, Any]:
+    #     """
+    #     Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse.
+    #
+    #     :param entity: The KinematicStructureEntity object to convert.
+    #     :return: A dictionary of body properties.
+    #     """
+    #     px, py, pz, qw, qx, qy, qz = cas_pose_to_list(
+    #         entity.parent_connection.origin_expression
+    #     )
+    #     body_pos = [px, py, pz]
+    #     body_quat = [qw, qx, qy, qz]
+    #     return {
+    #         "pos": body_pos,
+    #         "quat": body_quat,
+    #     }
+    #
+    # @staticmethod
+    # def shape_to_geom_props(shape: Shape) -> Dict[str, Any]:
+    #     """
+    #     Converts a Shape object to a dictionary of geometry properties for Multiverse.
+    #
+    #     :param shape: The Shape object to convert.
+    #     :return: A dictionary of geometry properties.
+    #     """
+    #     px, py, pz, qw, qx, qy, qz = cas_pose_to_list(shape.origin)
+    #     geom_pos = [px, py, pz]
+    #     geom_quat = [qw, qx, qy, qz]
+    #     r, g, b, a = (
+    #         shape.color.R,
+    #         shape.color.G,
+    #         shape.color.B,
+    #         shape.color.A,
+    #     )
+    #     geom_color = [r, g, b, a]
+    #     if isinstance(shape, Box):
+    #         size = [
+    #             symbol_manager.evaluate_expr(shape.scale.x) / 2,
+    #             symbol_manager.evaluate_expr(shape.scale.y) / 2,
+    #             symbol_manager.evaluate_expr(shape.scale.z) / 2,
+    #         ]
+    #         return {
+    #             "type": mujoco.mjtGeom.mjGEOM_BOX,
+    #             "pos": geom_pos,
+    #             "quat": geom_quat,
+    #             "size": size,
+    #             "rgba": geom_color,
+    #         }
+    #     elif isinstance(shape, Cylinder):
+    #         size = [
+    #             symbol_manager.evaluate_expr(shape.width) / 2,
+    #             symbol_manager.evaluate_expr(shape.height),
+    #             0.0,
+    #         ]
+    #         return {
+    #             "type": mujoco.mjtGeom.mjGEOM_CYLINDER,
+    #             "pos": geom_pos,
+    #             "quat": geom_quat,
+    #             "size": size,
+    #             "rgba": geom_color,
+    #         }
+    #     elif isinstance(shape, Sphere):
+    #         size = [
+    #             symbol_manager.evaluate_expr(shape.radius),
+    #             symbol_manager.evaluate_expr(shape.radius),
+    #             symbol_manager.evaluate_expr(shape.radius),
+    #         ]
+    #         return {
+    #             "type": mujoco.mjtGeom.mjGEOM_SPHERE,
+    #             "pos": geom_pos,
+    #             "quat": geom_quat,
+    #             "size": size,
+    #             "rgba": geom_color,
+    #         }
+    #     else:
+    #         raise NotImplementedError(
+    #             f"Shape type {type(shape)} is not implemented yet."
+    #         )
+    #
+    # @staticmethod
+    # def connection_to_joints_props(connection: Connection) -> List[Dict[str, Any]]:
+    #     """
+    #     Converts a Connection object to a list of dictionaries of joint properties for Multiverse.
+    #
+    #     :param connection: The Connection object to convert.
+    #     :return: A list of dictionaries of joint properties.
+    #     """
+    #
+    #     joints_props = []
+    #     for i, dof in enumerate(connection.dofs):
+    #         if isinstance(connection, RevoluteConnection):
+    #             joint_type = mujoco.mjtJoint.mjJNT_HINGE
+    #             joint_axis = connection.axis.to_np().tolist()[:3]
+    #             joint_range = [
+    #                 dof.lower_limits.position,
+    #                 dof.upper_limits.position,
+    #             ]
+    #         elif isinstance(connection, PrismaticConnection):
+    #             joint_type = mujoco.mjtJoint.mjJNT_SLIDE
+    #             joint_axis = connection.axis.to_np().tolist()[:3]
+    #             joint_range = [
+    #                 dof.lower_limits.position,
+    #                 dof.upper_limits.position,
+    #             ]
+    #         else:
+    #             raise NotImplementedError(
+    #                 f"Connection type {type(connection)} is not implemented yet."
+    #             )
+    #         joints_props.append(
+    #             {
+    #                 "type": joint_type,
+    #                 "axis": joint_axis,
+    #                 "range": joint_range,
+    #             }
+    #         )
+    #     return joints_props
 
 
 class MultiSim:
