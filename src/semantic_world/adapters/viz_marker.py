@@ -1,8 +1,10 @@
 import atexit
 import threading
 import time
+from dataclasses import dataclass
 
 import numpy as np
+import rclpy.node
 
 from .. import logger
 from ..callbacks.callback import StateChangeCallback
@@ -30,37 +32,35 @@ from ..world_description.geometry import (
 )
 from ..world import World
 
-
+@dataclass
 class VizMarkerPublisher(StateChangeCallback):
     """
     Publishes an Array of visualization marker which represent the situation in the World
     """
 
-    def __init__(
-        self,
-        world: World,
-        node,
-        topic_name="/semworld/viz_marker",
-        interval=0.1,
-        reference_frame="map",
-    ):
-        """
-        The Publisher creates an Array of Visualization marker with a Marker for each body in the World and publishes
-        it to the given topic name at a fixed interval. The publisher automatically stops publishing when the process
-        is killed.
+    node: rclpy.node.Node
+    """
+    The ROS2 node that will be used to publish the visualization marker.
+    """
 
-        :param world: The World to which the Visualization Marker should be published.
-        :param node: The ROS2 node that will be used to publish the visualization marker.
-        :param topic_name: The name of the topic to which the Visualization Marker should be published.
-        :param interval: The interval at which the visualization marker should be published, in seconds.
-        :param reference_frame: The reference frame of the visualization marker.
-        """
-        self.interval = interval
-        self.reference_frame = reference_frame
-        self.world = world
-        self.node = node
+    topic_name: str = "/semworld/viz_marker"
+    """
+    The name of the topic to which the Visualization Marker should be published.
+    """
 
-        self.pub = self.node.create_publisher(MarkerArray, topic_name, 10)
+    reference_frame: str = "map"
+    """
+    The reference frame of the visualization marker.
+    """
+
+    def __post_init__(self):
+        """
+        Initializes the publisher and registers the callback to the world.
+        """
+        super().__post_init__()
+        self.pub = self.node.create_publisher(MarkerArray, self.topic_name, 10)
+        time.sleep(0.2)
+        self.notify()
 
     def notify(self):
         """
@@ -101,7 +101,7 @@ class VizMarkerPublisher(StateChangeCallback):
                     if isinstance(collision, Primitive)
                     else ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
                 )
-                msg.lifetime = Duration(sec=1)
+                msg.lifetime = Duration(sec=100)
 
                 if isinstance(collision, FileMesh):
                     msg.type = Marker.MESH_RESOURCE
