@@ -7,7 +7,7 @@ from mujoco_connector import MultiverseMujocoConnector
 from multiverse_simulator import MultiverseSimulatorState, MultiverseViewer
 
 from semantic_world.adapters.multi_parser import MultiParser
-from semantic_world.adapters.multi_sim import MultiSim
+from semantic_world.adapters.multi_sim import MujocoSim
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.world import World
@@ -185,7 +185,7 @@ class MultiverseMujocoConnectorTestCase(unittest.TestCase):
         self.assertIs(simulator.state, MultiverseSimulatorState.STOPPED)
 
 
-class MultiSimTestCase(unittest.TestCase):
+class MujocoSimTestCase(unittest.TestCase):
     test_urdf = os.path.normpath(os.path.join(urdf_dir, "simple_two_arm_robot.urdf"))
     test_mjcf = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
     step_size = 1e-3
@@ -197,7 +197,7 @@ class MultiSimTestCase(unittest.TestCase):
     def test_empty_multi_sim_in_5s(self):
         world = World()
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(viewer=viewer, world=world, headless=headless)
+        multi_sim = MujocoSim(viewer=viewer, world=world, headless=headless)
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
         self.assertEqual(multi_sim.simulator.file_path, "/tmp/scene.xml")
         self.assertIs(multi_sim.simulator.headless, headless)
@@ -210,7 +210,7 @@ class MultiSimTestCase(unittest.TestCase):
 
     def test_world_multi_sim_in_5s(self):
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_world, headless=headless
         )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
@@ -225,7 +225,7 @@ class MultiSimTestCase(unittest.TestCase):
 
     def test_world_multi_sim_with_change(self):
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             viewer=viewer, world=self.test_urdf_world, headless=headless
         )
         self.assertIsInstance(multi_sim.simulator, MultiverseMujocoConnector)
@@ -302,7 +302,7 @@ class MultiSimTestCase(unittest.TestCase):
     @unittest.skip("Dynamics not there yet")
     def test_multi_sim_in_5s(self):
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             world=self.test_mjcf_world,
             viewer=viewer,
             headless=headless,
@@ -334,7 +334,7 @@ class MultiSimTestCase(unittest.TestCase):
             "box": {"position": [0.0, 0.0, 0.0], "quaternion": [1.0, 0.0, 0.0, 0.0]},
         }
         viewer = MultiverseViewer(read_objects=read_objects)
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             world=self.test_mjcf_world,
             viewer=viewer,
             headless=headless,
@@ -357,7 +357,7 @@ class MultiSimTestCase(unittest.TestCase):
     def test_write_objects_to_multi_sim_in_5s(self):
         write_objects = {"box": {"position": [0.0, 0.0, 0.0]}}
         viewer = MultiverseViewer(write_objects=write_objects)
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             world=self.test_mjcf_world,
             viewer=viewer,
             headless=headless,
@@ -389,7 +389,7 @@ class MultiSimTestCase(unittest.TestCase):
             "box": {"position": [0.0, 0.0, 0.0], "quaternion": [1.0, 0.0, 0.0, 0.0]}
         }
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             world=self.test_mjcf_world,
             viewer=viewer,
             headless=headless,
@@ -425,7 +425,7 @@ class MultiSimTestCase(unittest.TestCase):
             "box": {"position": [0.0, 0.0, 0.0], "quaternion": [1.0, 0.0, 0.0, 0.0]}
         }
         viewer = MultiverseViewer()
-        multi_sim = MultiSim(
+        multi_sim = MujocoSim(
             world=self.test_mjcf_world,
             viewer=viewer,
             headless=headless,
