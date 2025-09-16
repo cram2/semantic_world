@@ -29,4 +29,5 @@ ortools
 fbxloader
 coacd
 pymysql
+mujoco==3.3.5
 multiverse-simulators==0.0.7
