@@ -92,7 +92,7 @@ class WorldEntityConverter(ABC):
             self.name_str: (
                 entity.name.name
                 if hasattr(entity, "name") and isinstance(entity.name, PrefixedName)
-                else f"{type(entity).__name__}_{id(entity)}"
+                else f"{type(entity).__name__.lower()}_{id(entity)}"
             )
         }
 
