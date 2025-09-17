@@ -157,13 +157,15 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
 
     def _convert(self, entity: Body, **kwargs) -> Dict[str, Any]:
         body_props = KinematicStructureEntityConverter._convert(self, entity)
-        mass, inertia_pos, inertia_quat, diagonal_inertia = self._compute_inertial(
-            mass=kwargs.get("mass", 1e-3),
-            inertia_pos=kwargs.get("inertia_pos", [0.0, 0.0, 0.0]),
-            inertia_quat=kwargs.get("inertia_quat", [1.0, 0.0, 0.0, 0.0]),
-            diagonal_inertia=kwargs.get("diagonal_inertia"),
-            inertia=kwargs.get("inertia"),
-            inertia_matrix=kwargs.get("inertia_matrix"),
+        mass, inertia_pos, inertia_quat, diagonal_inertia = (
+            self._compute_inertial(  # TODO: get values from entity
+                mass=1e-3,
+                inertia_pos=[0.0, 0.0, 0.0],
+                inertia_quat=[1.0, 0.0, 0.0, 0.0],
+                diagonal_inertia=[1.5e-8, 1.5e-8, 1.5e-8],  # Either this
+                inertia=None,  # Or this
+                inertia_matrix=None,  # Or this
+            )
         )
         body_props[self.mass_str] = mass
         body_props[self.inertia_pos_str] = inertia_pos
@@ -592,6 +594,31 @@ class MujocoBuilder(MultiSimBuilder):
     def _end_build(self, file_path: str):
         self.spec.compile()
         self.spec.to_file(file_path)
+        try:
+            mujoco.MjModel.from_xml_path(file_path)
+        except ValueError as e:
+            if (
+                "Error: mass and inertia of moving bodies must be larger than mjMINVAL"
+                in str(e)
+            ):  # Fix mujoco error
+                import xml.etree.ElementTree as ET
+
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+                for body_id, body_element in enumerate(root.findall(".//body")):
+                    body_spec = self.spec.bodies[body_id + 1]
+                    inertial_element = ET.SubElement(body_element, "inertial")
+                    inertial_element.set("mass", f"{body_spec.mass}")
+                    inertial_element.set(
+                        "diaginertia", " ".join(map(str, body_spec.inertia.tolist()))
+                    )
+                    inertial_element.set(
+                        "pos", " ".join(map(str, body_spec.ipos.tolist()))
+                    )
+                    inertial_element.set(
+                        "quat", " ".join(map(str, body_spec.iquat.tolist()))
+                    )
+                tree.write(file_path)
 
     def _build_body(self, body: Body):
         self._build_mujoco_body(body=body)
