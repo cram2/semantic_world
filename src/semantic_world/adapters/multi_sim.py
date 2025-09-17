@@ -139,12 +139,34 @@ class KinematicStructureEntityConverter(WorldEntityConverter):
 
 class BodyConverter(KinematicStructureEntityConverter, ABC):
     def _convert(self, entity: Body) -> Dict[str, Any]:
-        return KinematicStructureEntityConverter._convert(self, entity)
+        body_props = KinematicStructureEntityConverter._convert(self, entity)
+        body_props.update(self._convert_body(entity))
+        return body_props
+
+    @abstractmethod
+    def _convert_body(self, entity: Body) -> Dict[str, Any]:
+        """
+        Converts a Body object to a dictionary of additional properties for Multiverse.
+
+        :param entity: The Body object to convert.
+        :return: A dictionary of additional properties.
+        """
+        raise NotImplementedError
 
 
 class RegionConverter(KinematicStructureEntityConverter, ABC):
     def _convert(self, entity: Region) -> Dict[str, Any]:
         return KinematicStructureEntityConverter._convert(self, entity)
+
+    @abstractmethod
+    def _convert_region(self, entity: Region) -> Dict[str, Any]:
+        """
+        Converts a Region object to a dictionary of additional properties for Multiverse.
+
+        :param entity: The Region object to convert.
+        :return: A dictionary of additional properties.
+        """
+        raise NotImplementedError
 
 
 class ShapeConverter(WorldEntityConverter):
@@ -191,29 +213,75 @@ class ShapeConverter(WorldEntityConverter):
 
 class BoxConverter(ShapeConverter, ABC):
     def _convert(self, entity: Box) -> Dict[str, Any]:
-        return ShapeConverter._convert(self, entity)
+        shape_props = ShapeConverter._convert(self, entity)
+        shape_props.update(self._convert_box(entity))
+        return shape_props
+
+    @abstractmethod
+    def _convert_box(self, entity: Box) -> Dict[str, Any]:
+        """
+        Converts a Box object to a dictionary of additional properties for Multiverse.
+
+        :param entity: The Box object to convert.
+        :return: A dictionary of additional properties.
+        """
+        raise NotImplementedError
 
 
 class SphereConverter(ShapeConverter, ABC):
     def _convert(self, entity: Sphere) -> Dict[str, Any]:
-        return ShapeConverter._convert(self, entity)
+        shape_props = ShapeConverter._convert(self, entity)
+        shape_props.update(self._convert_sphere(entity))
+        return shape_props
+
+    @abstractmethod
+    def _convert_sphere(self, entity: Sphere) -> Dict[str, Any]:
+        """
+        Converts a Sphere object to a dictionary of additional properties for Multiverse.
+
+        :param entity: The Sphere object to convert.
+        :return: A dictionary of additional properties.
+        """
+        raise NotImplementedError
 
 
 class CylinderConverter(ShapeConverter, ABC):
     def _convert(self, entity: Cylinder) -> Dict[str, Any]:
-        return ShapeConverter._convert(self, entity)
+        shape_props = ShapeConverter._convert(self, entity)
+        shape_props.update(self._convert_cylinder(entity))
+        return shape_props
+
+    @abstractmethod
+    def _convert_cylinder(self, entity: Cylinder) -> Dict[str, Any]:
+        """
+        Converts a Cylinder object to a dictionary of additional properties for Multiverse.
+
+        :param entity: The Cylinder object to convert.
+        :return: A dictionary of additional properties.
+        """
+        raise NotImplementedError
 
 
 class ConnectionConverter(WorldEntityConverter):
-    @abstractmethod
+    pos_name: str
+    quat_name: str
+
     def _convert(self, entity: Connection) -> Dict[str, Any]:
         """
         Converts a Connection object to a dictionary of joint properties for Multiverse.
 
         :param entity: The Connection object to convert.
-        :return: A dictionary of joint properties.
+        :return: A dictionary of joint properties, by default containing position and quaternion.
         """
-        raise NotImplementedError
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity.origin)
+        joint_pos = [px, py, pz]
+        joint_quat = [qw, qx, qy, qz]
+        joint_props = {
+            self.pos_name: joint_pos,
+            self.quat_name: joint_quat,
+        }
+        joint_props.update(self._convert_joint(entity))
+        return joint_props
 
     @abstractmethod
     def _convert_joint(self, entity: Connection) -> Dict[str, Any]:
@@ -227,36 +295,53 @@ class ConnectionConverter(WorldEntityConverter):
 
 
 class Connection1DOFConverter(ConnectionConverter):
-    type: Any
     axis_name: str
     range_name: str
 
-    @abstractmethod
     def _convert(self, entity: ActiveConnection1DOF) -> Dict[str, Any]:
         """
-        Converts a 1-DOF Connection object to a dictionary of joint properties for Multiverse.
+        Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse.
 
-        :param entity: The 1-DOF Connection object to convert.
-        :return: A dictionary of joint properties, by default containing axis and range.
+        :param entity: The ActiveConnection1DOF object to convert.
+        :return: A dictionary of joint properties, including additional axis and range properties.
         """
+        joint_props = ConnectionConverter._convert(self, entity)
         assert len(entity.dofs) == 1, "ActiveConnection1DOF must have exactly one DOF."
         dof = list(entity.dofs)[0]
-        joint_props = {
-            self.axis_name: entity.axis.to_np().tolist()[:3],
-            self.range_name: [dof.lower_limits.position, dof.upper_limits.position],
-        }
-        joint_props.update(self._convert_joint(entity))
+        joint_props.update(
+            {
+                self.axis_name: entity.axis.to_np().tolist()[:3],
+                self.range_name: [dof.lower_limits.position, dof.upper_limits.position],
+            }
+        )
+        joint_props.update(self._convert_joint_1dof(entity))
         return joint_props
+
+    @abstractmethod
+    def _convert_joint_1dof(self, entity: ActiveConnection1DOF) -> Dict[str, Any]:
+        raise NotImplementedError
 
 
 class ConnectionRevoluteConverter(Connection1DOFConverter, ABC):
     def _convert(self, entity: RevoluteConnection) -> Dict[str, Any]:
-        return Connection1DOFConverter._convert(self, entity)
+        joint_props = Connection1DOFConverter._convert(self, entity)
+        joint_props.update(self._convert_joint_revolute(entity))
+        return joint_props
+
+    @abstractmethod
+    def _convert_joint_revolute(self, entity: RevoluteConnection) -> Dict[str, Any]:
+        raise NotImplementedError
 
 
 class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
     def _convert(self, entity: PrismaticConnection) -> Dict[str, Any]:
-        return Connection1DOFConverter._convert(self, entity)
+        joint_props = Connection1DOFConverter._convert(self, entity)
+        joint_props.update(self._convert_joint_prismatic(entity))
+        return joint_props
+
+    @abstractmethod
+    def _convert_joint_prismatic(self, entity: PrismaticConnection) -> Dict[str, Any]:
+        raise NotImplementedError
 
 
 class MujocoGeomConverter(ShapeConverter):
@@ -268,39 +353,28 @@ class MujocoGeomConverter(ShapeConverter):
     def _convert_shape(self, entity: Shape) -> Dict[str, Any]:
         return {
             "type": self.type,
-            "size": self._get_size(entity),
         }
-
-    @abstractmethod
-    def _get_size(self, entity: Shape) -> List[float]:
-        """
-        Gets the size of the shape for Mujoco.
-
-        :param entity: The Shape object to get the size from.
-        :return: A list of floats representing the size.
-        """
-        raise NotImplementedError
 
 
 class MujocoBoxConverter(MujocoGeomConverter, BoxConverter):
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_BOX
 
-    def _get_size(self, entity: Box) -> List[float]:
-        return [entity.scale.x / 2, entity.scale.y / 2, entity.scale.z / 2]
+    def _convert_box(self, entity: Box) -> Dict[str, Any]:
+        return {"size": [entity.scale.x / 2, entity.scale.y / 2, entity.scale.z / 2]}
 
 
 class MujocoSphereConverter(MujocoGeomConverter, SphereConverter):
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_SPHERE
 
-    def _get_size(self, entity: Sphere) -> List[float]:
-        return [entity.radius, entity.radius, entity.radius]
+    def _convert_sphere(self, entity: Sphere) -> Dict[str, Any]:
+        return {"size": [entity.radius, entity.radius, entity.radius]}
 
 
 class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
     type: mujoco.mjtGeom = mujoco.mjtGeom.mjGEOM_CYLINDER
 
-    def _get_size(self, entity: Cylinder) -> List[float]:
-        return [entity.width / 2, entity.height, 0.0]
+    def _convert_cylinder(self, entity: Cylinder) -> Dict[str, Any]:
+        return {"size": [entity.width / 2, entity.height, 0.0]}
 
 
 class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter):
@@ -313,19 +387,23 @@ class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter)
         return {}
 
 
-class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter): ...
+class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter):
+    def _convert_body(self, entity: Body) -> Dict[str, Any]:
+        return {}
 
 
-class MujocoRegionConverter(
-    MujocoKinematicStructureEntityConverter, RegionConverter
-): ...
+class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConverter):
+    def _convert_region(self, entity: Region) -> Dict[str, Any]:
+        return {}
 
 
 class MujocoJointConverter(ConnectionConverter, ABC):
+    pos_name: str = "pos"
+    quat_name: str = "quat"
     type: mujoco.mjtJoint
 
 
-class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter, ABC):
+class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
     axis_name: str = "axis"
     range_name: str = "range"
 
@@ -334,17 +412,26 @@ class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter, AB
             "type": self.type,
         }
 
+    def _convert_joint_1dof(self, entity: ActiveConnection1DOF) -> Dict[str, Any]:
+        return {}
+
 
 class MujocoRevoluteJointConverter(
     Mujoco1DOFJointConverter, ConnectionRevoluteConverter
 ):
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_HINGE
 
+    def _convert_joint_revolute(self, entity: RevoluteConnection) -> Dict[str, Any]:
+        return {}
+
 
 class MujocoPrismaticJointConverter(
     Mujoco1DOFJointConverter, ConnectionPrismaticConverter
 ):
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_SLIDE
+
+    def _convert_joint_prismatic(self, entity: PrismaticConnection) -> Dict[str, Any]:
+        return {}
 
 
 @dataclass
@@ -517,6 +604,10 @@ class MujocoBuilder(MultiSimBuilder):
         child_body_spec = self._find_entity("body", child_body_name)
         assert child_body_spec is not None, f"Child body {child_body_name} not found."
         joint_name = connection.name.name
+        assert numpy.allclose(
+            joint_props["quat"], [1.0, 0.0, 0.0, 0.0]
+        ), "Joint rotation not supported yet."  # TODO: Rotate joint axis
+        del joint_props["quat"]
         joint_spec = child_body_spec.add_joint(
             name=joint_name,
             **joint_props,
