@@ -3,7 +3,16 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from types import NoneType
-from typing import Dict, List, Any, ClassVar, Type, Optional, get_type_hints, Union
+from typing import (
+    Dict,
+    List,
+    Any,
+    ClassVar,
+    Type,
+    Optional,
+    Union,
+    Tuple,
+)
 
 import numpy
 from mujoco_connector import MultiverseMujocoConnector
@@ -16,6 +25,7 @@ from multiverse_simulator import (
     MultiverseCallbackResult,
 )
 from random_events.utils import recursive_subclasses
+from scipy.spatial.transform import Rotation
 
 from ..callbacks.callback import ModelChangeCallback
 from ..datastructures.prefixed_name import PrefixedName
@@ -36,8 +46,6 @@ from ..world_description.world_entity import (
     WorldEntity,
 )
 from ..world_description.world_modification import (
-    WorldModelModificationBlock,
-    AddDegreeOfFreedomModification,
     AddKinematicStructureEntityModification,
 )
 from ..spatial_types.symbol_manager import symbol_manager
@@ -57,35 +65,37 @@ def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
     return [px, py, pz, qw, qx, qy, qz]
 
 
-class WorldEntityConverter(ABC):
+class EntityConverter(ABC):
+    """
+    A converter to convert an entity object (WorldEntity, Shape) to a dictionary of properties for Multiverse simulator.
+    """
+
+    entity_type: ClassVar[Type[Any]] = Any
     name_str: str = "name"
 
-    """
-    A converter to convert a WorldEntity object to a dictionary of properties for Multiverse simulator.
-    """
-
     @classmethod
-    def convert(cls, entity: Any, **kwargs) -> Optional[Dict[str, Any]]:
+    def convert(cls, entity: entity_type, **kwargs) -> Dict[str, Any]:  # type: ignore
         """
-        Converts a WorldEntity object to a dictionary of properties for Multiverse.
+        Converts an entity object to a dictionary of properties for Multiverse simulator.
 
-        :param entity: The WorldEntity object to convert.
-        :return: A dictionary of properties if conversion is successful, None otherwise.
+        :param entity: The object to convert.
+        :return: A dictionary of properties.
         """
-        if type(entity) is cls.get_type():
-            entity_props = cls()._convert(entity, **kwargs)
-            return cls()._post_convert(entity, entity_props, **kwargs)
         for subclass in recursive_subclasses(cls):
-            result = subclass.convert(entity, **kwargs)
-            if result is not None:
-                return result
-        return None
+            if (
+                not inspect.isabstract(subclass)
+                and not inspect.isabstract(subclass.entity_type)
+                and type(entity) is subclass.entity_type
+            ):
+                entity_props = subclass()._convert(entity, **kwargs)
+                return subclass()._post_convert(entity, entity_props, **kwargs)
+        raise NotImplementedError(f"No converter found for entity type {type(entity)}.")
 
-    def _convert(self, entity: Any, **kwargs) -> Dict[str, Any]:
+    def _convert(self, entity: entity_type, **kwargs) -> Dict[str, Any]:  # type: ignore
         """
         The actual conversion method to be implemented by subclasses.
 
-        :param entity: The WorldEntity object to convert.
+        :param entity: The object to convert.
         :return: A dictionary of properties, by default containing the name.
         """
         return {
@@ -98,41 +108,32 @@ class WorldEntityConverter(ABC):
 
     @abstractmethod
     def _post_convert(
-        self, entity: WorldEntity, entity_props: Dict[str, Any], **kwargs
+        self, entity: entity_type, entity_props: Dict[str, Any], **kwargs  # type: ignore
     ) -> Dict[str, Any]:
         """
         Post-processes the converted entity properties. This method can be overridden by subclasses to update the properties after conversion.
 
-        :param entity: The WorldEntity object that was converted.
+        :param entity: The object that was converted.
         :param entity_props: The dictionary of properties that was converted.
         :return: The updated dictionary of properties.
         """
         raise NotImplementedError
 
-    @classmethod
-    def get_type(cls) -> Optional[Type]:
-        """
-        Gets the type of WorldEntity that this converter can convert.
-        :return: The type of WorldEntity, or None if the converter is abstract.
-        """
-        if inspect.isabstract(cls):
-            return None
-        hints = get_type_hints(cls._convert)
-        return hints.get("entity", NoneType)
 
+class KinematicStructureEntityConverter(EntityConverter, ABC):
+    entity_type: ClassVar[Type[KinematicStructureEntity]] = KinematicStructureEntity
+    pos_str: str
+    quat_str: str
 
-class KinematicStructureEntityConverter(WorldEntityConverter, ABC):
-    pos_name: str
-    quat_name: str
-
-    def _convert(self, entity: KinematicStructureEntity, **kwargs) -> Dict[str, Any]:
+    def _convert(self, entity: entity_type, **kwargs) -> Dict[str, Any]:
         """
         Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse.
 
         :param entity: The KinematicStructureEntity object to convert.
         :return: A dictionary of body properties, by default containing position and quaternion.
         """
-        kinematic_structure_entity_props = WorldEntityConverter._convert(self, entity)
+
+        kinematic_structure_entity_props = EntityConverter._convert(self, entity)
         px, py, pz, qw, qx, qy, qz = cas_pose_to_list(
             entity.parent_connection.origin_expression
         )
@@ -140,28 +141,109 @@ class KinematicStructureEntityConverter(WorldEntityConverter, ABC):
         kinematic_structure_entity_quat = [qw, qx, qy, qz]
         kinematic_structure_entity_props.update(
             {
-                self.pos_name: kinematic_structure_entity_pos,
-                self.quat_name: kinematic_structure_entity_quat,
+                self.pos_str: kinematic_structure_entity_pos,
+                self.quat_str: kinematic_structure_entity_quat,
             }
         )
         return kinematic_structure_entity_props
 
 
 class BodyConverter(KinematicStructureEntityConverter, ABC):
+    entity_type: ClassVar[Type[WorldEntity]] = Body
+    mass_str: str
+    inertia_pos_str: str
+    inertia_quat_str: str
+    diagonal_inertia_str: str
+
     def _convert(self, entity: Body, **kwargs) -> Dict[str, Any]:
-        return KinematicStructureEntityConverter._convert(self, entity)
+        body_props = KinematicStructureEntityConverter._convert(self, entity)
+        mass, inertia_pos, inertia_quat, diagonal_inertia = self._compute_inertial(
+            mass=kwargs.get("mass", 1e-3),
+            inertia_pos=kwargs.get("inertia_pos", [0.0, 0.0, 0.0]),
+            inertia_quat=kwargs.get("inertia_quat", [1.0, 0.0, 0.0, 0.0]),
+            diagonal_inertia=kwargs.get("diagonal_inertia"),
+            inertia=kwargs.get("inertia"),
+            inertia_matrix=kwargs.get("inertia_matrix"),
+        )
+        body_props[self.mass_str] = mass
+        body_props[self.inertia_pos_str] = inertia_pos
+        body_props[self.inertia_quat_str] = inertia_quat
+        body_props[self.diagonal_inertia_str] = diagonal_inertia
+        return body_props
+
+    @staticmethod
+    def _compute_inertial(
+        mass: float,
+        inertia_pos: List[float],
+        inertia_quat: List[float],
+        diagonal_inertia: Optional[List[float]] = None,
+        inertia: Optional[List[float]] = None,
+        inertia_matrix: Optional[List[float]] = None,
+    ) -> Tuple[float, List[float], List[float], List[float]]:
+        """
+        Computes the inertial properties of a body.
+        If `diagonal_inertia` is given, it is used directly.
+        If `inertia` or `inertia_matrix` is given, they are converted to diagonal form and `inertia_quat` is updated.
+        If none are provided, default values are applied.
+        The order of precedence is: diagonal_inertia > inertia > inertia_matrix > default values.
+
+        :param mass: The mass of the body.
+        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
+        :param diagonal_inertia: The diagonal elements of the inertia tensor [Ixx, Iyy, Izz].
+        :param inertia: The inertia tensor in the form [Ixx, Iyy, Izz, Ixy, Ixz, Iyz].
+        :param inertia_matrix: The inertia tensor as a 3x3 matrix in row-major order [Ixx, Ixy, Ixz, Iyx, Iyy, Iyz, Izx, Izy, Izz].
+        :return: A tuple containing the resulting mass, inertia position (center of mass), inertia quaternion, and diagonal inertia.
+        """
+        # Case 1: diagonal_inertia is provided directly
+        if diagonal_inertia is not None:
+            return mass, inertia_pos, inertia_quat, diagonal_inertia
+
+        # Case 2: inertia is provided as [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]
+        if inertia is not None:
+            Ixx, Iyy, Izz, Ixy, Ixz, Iyz = inertia
+            I = numpy.array([[Ixx, Ixy, Ixz], [Ixy, Iyy, Iyz], [Ixz, Iyz, Izz]])
+        # Case 3: inertia_matrix is provided as row-major 3x3
+        elif inertia_matrix is not None:
+            I = numpy.array(inertia_matrix).reshape(3, 3)
+        # Case 4: default inertia
+        else:
+            I = numpy.eye(3) * 1.5e-8
+
+        # Check if inertia is already (approximately) diagonal
+        off_diag = I - numpy.diag(numpy.diag(I))
+        if numpy.allclose(off_diag, 0.0):
+            return mass, inertia_pos, inertia_quat, numpy.diag(I).tolist()
+
+        # Diagonalize inertia tensor
+        eigenvalues, eigenvectors = numpy.linalg.eigh(I)
+
+        # Sort eigenvalues/eigenvectors for consistency
+        idx = numpy.argsort(eigenvalues)
+        eigenvalues = eigenvalues[idx]
+        eigenvectors = eigenvectors[:, idx]
+
+        # Ensure right-handed basis
+        if numpy.linalg.det(eigenvectors) < 0:
+            eigenvectors[:, 0] *= -1
+
+        R_orig = Rotation.from_quat(quat=inertia_quat, scalar_first=True)  # type: ignore
+        R_diag = Rotation.from_matrix(eigenvectors)  # type: ignore
+        R_new = R_orig * R_diag
+        inertia_quat = R_new.as_quat(scalar_first=True).tolist()
+
+        return mass, inertia_pos, inertia_quat, eigenvalues.tolist()
 
 
 class RegionConverter(KinematicStructureEntityConverter, ABC):
-    def _convert(self, entity: Region, **kwargs) -> Dict[str, Any]:
-        return KinematicStructureEntityConverter._convert(self, entity)
+    entity_type: ClassVar[Type[WorldEntity]] = Region
 
 
-class ShapeConverter(WorldEntityConverter, ABC):
-    pos_name: str
-    quat_name: str
-    rgba_name: str
-    visible: bool
+class ShapeConverter(EntityConverter, ABC):
+    entity_type: ClassVar[Type[Shape]] = Shape
+    pos_str: str
+    quat_str: str
+    rgba_str: str
 
     def _convert(self, entity: Shape, **kwargs) -> Dict[str, Any]:
         """
@@ -170,7 +252,7 @@ class ShapeConverter(WorldEntityConverter, ABC):
         :param entity: The Shape object to convert.
         :return: A dictionary of shape properties, by default containing position, quaternion, and RGBA color.
         """
-        geom_props = WorldEntityConverter._convert(self, entity)
+        geom_props = EntityConverter._convert(self, entity)
         px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity.origin)
         geom_pos = [px, py, pz]
         geom_quat = [qw, qx, qy, qz]
@@ -183,32 +265,30 @@ class ShapeConverter(WorldEntityConverter, ABC):
         geom_color = [r, g, b, a]
         geom_props.update(
             {
-                self.pos_name: geom_pos,
-                self.quat_name: geom_quat,
-                self.rgba_name: geom_color,
+                self.pos_str: geom_pos,
+                self.quat_str: geom_quat,
+                self.rgba_str: geom_color,
             }
         )
         return geom_props
 
 
 class BoxConverter(ShapeConverter, ABC):
-    def _convert(self, entity: Box, **kwargs) -> Dict[str, Any]:
-        return ShapeConverter._convert(self, entity)
+    entity_type: ClassVar[Type[Box]] = Box
 
 
 class SphereConverter(ShapeConverter, ABC):
-    def _convert(self, entity: Sphere, **kwargs) -> Dict[str, Any]:
-        return ShapeConverter._convert(self, entity)
+    entity_type: ClassVar[Type[Sphere]] = Sphere
 
 
 class CylinderConverter(ShapeConverter, ABC):
-    def _convert(self, entity: Cylinder, **kwargs) -> Dict[str, Any]:
-        return ShapeConverter._convert(self, entity)
+    entity_type: ClassVar[Type[Cylinder]] = Cylinder
 
 
-class ConnectionConverter(WorldEntityConverter, ABC):
-    pos_name: str
-    quat_name: str
+class ConnectionConverter(EntityConverter, ABC):
+    entity_type: ClassVar[Type[Connection]] = Connection
+    pos_str: str
+    quat_str: str
 
     def _convert(self, entity: Connection, **kwargs) -> Dict[str, Any]:
         """
@@ -217,22 +297,23 @@ class ConnectionConverter(WorldEntityConverter, ABC):
         :param entity: The Connection object to convert.
         :return: A dictionary of joint properties, by default containing position and quaternion.
         """
-        joint_props = WorldEntityConverter._convert(self, entity)
+        joint_props = EntityConverter._convert(self, entity)
         px, py, pz, qw, qx, qy, qz = cas_pose_to_list(entity.origin)
         joint_pos = [px, py, pz]
         joint_quat = [qw, qx, qy, qz]
         joint_props.update(
             {
-                self.pos_name: joint_pos,
-                self.quat_name: joint_quat,
+                self.pos_str: joint_pos,
+                self.quat_str: joint_quat,
             }
         )
         return joint_props
 
 
 class Connection1DOFConverter(ConnectionConverter, ABC):
-    axis_name: str
-    range_name: str
+    entity_type: ClassVar[Type[ActiveConnection1DOF]] = ActiveConnection1DOF
+    axis_str: str
+    range_str: str
 
     def _convert(self, entity: ActiveConnection1DOF, **kwargs) -> Dict[str, Any]:
         """
@@ -246,27 +327,25 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         dof = list(entity.dofs)[0]
         joint_props.update(
             {
-                self.axis_name: entity.axis.to_np().tolist()[:3],
-                self.range_name: [dof.lower_limits.position, dof.upper_limits.position],
+                self.axis_str: entity.axis.to_np().tolist()[:3],
+                self.range_str: [dof.lower_limits.position, dof.upper_limits.position],
             }
         )
         return joint_props
 
 
 class ConnectionRevoluteConverter(Connection1DOFConverter, ABC):
-    def _convert(self, entity: RevoluteConnection, **kwargs) -> Dict[str, Any]:
-        return Connection1DOFConverter._convert(self, entity)
+    entity_type: ClassVar[Type[RevoluteConnection]] = RevoluteConnection
 
 
 class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
-    def _convert(self, entity: PrismaticConnection, **kwargs) -> Dict[str, Any]:
-        return Connection1DOFConverter._convert(self, entity)
+    entity_type: ClassVar[Type[PrismaticConnection]] = PrismaticConnection
 
 
 class MujocoGeomConverter(ShapeConverter, ABC):
-    pos_name: str = "pos"
-    quat_name: str = "quat"
-    rgba_name: str = "rgba"
+    pos_str: str = "pos"
+    quat_str: str = "quat"
+    rgba_str: str = "rgba"
     type: mujoco.mjtGeom
 
     def _post_convert(
@@ -278,7 +357,7 @@ class MujocoGeomConverter(ShapeConverter, ABC):
             }
         )
         if not kwargs.get("visible", True):
-            shape_props[self.rgba_name][3] = 0.0
+            shape_props[self.rgba_str][3] = 0.0
         if not kwargs.get("collidable", True):
             shape_props["contype"] = 0
             shape_props["conaffinity"] = 0
@@ -321,25 +400,19 @@ class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
 
 
 class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter, ABC):
-    pos_name: str = "pos"
-    quat_name: str = "quat"
-
-    def _post_convert(
-        self,
-        entity: KinematicStructureEntity,
-        kinematic_structure_entity_props: Dict[str, Any],
-        **kwargs,
-    ) -> Dict[str, Any]:
-        return kinematic_structure_entity_props
+    pos_str: str = "pos"
+    quat_str: str = "quat"
 
 
 class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter):
+    mass_str: str = "mass"
+    inertia_pos_str: str = "ipos"
+    inertia_quat_str: str = "iquat"
+    diagonal_inertia_str: str = "inertia"
+
     def _post_convert(
         self, entity: Body, body_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        body_props = MujocoKinematicStructureEntityConverter._post_convert(
-            self, entity, body_props
-        )
         return body_props
 
 
@@ -347,35 +420,33 @@ class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConve
     def _post_convert(
         self, entity: Region, region_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        region_props = MujocoKinematicStructureEntityConverter._post_convert(
-            self, entity, region_props
-        )
         return region_props
 
 
 class MujocoJointConverter(ConnectionConverter, ABC):
-    pos_name: str = "pos"
-    quat_name: str = "quat"
+    pos_str: str = "pos"
+    quat_str: str = "quat"
     type: mujoco.mjtJoint
 
     def _post_convert(
         self, entity: Connection, joint_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
-        joint_props.update({"type": self.type})
+        joint_props["type"] = self.type
         return joint_props
 
 
 class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
-    axis_name: str = "axis"
-    range_name: str = "range"
+    axis_str: str = "axis"
+    range_str: str = "range"
 
     def _post_convert(
         self, entity: ActiveConnection1DOF, joint_props: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
         joint_props = MujocoJointConverter._post_convert(self, entity, joint_props)
-        assert numpy.allclose(
-            joint_props["quat"], [1.0, 0.0, 0.0, 0.0]
-        ), "Joint rotation not supported yet."  # TODO: Rotate joint axis
+        if not numpy.allclose(joint_props["quat"], [1.0, 0.0, 0.0, 0.0]):
+            joint_axis = numpy.array(joint_props["axis"])
+            R_joint = Rotation.from_quat(quat=joint_props["quat"], scalar_first=True)  # type: ignore
+            joint_props["axis"] = R_joint.apply(joint_axis).tolist()
         del joint_props["quat"]
         return joint_props
 
@@ -385,23 +456,11 @@ class MujocoRevoluteJointConverter(
 ):
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_HINGE
 
-    def _post_convert(
-        self, entity: RevoluteConnection, joint_props: Dict[str, Any], **kwargs
-    ) -> Dict[str, Any]:
-        joint_props = Mujoco1DOFJointConverter._post_convert(self, entity, joint_props)
-        return joint_props
-
 
 class MujocoPrismaticJointConverter(
     Mujoco1DOFJointConverter, ConnectionPrismaticConverter
 ):
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_SLIDE
-
-    def _post_convert(
-        self, entity: PrismaticConnection, joint_props: Dict[str, Any], **kwargs
-    ) -> Dict[str, Any]:
-        joint_props = Mujoco1DOFJointConverter._post_convert(self, entity, joint_props)
-        return joint_props
 
 
 @dataclass
@@ -622,8 +681,10 @@ class WorldEntitySpawner(ABC):
     A spawner to spawn a WorldEntity object in the Multiverse simulator.
     """
 
+    entity_type: ClassVar[Type[Any]] = Any
+
     @classmethod
-    def spawn(cls, simulator: MultiverseSimulator, entity: Any) -> bool:
+    def spawn(cls, simulator: MultiverseSimulator, entity: entity_type) -> bool:  # type: ignore
         """
         Spawns a WorldEntity object in the Multiverse simulator.
 
@@ -631,13 +692,14 @@ class WorldEntitySpawner(ABC):
         :param entity: The WorldEntity object to spawn.
         :return: True if the entity was spawned successfully, False otherwise.
         """
-        if type(entity) is cls.get_type():
-            return cls()._spawn(simulator, entity)
         for subclass in recursive_subclasses(cls):
-            result = subclass.spawn(simulator, entity)
-            if result:
-                return True
-        return False
+            if (
+                not inspect.isabstract(subclass)
+                and not inspect.isabstract(subclass.entity_type)
+                and type(entity) is subclass.entity_type
+            ):
+                return subclass()._spawn(simulator, entity)
+        raise NotImplementedError(f"No converter found for entity type {type(entity)}.")
 
     @abstractmethod
     def _spawn(self, simulator: MultiverseSimulator, entity: Any) -> bool:
@@ -650,20 +712,10 @@ class WorldEntitySpawner(ABC):
         """
         raise NotImplementedError
 
-    @classmethod
-    def get_type(cls) -> Optional[Type]:
-        """
-        Gets the type of WorldEntity that this spawner can spawn.
-
-        :return: The type of WorldEntity, or None if the spawner is abstract.
-        """
-        if inspect.isabstract(cls):
-            return None
-        hints = get_type_hints(cls._spawn)
-        return hints.get("entity", NoneType)
-
 
 class KinematicStructureEntitySpawner(WorldEntitySpawner):
+    entity_type: ClassVar[Type[KinematicStructureEntity]] = KinematicStructureEntity
+
     def _spawn(
         self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
     ) -> bool:
@@ -727,6 +779,8 @@ class KinematicStructureEntitySpawner(WorldEntitySpawner):
 
 
 class BodySpawner(KinematicStructureEntitySpawner, ABC):
+    entity_type: ClassVar[Type[Body]] = Body
+
     def _spawn(self, simulator: MultiverseSimulator, entity: Body) -> bool:
         return KinematicStructureEntitySpawner._spawn(self, simulator, entity)
 
@@ -744,6 +798,8 @@ class BodySpawner(KinematicStructureEntitySpawner, ABC):
 
 
 class RegionSpawner(KinematicStructureEntitySpawner, ABC):
+    entity_type: ClassVar[Type[Region]] = Region
+
     def _spawn(self, simulator: MultiverseSimulator, entity: Region) -> bool:
         return KinematicStructureEntitySpawner._spawn(self, simulator, entity)
 
@@ -824,10 +880,12 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
 
     world: World
     simulator: MultiverseSimulator
-    kinematic_structure_entity_converter: Type[KinematicStructureEntityConverter]
-    shape_converter: Type[ShapeConverter]
-    connection_converter: Type[ConnectionConverter]
-    kinematic_structure_entity_spawner: Type[KinematicStructureEntitySpawner]
+    kinematic_structure_entity_converter: Type[KinematicStructureEntityConverter] = (
+        NoneType
+    )
+    shape_converter: Type[ShapeConverter] = NoneType
+    connection_converter: Type[ConnectionConverter] = NoneType
+    kinematic_structure_entity_spawner: Type[KinematicStructureEntitySpawner] = NoneType
 
     def notify(self):
         for modification in self.world._model_modification_blocks[-1]:
@@ -894,7 +952,8 @@ class MultiSim(ABC):
             real_time_factor=real_time_factor,
         )
         self.synchronizer = self.synchronizer_class(
-            world=world, simulator=self.simulator
+            world=world,
+            simulator=self.simulator,
         )
         self._viewer = viewer
 
