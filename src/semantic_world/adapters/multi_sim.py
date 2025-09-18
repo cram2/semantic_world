@@ -609,7 +609,7 @@ class MultiSimBuilder(ABC):
             self.build_region(region=region)
 
         for connection in world.connections:
-            self._build_connection(connection)
+            self._build_connection(connection=connection)
 
         self._end_build(file_path=file_path)
 
