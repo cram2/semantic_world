@@ -1112,9 +1112,7 @@ class MultiSim(ABC):
 
     def start_simulation(self):
         """
-        Starts the simulation. This will start a physics simulation thread and render it at 60Hz.
-
-        :return: None
+        Starts the simulation. This will start one physics simulation thread and render it at 60Hz.
         """
         assert (
             self.simulator.state != MultiverseSimulatorState.RUNNING
@@ -1124,8 +1122,6 @@ class MultiSim(ABC):
     def stop_simulation(self):
         """
         Stops the simulation. This will stop the physics simulation and the rendering.
-
-        :return: None
         """
         self.synchronizer.stop()
         self.simulator.stop()
@@ -1133,8 +1129,6 @@ class MultiSim(ABC):
     def pause_simulation(self):
         """
         Pauses the simulation. This will pause the physics simulation but not the rendering.
-
-        :return: None
         """
         if self.simulator.state != MultiverseSimulatorState.PAUSED:
             self.simulator.pause()
@@ -1142,8 +1136,6 @@ class MultiSim(ABC):
     def unpause_simulation(self):
         """
         Unpauses the simulation. This will unpause the physics simulation.
-
-        :return: None
         """
         if self.simulator.state == MultiverseSimulatorState.PAUSED:
             self.simulator.unpause()
@@ -1151,8 +1143,6 @@ class MultiSim(ABC):
     def reset_simulation(self):
         """
         Resets the simulation. This will reset the physics simulation to the initial state.
-
-        :return: None
         """
         self.simulator.reset()
 
@@ -1168,7 +1158,6 @@ class MultiSim(ABC):
         }
 
         :param write_objects: The objects to be written to the simulator.
-        :return: None
         """
         self._viewer.write_objects = write_objects
         if self.simulator.state == MultiverseSimulatorState.PAUSED:
@@ -1186,7 +1175,6 @@ class MultiSim(ABC):
             }
         }
         :param read_objects: The objects to be read from the simulator.
-        :return: None
         """
         self._viewer.read_objects = read_objects
         if self.simulator.state == MultiverseSimulatorState.PAUSED:
