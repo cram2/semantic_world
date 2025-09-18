@@ -740,6 +740,8 @@ class MujocoBuilder(MultiSimBuilder):
                         "quat", " ".join(map(str, body_spec.iquat.tolist()))
                     )
                 tree.write(file_path)
+            else:
+                raise e
 
     def _build_body(self, body: Body):
         self._build_mujoco_body(body=body)
