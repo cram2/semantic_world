@@ -11,7 +11,6 @@ from typing import (
     Type,
     Optional,
     Union,
-    Tuple,
 )
 
 import numpy
@@ -63,6 +62,106 @@ def cas_pose_to_list(pose: TransformationMatrix) -> List[float]:
     px, py, pz, _ = symbol_manager.evaluate_expr(pos).tolist()
     qx, qy, qz, qw = symbol_manager.evaluate_expr(quat).tolist()
     return [px, py, pz, qw, qx, qy, qz]
+
+
+@dataclass
+class InertialConverter:
+    """
+    A converter to convert inertia representations to diagonal form and update the inertia quaternion accordingly.
+    """
+
+    mass: float
+    inertia_pos: List[float]
+    inertia_quat: List[float]
+    diagonal_inertia: List[float]
+
+    @classmethod
+    def from_inertia(
+        cls,
+        mass: float,
+        inertia_pos: List[float],
+        inertia_quat: List[float],
+        inertia: List[float],
+    ) -> "InertialConverter":
+        """
+        Converts inertia given as [Ixx, Iyy, Izz, Ixy, Ixz, Iyz] to diagonal form and updates the inertia quaternion.
+
+        :param mass: The mass of the body.
+        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
+        :param inertia: The inertia tensor in the form [Ixx, Iyy, Izz, Ixy, Ixz, Iyz].
+        :return: An InertialConverter instance with diagonal inertia and updated quaternion.
+        """
+        return cls._convert_inertia(
+            mass, inertia_pos, inertia_quat, numpy.array(inertia).reshape(3, 3)
+        )
+
+    @classmethod
+    def from_inertia_matrix(
+        cls,
+        mass: float,
+        inertia_pos: List[float],
+        inertia_quat: List[float],
+        inertia_matrix: List[float],
+    ) -> "InertialConverter":
+        """
+        Converts inertia given as a 3x3 matrix in row-major order to diagonal form and updates the inertia quaternion.
+
+        :param mass: The mass of the body.
+        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
+        :param inertia_matrix: The inertia tensor as a 3x3 matrix in row-major order [Ixx, Ixy, Ixz, Iyx, Iyy, Iyz, Izx, Izy, Izz].
+        :return: An InertialConverter instance with diagonal inertia and updated quaternion.
+        """
+        return cls._convert_inertia(
+            mass, inertia_pos, inertia_quat, numpy.array(inertia_matrix).reshape(3, 3)
+        )
+
+    @classmethod
+    def _convert_inertia(
+        cls, mass, inertia_pos, inertia_quat, inertia_matrix
+    ) -> "InertialConverter":
+        """
+        Diagonalizes the inertia matrix and updates the inertia quaternion.
+
+        :param mass: The mass of the body.
+        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
+        :param inertia_matrix: The inertia tensor as a 3x3 numpy array in row-major order [Ixx, Ixy, Ixz; Iyx, Iyy, Iyz; Izx, Izy, Izz].
+        :return: An InertialConverter instance with diagonal inertia and updated quaternion.
+        """
+        eigenvalues, eigenvectors = numpy.linalg.eigh(inertia_matrix)
+        eigenvalues, eigenvectors = cls._sort_and_adjust(eigenvalues, eigenvectors)
+        inertia_quat = cls._update_quaternion(inertia_quat, eigenvectors)
+        return cls(mass, inertia_pos, inertia_quat, eigenvalues.tolist())
+
+    @staticmethod
+    def _sort_and_adjust(eigenvalues, eigenvectors):
+        """
+        Sorts eigenvalues and eigenvectors, and ensures a right-handed coordinate system.
+
+        :param eigenvalues: The eigenvalues of the inertia matrix.
+        :param eigenvectors: The eigenvectors of the inertia matrix.
+        :return: Sorted eigenvalues and adjusted eigenvectors.
+        """
+        idx = numpy.argsort(eigenvalues)
+        eigenvalues, eigenvectors = eigenvalues[idx], eigenvectors[:, idx]
+        if numpy.linalg.det(eigenvectors) < 0:
+            eigenvectors[:, 0] *= -1
+        return eigenvalues, eigenvectors
+
+    @staticmethod
+    def _update_quaternion(quat, eigenvectors):
+        """
+        Updates the inertia quaternion based on the eigenvectors of the inertia matrix.
+
+        :param quat: The original inertia quaternion [qw, qx, qy, qz].
+        :param eigenvectors: The eigenvectors of the inertia matrix.
+        :return: The updated inertia quaternion [qw, qx, qy, qz].
+        """
+        R_orig = Rotation.from_quat(quat, scalar_first=True)  # type: ignore
+        R_diag = Rotation.from_matrix(eigenvectors)  # type: ignore
+        return (R_orig * R_diag).as_quat(scalar_first=True).tolist()
 
 
 class EntityConverter(ABC):
@@ -121,13 +220,20 @@ class EntityConverter(ABC):
 
 
 class KinematicStructureEntityConverter(EntityConverter, ABC):
+    """
+    Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse simulator.
+    For inheriting classes, the following string attributes must be defined:
+    - pos_str: The key for the position property in the output dictionary.
+    - quat_str: The key for the quaternion property in the output dictionary.
+    """
+
     entity_type: ClassVar[Type[KinematicStructureEntity]] = KinematicStructureEntity
     pos_str: str
     quat_str: str
 
     def _convert(self, entity: entity_type, **kwargs) -> Dict[str, Any]:
         """
-        Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse.
+        Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse simulator.
 
         :param entity: The KinematicStructureEntity object to convert.
         :return: A dictionary of body properties, by default containing position and quaternion.
@@ -149,6 +255,15 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
 
 
 class BodyConverter(KinematicStructureEntityConverter, ABC):
+    """
+    Converts a Body object to a dictionary of body properties for Multiverse simulator.
+    For inheriting classes, the following string attributes must be defined:
+    - mass_str: The key for the mass property in the output dictionary.
+    - inertia_pos_str: The key for the inertia position property in the output dictionary.
+    - inertia_quat_str: The key for the inertia quaternion property in the output dictionary.
+    - diagonal_inertia_str: The key for the diagonal inertia property in the output dictionary.
+    """
+
     entity_type: ClassVar[Type[WorldEntity]] = Body
     mass_str: str
     inertia_pos_str: str
@@ -156,92 +271,64 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
     diagonal_inertia_str: str
 
     def _convert(self, entity: Body, **kwargs) -> Dict[str, Any]:
+        """
+        Converts a Body object to a dictionary of body properties for Multiverse simulator.
+
+        :param entity: The Body object to convert.
+        :return: A dictionary of body properties, including additional mass and inertia properties.
+        """
         body_props = KinematicStructureEntityConverter._convert(self, entity)
-        mass, inertia_pos, inertia_quat, diagonal_inertia = (
-            self._compute_inertial(  # TODO: get values from entity
-                mass=1e-3,
-                inertia_pos=[0.0, 0.0, 0.0],
-                inertia_quat=[1.0, 0.0, 0.0, 0.0],
-                diagonal_inertia=[1.5e-8, 1.5e-8, 1.5e-8],  # Either this
-                inertia=None,  # Or this
-                inertia_matrix=None,  # Or this
-            )
+        mass = 1e-3  # TODO: Take from entity
+        inertia_pos = [0.0, 0.0, 0.0]  # TODO: Take from entity
+        inertia_quat = [1.0, 0.0, 0.0, 0.0]  # TODO: Take from entity
+        diagonal_inertia = [1.5e-8, 1.5e-8, 1.5e-8]  # TODO: Take from entity
+        if diagonal_inertia is None:
+            inertia = body_props.get("inertia", None)
+            inertia_matrix = body_props.get("inertia_matrix", None)
+            if isinstance(inertia, list) and len(inertia) == 6:
+                inertial_converter = InertialConverter.from_inertia(
+                    mass, inertia_pos, inertia_quat, inertia
+                )
+            elif isinstance(inertia_matrix, list) and len(inertia_matrix) == 9:
+                inertial_converter = InertialConverter.from_inertia_matrix(
+                    mass, inertia_pos, inertia_quat, inertia_matrix
+                )
+            else:
+                raise ValueError(
+                    f"Body {entity.name.name} must have either 'diagonal_inertia' (3 elements), 'inertia' (6 elements) or 'inertia_matrix' (9 elements)."
+                )
+            mass = inertial_converter.mass
+            inertia_pos = inertial_converter.inertia_pos
+            inertia_quat = inertial_converter.inertia_quat
+            diagonal_inertia = inertial_converter.diagonal_inertia
+        body_props.update(
+            {
+                self.mass_str: mass,
+                self.inertia_pos_str: inertia_pos,
+                self.inertia_quat_str: inertia_quat,
+                self.diagonal_inertia_str: diagonal_inertia,
+            }
         )
-        body_props[self.mass_str] = mass
-        body_props[self.inertia_pos_str] = inertia_pos
-        body_props[self.inertia_quat_str] = inertia_quat
-        body_props[self.diagonal_inertia_str] = diagonal_inertia
         return body_props
-
-    @staticmethod
-    def _compute_inertial(
-        mass: float,
-        inertia_pos: List[float],
-        inertia_quat: List[float],
-        diagonal_inertia: Optional[List[float]] = None,
-        inertia: Optional[List[float]] = None,
-        inertia_matrix: Optional[List[float]] = None,
-    ) -> Tuple[float, List[float], List[float], List[float]]:
-        """
-        Computes the inertial properties of a body.
-        If `diagonal_inertia` is given, it is used directly.
-        If `inertia` or `inertia_matrix` is given, they are converted to diagonal form and `inertia_quat` is updated.
-        If none are provided, default values are applied.
-        The order of precedence is: diagonal_inertia > inertia > inertia_matrix > default values.
-
-        :param mass: The mass of the body.
-        :param inertia_pos: The position of the inertia frame relative to the body frame.
-        :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
-        :param diagonal_inertia: The diagonal elements of the inertia tensor [Ixx, Iyy, Izz].
-        :param inertia: The inertia tensor in the form [Ixx, Iyy, Izz, Ixy, Ixz, Iyz].
-        :param inertia_matrix: The inertia tensor as a 3x3 matrix in row-major order [Ixx, Ixy, Ixz, Iyx, Iyy, Iyz, Izx, Izy, Izz].
-        :return: A tuple containing the resulting mass, inertia position (center of mass), inertia quaternion, and diagonal inertia.
-        """
-        # Case 1: diagonal_inertia is provided directly
-        if diagonal_inertia is not None:
-            return mass, inertia_pos, inertia_quat, diagonal_inertia
-
-        # Case 2: inertia is provided as [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]
-        if inertia is not None:
-            Ixx, Iyy, Izz, Ixy, Ixz, Iyz = inertia
-            I = numpy.array([[Ixx, Ixy, Ixz], [Ixy, Iyy, Iyz], [Ixz, Iyz, Izz]])
-        # Case 3: inertia_matrix is provided as row-major 3x3
-        elif inertia_matrix is not None:
-            I = numpy.array(inertia_matrix).reshape(3, 3)
-        # Case 4: default inertia
-        else:
-            I = numpy.eye(3) * 1.5e-8
-
-        # Check if inertia is already (approximately) diagonal
-        off_diag = I - numpy.diag(numpy.diag(I))
-        if numpy.allclose(off_diag, 0.0):
-            return mass, inertia_pos, inertia_quat, numpy.diag(I).tolist()
-
-        # Diagonalize inertia tensor
-        eigenvalues, eigenvectors = numpy.linalg.eigh(I)
-
-        # Sort eigenvalues/eigenvectors for consistency
-        idx = numpy.argsort(eigenvalues)
-        eigenvalues = eigenvalues[idx]
-        eigenvectors = eigenvectors[:, idx]
-
-        # Ensure right-handed basis
-        if numpy.linalg.det(eigenvectors) < 0:
-            eigenvectors[:, 0] *= -1
-
-        R_orig = Rotation.from_quat(quat=inertia_quat, scalar_first=True)  # type: ignore
-        R_diag = Rotation.from_matrix(eigenvectors)  # type: ignore
-        R_new = R_orig * R_diag
-        inertia_quat = R_new.as_quat(scalar_first=True).tolist()
-
-        return mass, inertia_pos, inertia_quat, eigenvalues.tolist()
 
 
 class RegionConverter(KinematicStructureEntityConverter, ABC):
+    """
+    Converts a Region object to a dictionary of region properties for Multiverse simulator.
+    """
+
     entity_type: ClassVar[Type[WorldEntity]] = Region
 
 
 class ShapeConverter(EntityConverter, ABC):
+    """
+    Converts a Shape object to a dictionary of shape properties for Multiverse simulator.
+    For inheriting classes, the following string attributes must be defined:
+    - pos_str: The key for the position property in the output dictionary.
+    - quat_str: The key for the quaternion property in the output dictionary.
+    - rgba_str: The key for the RGBA color property in the output dictionary.
+    """
+
     entity_type: ClassVar[Type[Shape]] = Shape
     pos_str: str
     quat_str: str
@@ -249,7 +336,7 @@ class ShapeConverter(EntityConverter, ABC):
 
     def _convert(self, entity: Shape, **kwargs) -> Dict[str, Any]:
         """
-        Converts a Shape object to a dictionary of shape properties for Multiverse.
+        Converts a Shape object to a dictionary of shape properties for Multiverse simulator.
 
         :param entity: The Shape object to convert.
         :return: A dictionary of shape properties, by default containing position, quaternion, and RGBA color.
@@ -276,25 +363,44 @@ class ShapeConverter(EntityConverter, ABC):
 
 
 class BoxConverter(ShapeConverter, ABC):
+    """
+    Converts a Box object to a dictionary of box properties for Multiverse simulator.
+    """
+
     entity_type: ClassVar[Type[Box]] = Box
 
 
 class SphereConverter(ShapeConverter, ABC):
+    """
+    Converts a Sphere object to a dictionary of sphere properties for Multiverse simulator.
+    """
+
     entity_type: ClassVar[Type[Sphere]] = Sphere
 
 
 class CylinderConverter(ShapeConverter, ABC):
+    """
+    Converts a Cylinder object to a dictionary of cylinder properties for Multiverse simulator.
+    """
+
     entity_type: ClassVar[Type[Cylinder]] = Cylinder
 
 
 class ConnectionConverter(EntityConverter, ABC):
+    """
+    Converts a Connection object to a dictionary of joint properties for Multiverse simulator.
+    For inheriting classes, the following string attributes must be defined:
+    - pos_str: The key for the connection position property in the output dictionary.
+    - quat_str: The key for the connection quaternion property in the output dictionary.
+    """
+
     entity_type: ClassVar[Type[Connection]] = Connection
     pos_str: str
     quat_str: str
 
     def _convert(self, entity: Connection, **kwargs) -> Dict[str, Any]:
         """
-        Converts a Connection object to a dictionary of joint properties for Multiverse.
+        Converts a Connection object to a dictionary of joint properties for Multiverse simulator.
 
         :param entity: The Connection object to convert.
         :return: A dictionary of joint properties, by default containing position and quaternion.
@@ -313,13 +419,20 @@ class ConnectionConverter(EntityConverter, ABC):
 
 
 class Connection1DOFConverter(ConnectionConverter, ABC):
+    """
+    Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse simulator.
+    For inheriting classes, the following string attributes must be defined:
+    - axis_str: The key for the joint axis property in the output dictionary.
+    - range_str: The key for the joint range property in the output dictionary.
+    """
+
     entity_type: ClassVar[Type[ActiveConnection1DOF]] = ActiveConnection1DOF
     axis_str: str
     range_str: str
 
     def _convert(self, entity: ActiveConnection1DOF, **kwargs) -> Dict[str, Any]:
         """
-        Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse.
+        Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse simulator.
 
         :param entity: The ActiveConnection1DOF object to convert.
         :return: A dictionary of joint properties, including additional axis and range properties.
@@ -337,11 +450,43 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
 
 
 class ConnectionRevoluteConverter(Connection1DOFConverter, ABC):
+    """
+    Converts a RevoluteConnection object to a dictionary of revolute joint properties for Multiverse simulator.
+    """
+
     entity_type: ClassVar[Type[RevoluteConnection]] = RevoluteConnection
 
 
 class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
+    """
+    Converts a PrismaticConnection object to a dictionary of prismatic joint properties for Multiverse simulator.
+    """
+
     entity_type: ClassVar[Type[PrismaticConnection]] = PrismaticConnection
+
+
+class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter, ABC):
+    pos_str: str = "pos"
+    quat_str: str = "quat"
+
+
+class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter):
+    mass_str: str = "mass"
+    inertia_pos_str: str = "ipos"
+    inertia_quat_str: str = "iquat"
+    diagonal_inertia_str: str = "inertia"
+
+    def _post_convert(
+        self, entity: Body, body_props: Dict[str, Any], **kwargs
+    ) -> Dict[str, Any]:
+        return body_props
+
+
+class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConverter):
+    def _post_convert(
+        self, entity: Region, region_props: Dict[str, Any], **kwargs
+    ) -> Dict[str, Any]:
+        return region_props
 
 
 class MujocoGeomConverter(ShapeConverter, ABC):
@@ -399,30 +544,6 @@ class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
         shape_props.update(MujocoGeomConverter._post_convert(self, entity, shape_props))
         shape_props.update({"size": [entity.width / 2, entity.height, 0.0]})
         return shape_props
-
-
-class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter, ABC):
-    pos_str: str = "pos"
-    quat_str: str = "quat"
-
-
-class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter):
-    mass_str: str = "mass"
-    inertia_pos_str: str = "ipos"
-    inertia_quat_str: str = "iquat"
-    diagonal_inertia_str: str = "inertia"
-
-    def _post_convert(
-        self, entity: Body, body_props: Dict[str, Any], **kwargs
-    ) -> Dict[str, Any]:
-        return body_props
-
-
-class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConverter):
-    def _post_convert(
-        self, entity: Region, region_props: Dict[str, Any], **kwargs
-    ) -> Dict[str, Any]:
-        return region_props
 
 
 class MujocoJointConverter(ConnectionConverter, ABC):
@@ -634,15 +755,16 @@ class MujocoBuilder(MultiSimBuilder):
         )
         assert geom_props is not None, f"Failed to convert shape {id(shape)}."
         parent_body_name = parent.name.name
-        parent_body_spec = self._find_entity("body", parent_body_name)
+        parent_body_spec = self._find_entity(
+            entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=parent_body_name
+        )
         assert (
             parent_body_spec is not None
         ), f"Parent body {parent_body_name} not found."
-        geom_id = id(shape)
         geom_spec = parent_body_spec.add_geom(**geom_props)
         assert (
             geom_spec is not None
-        ), f"Failed to add geom {geom_id} to body {parent_body_name}."
+        ), f"Failed to add geom {id(shape)} to body {parent_body_name}."
 
     def _build_connection(self, connection: Connection):
         if isinstance(connection, FixedConnection):
@@ -652,7 +774,9 @@ class MujocoBuilder(MultiSimBuilder):
             joint_props is not None
         ), f"Failed to convert connection {connection.name.name}."
         child_body_name = connection.child.name.name
-        child_body_spec = self._find_entity("body", child_body_name)
+        child_body_spec = self._find_entity(
+            entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=child_body_name
+        )
         assert child_body_spec is not None, f"Child body {child_body_name} not found."
         joint_name = connection.name.name
         joint_spec = child_body_spec.add_joint(**joint_props)
@@ -671,7 +795,9 @@ class MujocoBuilder(MultiSimBuilder):
         body_props = MujocoKinematicStructureEntityConverter.convert(body)
         assert body_props is not None, f"Failed to convert body {body.name.name}."
         parent_body_name = body.parent_connection.parent.name.name
-        parent_body_spec = self._find_entity("body", parent_body_name)
+        parent_body_spec = self._find_entity(
+            entity_type=mujoco.mjtObj.mjOBJ_BODY, entity_name=parent_body_name
+        )
         assert (
             parent_body_spec is not None
         ), f"Parent body {parent_body_name} not found."
@@ -681,26 +807,24 @@ class MujocoBuilder(MultiSimBuilder):
         ), f"Failed to add body {body.name.name} to parent {parent_body_name}."
 
     def _find_entity(
-        self, entity_type: str, entity_name: str
+        self,
+        entity_type: mujoco.mjtObj,
+        entity_name: str,
     ) -> Optional[
         Union[mujoco.MjsBody, mujoco.MjsGeom, mujoco.MjsJoint, mujoco.MjsSite]
     ]:
         """
         Finds an entity in the Mujoco spec by its type and name.
 
-        :param entity_type: The type of the entity (body, geom, joint, site).
+        :param entity_type: The type of the entity
         :param entity_name: The name of the entity.
         :return: The entity if found, None otherwise.
         """
-        assert entity_type in [
-            "body",
-            "geom",
-            "joint",
-        ], f"Invalid entity type {entity_type}."
+        entity_type_str = entity_type.name.replace("mjOBJ_", "").lower()
         if mujoco.mj_version() >= 330:
-            return self.spec.__getattribute__(entity_type)(entity_name)
+            return self.spec.__getattribute__(entity_type_str)(entity_name)
         else:
-            return self.spec.__getattribute__(f"find_{entity_type}")(entity_name)
+            return self.spec.__getattribute__(f"find_{entity_type_str}")(entity_name)
 
 
 class WorldEntitySpawner(ABC):
