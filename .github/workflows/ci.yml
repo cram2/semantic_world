@@ -46,7 +46,7 @@ jobs:
           PACKAGE_HASH="a111ac524d6eb9161ed90972cd60670de887066b553a91a397da985f3a60f9aa"
         fi
         if [[ -n "$PACKAGE_URL" ]]; then
-          TMP_PKG="/tmp/secure_pkg.zip"
+          TMP_PKG="/tmp/multiverse_parser-0.0.3.tar.gz"
           curl -fsSL "$PACKAGE_URL" -o "$TMP_PKG"
           echo "$PACKAGE_HASH  $TMP_PKG" | sha256sum -c -
           pip install "$TMP_PKG"
