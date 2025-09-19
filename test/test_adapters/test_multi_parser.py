@@ -34,8 +34,9 @@ class MultiParserTestCase(unittest.TestCase):
         self.single_cube_parser = MultiParser(self.single_cube)
 
     def test_table_parsing(self):
+        total_body_num = 7
         for world, body_num in zip(
-            [self.table_urdf_parser.parse(), self.table_xml_parser.parse()], [7, 7]
+            [self.table_urdf_parser.parse(), self.table_xml_parser.parse()], [total_body_num, total_body_num]
         ):
             world.validate()
             self.assertTrue(len(world.kinematic_structure_entities) == body_num)

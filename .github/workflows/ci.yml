@@ -39,9 +39,18 @@ jobs:
         git submodule update
         pip install -U pip && pip install -r requirements.txt && pip install -e . && pip install pytest
         if [[ $(python3 --version) == "Python 3.10"* ]]; then
-          pip install https://nc.uni-bremen.de/public.php/dav/files/fxWQigKXPBtnXsy/?accept=zip
+          PACKAGE_URL="https://nc.uni-bremen.de/public.php/dav/files/fxWQigKXPBtnXsy/?accept=zip"
+          PACKAGE_HASH="5249b21f6a6dbbb86eee9e64659cf19b9b09585ffbc888d13af9bd9c2bcce99c"
         elif [[ $(python3 --version) == "Python 3.12"* ]]; then
-          pip install https://nc.uni-bremen.de/public.php/dav/files/nxxi4QSBcYmmxba/?accept=zip
+          PACKAGE_URL="https://nc.uni-bremen.de/public.php/dav/files/nxxi4QSBcYmmxba/?accept=zip"
+          PACKAGE_HASH="a111ac524d6eb9161ed90972cd60670de887066b553a91a397da985f3a60f9aa"
+        fi
+        if [[ -n "$PACKAGE_URL" ]]; then
+          TMP_PKG="/tmp/secure_pkg.zip"
+          curl -fsSL "$PACKAGE_URL" -o "$TMP_PKG"
+          echo "$PACKAGE_HASH  $TMP_PKG" | sha256sum -c -
+          pip install "$TMP_PKG"
+          rm -f "$TMP_PKG"
         fi
         pip install -e ./src/ripple_down_rules_meta
 #        echo "PATH=/opt/ros/overlay_ws/src/Multiverse-Parser/ext/blender:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/lib/python:/opt/ros/overlay_ws/src/Multiverse-Parser/USD/linux/plugin/usd:$PATH" >> $GITHUB_ENV

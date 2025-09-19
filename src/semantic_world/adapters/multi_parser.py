@@ -190,7 +190,6 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
             data["scale"]["x"] = scale[0]
             data["scale"]["y"] = scale[1]
             data["scale"]["z"] = scale[2]
-            TriangleMesh.from_json(data=data)
             shape = TriangleMesh.from_json(data=data)
         else:
             logging.warning(f"Geometry type {geom_builder.type} is not supported yet.")

@@ -28,7 +28,7 @@ from scipy.spatial.transform import Rotation
 
 from ..callbacks.callback import ModelChangeCallback
 from ..datastructures.prefixed_name import PrefixedName
-from ..spatial_types.spatial_types import TransformationMatrix
+from ..spatial_types.spatial_types import TransformationMatrix, Point3, Quaternion
 from ..world import World
 from ..world_description.connections import (
     RevoluteConnection,
@@ -71,50 +71,91 @@ class InertialConverter:
     """
 
     mass: float
-    inertia_pos: List[float]
-    inertia_quat: List[float]
+    """
+    The mass of the body.
+    """
+
+    inertia_pos: Point3
+    """
+    The position of the inertia frame relative to the body frame [x, y, z].
+    """
+
+    inertia_quat: Quaternion
+    """
+    The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
+    """
+
     diagonal_inertia: List[float]
+    """
+    The diagonal inertia tensor in the form [Ixx, Iyy, Izz].
+    """
+
+    def __post_init__(self):
+        assert self.mass > 0, "Mass must be positive."
+        assert len(self.diagonal_inertia) == 3, "Diagonal inertia must have 3 elements."
+        assert all(
+            i >= 0 for i in self.diagonal_inertia
+        ), "Inertia values must be non-negative."
 
     @classmethod
     def from_inertia(
         cls,
         mass: float,
-        inertia_pos: List[float],
-        inertia_quat: List[float],
+        inertia_pos: Point3,
+        inertia_quat: Quaternion,
         inertia: List[float],
     ) -> "InertialConverter":
         """
         Converts inertia given as [Ixx, Iyy, Izz, Ixy, Ixz, Iyz] to diagonal form and updates the inertia quaternion.
 
         :param mass: The mass of the body.
-        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_pos: The position of the inertia frame relative to the body frame [x, y, z].
         :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
         :param inertia: The inertia tensor in the form [Ixx, Iyy, Izz, Ixy, Ixz, Iyz].
+
         :return: An InertialConverter instance with diagonal inertia and updated quaternion.
         """
-        return cls._convert_inertia(
-            mass, inertia_pos, inertia_quat, numpy.array(inertia).reshape(3, 3)
+        inertia_matrix = [
+            inertia[0],
+            inertia[3],
+            inertia[4],
+            inertia[3],
+            inertia[1],
+            inertia[5],
+            inertia[4],
+            inertia[5],
+            inertia[2],
+        ]
+        return cls.from_inertia_matrix(
+            mass=mass,
+            inertia_pos=inertia_pos,
+            inertia_quat=inertia_quat,
+            inertia_matrix=inertia_matrix,
         )
 
     @classmethod
     def from_inertia_matrix(
         cls,
         mass: float,
-        inertia_pos: List[float],
-        inertia_quat: List[float],
+        inertia_pos: Point3,
+        inertia_quat: Quaternion,
         inertia_matrix: List[float],
     ) -> "InertialConverter":
         """
         Converts inertia given as a 3x3 matrix in row-major order to diagonal form and updates the inertia quaternion.
 
         :param mass: The mass of the body.
-        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_pos: The position of the inertia frame relative to the body frame [x, y, z].
         :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
         :param inertia_matrix: The inertia tensor as a 3x3 matrix in row-major order [Ixx, Ixy, Ixz, Iyx, Iyy, Iyz, Izx, Izy, Izz].
+
         :return: An InertialConverter instance with diagonal inertia and updated quaternion.
         """
         return cls._convert_inertia(
-            mass, inertia_pos, inertia_quat, numpy.array(inertia_matrix).reshape(3, 3)
+            mass=mass,
+            inertia_pos=inertia_pos,
+            inertia_quat=inertia_quat,
+            inertia_matrix=numpy.array(inertia_matrix).reshape(3, 3),
         )
 
     @classmethod
@@ -125,23 +166,31 @@ class InertialConverter:
         Diagonalizes the inertia matrix and updates the inertia quaternion.
 
         :param mass: The mass of the body.
-        :param inertia_pos: The position of the inertia frame relative to the body frame.
+        :param inertia_pos: The position of the inertia frame relative to the body frame [x, y, z].
         :param inertia_quat: The orientation of the inertia frame relative to the body frame as a quaternion [qw, qx, qy, qz].
         :param inertia_matrix: The inertia tensor as a 3x3 numpy array in row-major order [Ixx, Ixy, Ixz; Iyx, Iyy, Iyz; Izx, Izy, Izz].
+
         :return: An InertialConverter instance with diagonal inertia and updated quaternion.
         """
         eigenvalues, eigenvectors = numpy.linalg.eigh(inertia_matrix)
         eigenvalues, eigenvectors = cls._sort_and_adjust(eigenvalues, eigenvectors)
         inertia_quat = cls._update_quaternion(inertia_quat, eigenvectors)
-        return cls(mass, inertia_pos, inertia_quat, eigenvalues.tolist())
+        diagonal_inertia = eigenvalues.tolist()
+        return cls(
+            mass=mass,
+            inertia_pos=inertia_pos,
+            inertia_quat=inertia_quat,
+            diagonal_inertia=diagonal_inertia,
+        )
 
     @staticmethod
-    def _sort_and_adjust(eigenvalues, eigenvectors):
+    def _sort_and_adjust(eigenvalues: numpy.ndarray, eigenvectors: numpy.ndarray):
         """
         Sorts eigenvalues and eigenvectors, and ensures a right-handed coordinate system.
 
         :param eigenvalues: The eigenvalues of the inertia matrix.
         :param eigenvectors: The eigenvectors of the inertia matrix.
+
         :return: Sorted eigenvalues and adjusted eigenvectors.
         """
         idx = numpy.argsort(eigenvalues)
@@ -151,26 +200,39 @@ class InertialConverter:
         return eigenvalues, eigenvectors
 
     @staticmethod
-    def _update_quaternion(quat, eigenvectors):
+    def _update_quaternion(
+        quat: numpy.ndarray, eigenvectors: numpy.ndarray
+    ) -> Quaternion:
         """
         Updates the inertia quaternion based on the eigenvectors of the inertia matrix.
 
         :param quat: The original inertia quaternion [qw, qx, qy, qz].
         :param eigenvectors: The eigenvectors of the inertia matrix.
+
         :return: The updated inertia quaternion [qw, qx, qy, qz].
         """
         R_orig = Rotation.from_quat(quat, scalar_first=True)  # type: ignore
         R_diag = Rotation.from_matrix(eigenvectors)  # type: ignore
-        return (R_orig * R_diag).as_quat(scalar_first=True).tolist()
+        updated_quat = (R_orig * R_diag).as_quat(scalar_first=True)
+        return Quaternion(
+            x=updated_quat[1], y=updated_quat[2], z=updated_quat[3], w=updated_quat[0]
+        )
 
 
 class EntityConverter(ABC):
     """
-    A converter to convert an entity object (WorldEntity, Shape) to a dictionary of properties for Multiverse simulator.
+    A converter to convert an entity object (WorldEntity, Shape, Connection) to a dictionary of properties for Multiverse simulator.
     """
 
     entity_type: ClassVar[Type[Any]] = Any
+    """
+    The type of the entity to convert.
+    """
+
     name_str: str = "name"
+    """
+    The key for the name property in the output dictionary.
+    """
 
     @classmethod
     def convert(cls, entity: entity_type, **kwargs) -> Dict[str, Any]:  # type: ignore
@@ -257,18 +319,34 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
 class BodyConverter(KinematicStructureEntityConverter, ABC):
     """
     Converts a Body object to a dictionary of body properties for Multiverse simulator.
-    For inheriting classes, the following string attributes must be defined:
-    - mass_str: The key for the mass property in the output dictionary.
-    - inertia_pos_str: The key for the inertia position property in the output dictionary.
-    - inertia_quat_str: The key for the inertia quaternion property in the output dictionary.
-    - diagonal_inertia_str: The key for the diagonal inertia property in the output dictionary.
     """
 
     entity_type: ClassVar[Type[WorldEntity]] = Body
+    """
+    The type of the entity to convert.
+    """
+
+    # Attributes for specifying body properties in the Mujoco simulator.
+
     mass_str: str
+    """
+    The key for the mass property in the output dictionary.
+    """
+
     inertia_pos_str: str
+    """
+    The key for the inertia position property in the output dictionary.
+    """
+
     inertia_quat_str: str
+    """
+    The key for the inertia quaternion property in the output dictionary.
+    """
+
     diagonal_inertia_str: str
+    """
+    The key for the diagonal inertia tensor property in the output dictionary.
+    """
 
     def _convert(self, entity: Body, **kwargs) -> Dict[str, Any]:
         """
@@ -279,28 +357,41 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
         """
         body_props = KinematicStructureEntityConverter._convert(self, entity)
         mass = 1e-3  # TODO: Take from entity
-        inertia_pos = [0.0, 0.0, 0.0]  # TODO: Take from entity
-        inertia_quat = [1.0, 0.0, 0.0, 0.0]  # TODO: Take from entity
+        inertia_pos = Point3(x=0.0, y=0.0, z=0.0)  # TODO: Take from entity
+        inertia_quat = Quaternion(w=1.0, x=0.0, y=0.0, z=0.0)  # TODO: Take from entity
         diagonal_inertia = [1.5e-8, 1.5e-8, 1.5e-8]  # TODO: Take from entity
         if diagonal_inertia is None:
             inertia = body_props.get("inertia", None)
             inertia_matrix = body_props.get("inertia_matrix", None)
             if isinstance(inertia, list) and len(inertia) == 6:
                 inertial_converter = InertialConverter.from_inertia(
-                    mass, inertia_pos, inertia_quat, inertia
+                    mass=mass,
+                    inertia_pos=inertia_pos,
+                    inertia_quat=inertia_quat,
+                    inertia=inertia,
                 )
             elif isinstance(inertia_matrix, list) and len(inertia_matrix) == 9:
                 inertial_converter = InertialConverter.from_inertia_matrix(
-                    mass, inertia_pos, inertia_quat, inertia_matrix
+                    mass=mass,
+                    inertia_pos=inertia_pos,
+                    inertia_quat=inertia_quat,
+                    inertia_matrix=inertia_matrix,
                 )
             else:
                 raise ValueError(
                     f"Body {entity.name.name} must have either 'diagonal_inertia' (3 elements), 'inertia' (6 elements) or 'inertia_matrix' (9 elements)."
                 )
-            mass = inertial_converter.mass
-            inertia_pos = inertial_converter.inertia_pos
-            inertia_quat = inertial_converter.inertia_quat
-            diagonal_inertia = inertial_converter.diagonal_inertia
+        else:
+            inertial_converter = InertialConverter(
+                mass=mass,
+                inertia_pos=inertia_pos,
+                inertia_quat=inertia_quat,
+                diagonal_inertia=diagonal_inertia,
+            )
+        mass = inertial_converter.mass
+        inertia_pos = inertial_converter.inertia_pos.to_np().tolist()[:3]
+        inertia_quat = inertial_converter.inertia_quat.to_np().tolist()[:4]
+        diagonal_inertia = inertial_converter.diagonal_inertia
         body_props.update(
             {
                 self.mass_str: mass,
@@ -318,21 +409,35 @@ class RegionConverter(KinematicStructureEntityConverter, ABC):
     """
 
     entity_type: ClassVar[Type[WorldEntity]] = Region
+    """
+    The type of the entity to convert.
+    """
 
 
 class ShapeConverter(EntityConverter, ABC):
     """
     Converts a Shape object to a dictionary of shape properties for Multiverse simulator.
-    For inheriting classes, the following string attributes must be defined:
-    - pos_str: The key for the position property in the output dictionary.
-    - quat_str: The key for the quaternion property in the output dictionary.
-    - rgba_str: The key for the RGBA color property in the output dictionary.
     """
 
     entity_type: ClassVar[Type[Shape]] = Shape
+    """
+    The type of the entity to convert.
+    """
+
     pos_str: str
+    """
+    The key for the shape position property in the output dictionary.
+    """
+
     quat_str: str
+    """
+    The key for the shape quaternion property in the output dictionary.
+    """
+
     rgba_str: str
+    """
+    The key for the shape RGBA color property in the output dictionary.
+    """
 
     def _convert(self, entity: Shape, **kwargs) -> Dict[str, Any]:
         """
@@ -389,14 +494,22 @@ class CylinderConverter(ShapeConverter, ABC):
 class ConnectionConverter(EntityConverter, ABC):
     """
     Converts a Connection object to a dictionary of joint properties for Multiverse simulator.
-    For inheriting classes, the following string attributes must be defined:
-    - pos_str: The key for the connection position property in the output dictionary.
-    - quat_str: The key for the connection quaternion property in the output dictionary.
     """
 
     entity_type: ClassVar[Type[Connection]] = Connection
+    """
+    The type of the entity to convert.
+    """
+
     pos_str: str
+    """
+    The key for the joint position property in the output dictionary.
+    """
+
     quat_str: str
+    """
+    The key for the joint quaternion property in the output dictionary.
+    """
 
     def _convert(self, entity: Connection, **kwargs) -> Dict[str, Any]:
         """
@@ -421,14 +534,22 @@ class ConnectionConverter(EntityConverter, ABC):
 class Connection1DOFConverter(ConnectionConverter, ABC):
     """
     Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse simulator.
-    For inheriting classes, the following string attributes must be defined:
-    - axis_str: The key for the joint axis property in the output dictionary.
-    - range_str: The key for the joint range property in the output dictionary.
     """
 
     entity_type: ClassVar[Type[ActiveConnection1DOF]] = ActiveConnection1DOF
+    """
+    The type of the entity to convert.
+    """
+
     axis_str: str
+    """
+    The key for the joint axis property in the output dictionary.
+    """
+
     range_str: str
+    """
+    The key for the joint range property in the output dictionary.
+    """
 
     def _convert(self, entity: ActiveConnection1DOF, **kwargs) -> Dict[str, Any]:
         """
@@ -455,6 +576,9 @@ class ConnectionRevoluteConverter(Connection1DOFConverter, ABC):
     """
 
     entity_type: ClassVar[Type[RevoluteConnection]] = RevoluteConnection
+    """
+    The type of the entity to convert.
+    """
 
 
 class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
@@ -463,9 +587,17 @@ class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
     """
 
     entity_type: ClassVar[Type[PrismaticConnection]] = PrismaticConnection
+    """
+    The type of the entity to convert.
+    """
 
 
-class MujocoKinematicStructureEntityConverter(KinematicStructureEntityConverter, ABC):
+class MujocoConverter(EntityConverter, ABC): ...
+
+
+class MujocoKinematicStructureEntityConverter(
+    MujocoConverter, KinematicStructureEntityConverter, ABC
+):
     pos_str: str = "pos"
     quat_str: str = "quat"
 
@@ -489,7 +621,7 @@ class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConve
         return region_props
 
 
-class MujocoGeomConverter(ShapeConverter, ABC):
+class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
     pos_str: str = "pos"
     quat_str: str = "quat"
     rgba_str: str = "rgba"
@@ -829,12 +961,15 @@ class MujocoBuilder(MultiSimBuilder):
             return self.spec.__getattribute__(f"find_{entity_type_str}")(entity_name)
 
 
-class WorldEntitySpawner(ABC):
+class EntitySpawner(ABC):
     """
-    A spawner to spawn a WorldEntity object in the Multiverse simulator.
+    A spawner to spawn an entity object (WorldEntity, Shape, Connection) in the Multiverse simulator.
     """
 
     entity_type: ClassVar[Type[Any]] = Any
+    """
+    The type of the entity to spawn.
+    """
 
     @classmethod
     def spawn(cls, simulator: MultiverseSimulator, entity: entity_type) -> bool:  # type: ignore
@@ -843,6 +978,7 @@ class WorldEntitySpawner(ABC):
 
         :param simulator: The Multiverse simulator to spawn the entity in.
         :param entity: The WorldEntity object to spawn.
+
         :return: True if the entity was spawned successfully, False otherwise.
         """
         for subclass in recursive_subclasses(cls):
@@ -866,8 +1002,11 @@ class WorldEntitySpawner(ABC):
         raise NotImplementedError
 
 
-class KinematicStructureEntitySpawner(WorldEntitySpawner):
+class KinematicStructureEntitySpawner(EntitySpawner):
     entity_type: ClassVar[Type[KinematicStructureEntity]] = KinematicStructureEntity
+    """
+    The type of the entity to spawn.
+    """
 
     def _spawn(
         self, simulator: MultiverseSimulator, entity: KinematicStructureEntity
@@ -877,6 +1016,7 @@ class KinematicStructureEntitySpawner(WorldEntitySpawner):
 
         :param simulator: The Multiverse simulator to spawn the entity in.
         :param entity: The KinematicStructureEntity object to spawn.
+
         :return: True if the entity and its shapes were spawned successfully, False otherwise.
         """
         return self._spawn_kinematic_structure_entity(
@@ -892,6 +1032,7 @@ class KinematicStructureEntitySpawner(WorldEntitySpawner):
 
         :param simulator: The Multiverse simulator to spawn the entity in.
         :param entity: The KinematicStructureEntity object to spawn.
+
         :return: True if the entity was spawned successfully, False otherwise.
         """
         raise NotImplementedError
@@ -905,6 +1046,7 @@ class KinematicStructureEntitySpawner(WorldEntitySpawner):
 
         :param simulator: The Multiverse simulator to spawn the shapes in.
         :param entity: The KinematicStructureEntity object whose shapes to spawn.
+
         :return: True if all shapes were spawned successfully, False otherwise.
         """
         raise NotImplementedError
@@ -926,6 +1068,7 @@ class KinematicStructureEntitySpawner(WorldEntitySpawner):
         :param shape: The shape to spawn.
         :param visible: Whether the shape is visible.
         :param collidable: Whether the shape is collidable.
+
         :return: True if the shape was spawned successfully, False otherwise.
         """
         raise NotImplementedError
@@ -933,9 +1076,9 @@ class KinematicStructureEntitySpawner(WorldEntitySpawner):
 
 class BodySpawner(KinematicStructureEntitySpawner, ABC):
     entity_type: ClassVar[Type[Body]] = Body
-
-    def _spawn(self, simulator: MultiverseSimulator, entity: Body) -> bool:
-        return KinematicStructureEntitySpawner._spawn(self, simulator, entity)
+    """
+    The type of the entity to spawn.
+    """
 
     def _spawn_shapes(self, simulator: MultiverseSimulator, parent: Body) -> bool:
         return all(
@@ -952,9 +1095,9 @@ class BodySpawner(KinematicStructureEntitySpawner, ABC):
 
 class RegionSpawner(KinematicStructureEntitySpawner, ABC):
     entity_type: ClassVar[Type[Region]] = Region
-
-    def _spawn(self, simulator: MultiverseSimulator, entity: Region) -> bool:
-        return KinematicStructureEntitySpawner._spawn(self, simulator, entity)
+    """
+    The type of the entity to spawn.
+    """
 
     def _spawn_shapes(self, simulator: MultiverseSimulator, parent: Region) -> bool:
         return all(
@@ -969,7 +1112,12 @@ class RegionSpawner(KinematicStructureEntitySpawner, ABC):
         )
 
 
-class MujocoKinematicStructureEntitySpawner(KinematicStructureEntitySpawner, ABC):
+class MujocoEntitySpawner(EntitySpawner, ABC): ...
+
+
+class MujocoKinematicStructureEntitySpawner(
+    MujocoEntitySpawner, KinematicStructureEntitySpawner, ABC
+):
     def _spawn_kinematic_structure_entity(
         self, simulator: MultiverseMujocoConnector, entity: KinematicStructureEntity
     ) -> bool:
@@ -1032,21 +1180,30 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
     """
 
     world: World
+    """
+    The world to synchronize with the simulator.
+    """
+
     simulator: MultiverseSimulator
-    kinematic_structure_entity_converter: Type[KinematicStructureEntityConverter] = (
-        NoneType
-    )
-    shape_converter: Type[ShapeConverter] = NoneType
-    connection_converter: Type[ConnectionConverter] = NoneType
-    kinematic_structure_entity_spawner: Type[KinematicStructureEntitySpawner] = NoneType
+    """
+    The Multiverse simulator to synchronize with the world.
+    """
+
+    entity_converter: Type[EntityConverter] = NoneType
+    """
+    The converter to convert WorldEntity, Shape, and Connection objects to dictionaries of properties for the simulator.
+    """
+
+    entity_spawner: Type[EntitySpawner] = NoneType
+    """
+    The spawner to spawn WorldEntity, Shape, and Connection objects in the simulator.
+    """
 
     def notify(self):
         for modification in self.world._model_modification_blocks[-1]:
             if isinstance(modification, AddKinematicStructureEntityModification):
                 entity = modification.kinematic_structure_entity
-                self.kinematic_structure_entity_spawner.spawn(
-                    simulator=self.simulator, entity=entity
-                )
+                self.entity_spawner.spawn(simulator=self.simulator, entity=entity)
 
     def stop(self):
         self.world.model_change_callbacks.remove(self)
@@ -1055,16 +1212,8 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
 @dataclass
 class MujocoSynchronizer(MultiSimSynchronizer):
     simulator: MultiverseMujocoConnector
-    kinematic_structure_entity_converter: Type[KinematicStructureEntityConverter] = (
-        field(default=MujocoKinematicStructureEntityConverter)
-    )
-    shape_converter: Type[ShapeConverter] = field(default=MujocoGeomConverter)
-    connection_converter: Type[ConnectionConverter] = field(
-        default=MujocoJointConverter
-    )
-    kinematic_structure_entity_spawner: Type[KinematicStructureEntitySpawner] = field(
-        default=MujocoKinematicStructureEntitySpawner
-    )
+    entity_converter: Type[EntityConverter] = field(default=MujocoConverter)
+    entity_spawner: Type[EntitySpawner] = field(default=MujocoEntitySpawner)
 
 
 class MultiSim(ABC):
@@ -1073,11 +1222,34 @@ class MultiSim(ABC):
     """
 
     simulator_class: ClassVar[Type[MultiverseSimulator]]
+    """
+    The class of the Multiverse simulator to use.
+    """
+
     synchronizer_class: ClassVar[Type[MultiSimSynchronizer]]
+    """
+    The class of the MultiSimSynchronizer to use.
+    """
+
     builder_class: ClassVar[Type[MultiSimBuilder]]
+    """
+    The class of the MultiSimBuilder to use.
+    """
+
     simulator: MultiverseSimulator
+    """
+    The Multiverse simulator instance.
+    """
+
     synchronizer: MultiSimSynchronizer
+    """
+    The MultiSimSynchronizer instance.
+    """
+
     default_file_path: str
+    """
+    The default file path to save the world to.
+    """
 
     def __init__(
         self,
