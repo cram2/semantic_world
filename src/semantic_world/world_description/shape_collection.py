@@ -4,13 +4,12 @@ import itertools
 import logging
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Dict, Any, Self, Optional, List, Iterator
 
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.utils import SubclassJSONSerializer
 from trimesh import Trimesh
 from trimesh.util import concatenate
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Self, Dict, Any, Optional, List, Iterator
 
 from .geometry import Shape, BoundingBox
 from ..datastructures.variables import SpatialVariables
@@ -91,6 +90,15 @@ class ShapeCollection(SubclassJSONSerializer):
     def __contains__(self, shape: Shape) -> bool:
         return shape in self.shapes
 
+    def __add__(self, other: Self) -> Self:
+        assert (
+            self.reference_frame == other.reference_frame
+        ), "The reference frames of the shape collections must be the same."
+        return ShapeCollection(
+            shapes=self.shapes + other.shapes,
+            reference_frame=self.reference_frame,
+        )
+
     def append(self, shape: Shape):
         if self.world is not None:
             self._transform_to_own_frame(
@@ -153,7 +161,7 @@ class ShapeCollection(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any]) -> Self:
+    def _from_json(cls, data: Dict[str, Any]):
         return cls(shapes=[Shape.from_json(d) for d in data["shapes"]])
 
 
@@ -254,9 +262,7 @@ class BoundingBoxCollection(ShapeCollection):
         return BoundingBoxCollection(result, reference_frame)
 
     @classmethod
-    def from_event(
-        cls, reference_frame: KinematicStructureEntity, event: Event
-    ) -> Self:
+    def from_event(cls, reference_frame: KinematicStructureEntity, event: Event):
         """
         Create a list of bounding boxes from a random event.
 
@@ -274,7 +280,7 @@ class BoundingBoxCollection(ShapeCollection):
         )
 
     @classmethod
-    def from_shapes(cls, shapes: ShapeCollection) -> Self:
+    def from_shapes(cls, shapes: ShapeCollection):
         """
         Create a bounding box collection from a list of shapes.
 
