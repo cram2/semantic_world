@@ -465,6 +465,6 @@ class MultiParser:
         result = Body(name=name)
         visuals = ShapeCollection(visuals, reference_frame=result)
         collisions = ShapeCollection(collisions, reference_frame=result)
-        result.visuals = visuals
-        result.collisions = collisions
+        result.visual = visuals
+        result.collision = collisions
         return result
