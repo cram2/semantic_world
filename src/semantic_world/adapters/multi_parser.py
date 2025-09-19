@@ -18,6 +18,7 @@ from ..world_description.geometry import (
     Color,
     TriangleMesh,
 )
+from ..world_description.shape_collection import ShapeCollection
 
 try:
     from multiverse_parser import (
@@ -131,7 +132,7 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
         translation: Gf.Vec3d = local_transformation.ExtractTranslation()
         rotation: Gf.Rotation = local_transformation.ExtractRotation()
         quat: Gf.Quatd = rotation.GetQuat()
-        origin_transform = TransformationMatrix.from_xyz_quaternionernion(
+        origin_transform = TransformationMatrix.from_xyz_quaternion(
             pos_x=translation[0],
             pos_y=translation[1],
             pos_z=translation[2],
@@ -461,4 +462,9 @@ class MultiParser:
             prefix=self.prefix, name=body_builder.xform.GetPrim().GetName()
         )
         visuals, collisions = parse_geometry(body_builder)
-        return Body(name=name, visual=visuals, collision=collisions)
+        result = Body(name=name)
+        visuals = ShapeCollection(visuals, reference_frame=result)
+        collisions = ShapeCollection(collisions, reference_frame=result)
+        result.visuals = visuals
+        result.collisions = collisions
+        return result

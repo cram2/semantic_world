@@ -357,8 +357,12 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
         """
         body_props = KinematicStructureEntityConverter._convert(self, entity)
         mass = 1e-3  # TODO: Take from entity
-        inertia_pos = Point3(x=0.0, y=0.0, z=0.0)  # TODO: Take from entity
-        inertia_quat = Quaternion(w=1.0, x=0.0, y=0.0, z=0.0)  # TODO: Take from entity
+        inertia_pos = Point3(
+            x_init=0.0, y_init=0.0, z_init=0.0
+        )  # TODO: Take from entity
+        inertia_quat = Quaternion(
+            w_init=1.0, x_init=0.0, y_init=0.0, z_init=0.0
+        )  # TODO: Take from entity
         diagonal_inertia = [1.5e-8, 1.5e-8, 1.5e-8]  # TODO: Take from entity
         if diagonal_inertia is None:
             inertia = body_props.get("inertia", None)

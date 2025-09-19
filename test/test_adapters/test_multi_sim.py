@@ -13,6 +13,7 @@ from semantic_world.spatial_types.spatial_types import TransformationMatrix
 from semantic_world.world import World
 from semantic_world.world_description.connections import Connection6DoF, FixedConnection
 from semantic_world.world_description.geometry import Box, Scale, Color
+from semantic_world.world_description.shape_collection import ShapeCollection
 from semantic_world.world_description.world_entity import Body, Region
 
 urdf_dir = os.path.join(
@@ -251,7 +252,7 @@ class MujocoSimTestCase(unittest.TestCase):
                 1.0,
             ),
         )
-        new_body.collision = [box]
+        new_body.collision = ShapeCollection([box], reference_frame=new_body)
 
         with self.test_urdf_world.modify_world():
             self.test_urdf_world.add_connection(
@@ -280,7 +281,7 @@ class MujocoSimTestCase(unittest.TestCase):
                 0.8,
             ),
         )
-        region.area = [region_box]
+        region.area = ShapeCollection([region_box], reference_frame=region)
 
         with self.test_urdf_world.modify_world():
             self.test_urdf_world.add_connection(
