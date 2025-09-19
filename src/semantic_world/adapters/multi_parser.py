@@ -64,7 +64,7 @@ def usd_pose_to_cas_pose(usd_transform: Gf.Matrix4d) -> cas.TransformationMatrix
     translation: Gf.Vec3d = usd_transform.ExtractTranslation()
     rotation: Gf.Rotation = usd_transform.ExtractRotation()
     quat: Gf.Quatd = rotation.GetQuat()
-    return cas.TransformationMatrix.from_xyz_quat(
+    return cas.TransformationMatrix.from_xyz_quaternion(
         pos_x=translation[0],
         pos_y=translation[1],
         pos_z=translation[2],
@@ -131,7 +131,7 @@ def parse_geometry(body_builder: BodyBuilder) -> tuple[List[Shape], List[Shape]]
         translation: Gf.Vec3d = local_transformation.ExtractTranslation()
         rotation: Gf.Rotation = local_transformation.ExtractRotation()
         quat: Gf.Quatd = rotation.GetQuat()
-        origin_transform = TransformationMatrix.from_xyz_quat(
+        origin_transform = TransformationMatrix.from_xyz_quaternionernion(
             pos_x=translation[0],
             pos_y=translation[1],
             pos_z=translation[2],
