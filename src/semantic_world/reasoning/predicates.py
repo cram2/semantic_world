@@ -2,7 +2,7 @@ import itertools
 
 import numpy as np
 import trimesh.boolean
-from entity_query_language import let, an, entity, contains, and_, not_, the
+from entity_query_language import let, an, entity, contains, and_, not_, the, predicate
 from random_events.interval import Interval
 from typing_extensions import List, Optional
 
@@ -133,7 +133,10 @@ def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
     cam_pose = np.eye(4, dtype=float)
     cam_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
 
-    seg = rt.create_segmentation_mask(TransformationMatrix(cam_pose, camera._world.root), resolution=256)
+    seg = rt.create_segmentation_mask(
+        TransformationMatrix(cam_pose, reference_frame=camera._world.root),
+        resolution=256,
+    )
     indices = np.unique(seg)
     indices = indices[indices > -1]
     bodies = [camera._world.kinematic_structure[i] for i in indices]
@@ -163,7 +166,7 @@ def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
     # get camera pose
     camera_pose = np.eye(4, dtype=float)
     camera_pose[:3, 3] = camera.root.global_pose.to_np()[:3, 3]
-    camera_pose = TransformationMatrix(camera_pose, camera._world.root)
+    camera_pose = TransformationMatrix(camera_pose, reference_frame=camera._world.root)
 
     # create a world only containing the target body
     world_without_occlusion = World()
@@ -270,12 +273,16 @@ def is_supported_by(
     """
     if below(supported_body, supporting_body, supported_body.global_pose):
         return False
-    bounding_box_supported_body = supported_body.as_bounding_box_collection_at_origin(
-        TransformationMatrix(reference_frame=supported_body)
-    ).event
-    bounding_box_supporting_body = supporting_body.as_bounding_box_collection_at_origin(
-        TransformationMatrix(reference_frame=supported_body)
-    ).event
+    bounding_box_supported_body = (
+        supported_body.collision.as_bounding_box_collection_at_origin(
+            TransformationMatrix(reference_frame=supported_body)
+        ).event
+    )
+    bounding_box_supporting_body = (
+        supporting_body.collision.as_bounding_box_collection_at_origin(
+            TransformationMatrix(reference_frame=supported_body)
+        ).event
+    )
 
     intersection = (
         bounding_box_supported_body & bounding_box_supporting_body
@@ -306,9 +313,9 @@ def is_body_in_gripper(
     """
 
     # Retrieve meshes in local frames
-    thumb_mesh = gripper.thumb.tip.combined_collision_mesh.copy()
-    finger_mesh = gripper.finger.tip.combined_collision_mesh.copy()
-    body_mesh = body.combined_collision_mesh.copy()
+    thumb_mesh = gripper.thumb.tip.collision.combined_mesh.copy()
+    finger_mesh = gripper.finger.tip.collision.combined_mesh.copy()
+    body_mesh = body.collision.combined_mesh.copy()
 
     # Transform copies of the meshes into the world frame
     body_mesh.apply_transform(body.global_pose.to_np())
@@ -340,8 +347,8 @@ def is_body_in_region(body: Body, region: Region) -> float:
     :return: The percentage (0.0..1.0) of the body's volume that lies in the region.
     """
     # Retrieve meshes in local frames
-    body_mesh_local = body.combined_collision_mesh
-    region_mesh_local = region.combined_area_mesh
+    body_mesh_local = body.collision.combined_mesh
+    region_mesh_local = region.area.combined_mesh
 
     # Transform copies of the meshes into the world frame
     body_mesh = body_mesh_local.copy().apply_transform(body.global_pose.to_np())
@@ -455,7 +462,7 @@ def _center_of_mass_in_world(b: Body) -> np.ndarray:
     :return: The bodies center of mass as a 3D array.
     """
     # Center of mass in the body's local frame (collision geometry)
-    com_local = b.combined_collision_mesh.center_mass  # (3,)
+    com_local = b.collision.combined_mesh.center_mass  # (3,)
     # Transform to world frame using the body's global pose
     T_bw = b.global_pose.to_np()  # body -> world
     com_h = np.array([com_local[0], com_local[1], com_local[2], 1.0], dtype=float)

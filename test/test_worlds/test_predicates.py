@@ -30,6 +30,7 @@ from semantic_world.testing import pr2_world
 from semantic_world.world import World
 from semantic_world.world_description.connections import Connection6DoF, FixedConnection
 from semantic_world.world_description.geometry import Box, Scale, Color
+from semantic_world.world_description.shape_collection import ShapeCollection
 from semantic_world.world_description.world_entity import Body, Region
 
 
@@ -41,7 +42,7 @@ def two_block_world():
             scale=Scale(1.0, 1.0, 1.0),
             origin=TransformationMatrix.from_xyz_rpy(reference_frame=result),
         )
-        result.collision = [collision]
+        result.collision = ShapeCollection([collision], reference_frame=result)
         return result
 
     world = World()
@@ -79,7 +80,7 @@ def test_in_contact():
         ),
         color=Color(1.0, 0.0, 0.0),
     )
-    b1.collision = [collision1]
+    b1.collision = ShapeCollection([collision1])
 
     b2 = Body(name=PrefixedName("b2"))
     collision2 = Box(
@@ -89,7 +90,7 @@ def test_in_contact():
         ),
         color=Color(0.0, 1.0, 0.0),
     )
-    b2.collision = [collision2]
+    b2.collision = ShapeCollection([collision2])
 
     b3 = Body(name=PrefixedName("b3"))
     collision3 = Box(
@@ -99,7 +100,7 @@ def test_in_contact():
         ),
         color=Color(0.0, 0.0, 1.0),
     )
-    b3.collision = [collision3]
+    b3.collision = ShapeCollection([collision3])
 
     with w.modify_world():
         w.add_kinematic_structure_entity(b1)
@@ -124,7 +125,7 @@ def test_robot_in_contact(pr2_world: World):
         ),
         color=Color(1.0, 0.0, 0.0),
     )
-    body.collision = [collision1]
+    body.collision = ShapeCollection([collision1])
 
     with pr2_world.modify_world():
         pr2_world.add_connection(Connection6DoF(pr2_world.root, body, _world=pr2_world))
@@ -152,7 +153,7 @@ def test_get_visible_objects(pr2_world: World):
         ),
         color=Color(1.0, 0.0, 0.0),
     )
-    body.collision = [collision1]
+    body.collision = ShapeCollection([collision1])
 
     with pr2_world.modify_world():
         pr2_world.add_connection(Connection6DoF(pr2_world.root, body, _world=pr2_world))
@@ -171,7 +172,7 @@ def test_occluding_bodies(pr2_world: World):
             scale=Scale(1.0, 1.0, 1.0),
             origin=TransformationMatrix.from_xyz_rpy(reference_frame=result),
         )
-        result.collision = [collision]
+        result.collision = ShapeCollection([collision])
         return result
 
     obstacle = make_body("obstacle")
@@ -253,7 +254,7 @@ def test_body_in_region(two_block_world):
         scale=Scale(1.0, 1.0, 1.0),
         origin=TransformationMatrix.from_xyz_rpy(reference_frame=region),
     )
-    region.area = [region_box]
+    region.area = ShapeCollection([region_box])
 
     with center._world.modify_world():
         connection = FixedConnection(
@@ -300,7 +301,7 @@ def test_is_body_in_gripper(
         origin=TransformationMatrix.from_xyz_rpy(reference_frame=test_box),
         color=Color(1.0, 0.0, 0.0),
     )
-    test_box.collision = [box_collision]
+    test_box.collision = ShapeCollection([box_collision])
 
     # Calculate position between fingers
     finger1_pos = _center_of_mass_in_world(left_gripper.finger.tip)
@@ -391,7 +392,7 @@ def test_blocking(pr2_world):
         scale=Scale(3.0, 1.0, 1.0),
         origin=TransformationMatrix.from_xyz_rpy(x=1.0, z=0.5),
     )
-    obstacle.collision = [collision]
+    obstacle.collision = ShapeCollection([collision])
 
     with pr2_world.modify_world():
         new_root = Body(name=PrefixedName("new_root"))

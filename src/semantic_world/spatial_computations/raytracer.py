@@ -8,7 +8,7 @@ from trimesh import Scene
 
 from ..datastructures.types import NpMatrix4x4
 from ..world_description.world_entity import Body
-from ..spatial_types.spatial_types import SpatialType
+from ..spatial_types.spatial_types import GenericSpatialType
 
 if TYPE_CHECKING:
     from ..world import World
@@ -107,8 +107,9 @@ class RayTracer:
                 )
                 self.scene.graph[body.name.name + f"_collision_{i}"] = transform
 
-    def create_segmentation_mask(self, camera_pose: SpatialType,
-                                 resolution: int = 512) -> np.ndarray:
+    def create_segmentation_mask(
+        self, camera_pose: GenericSpatialType, resolution: int = 512
+    ) -> np.ndarray:
         """
         Creates a segmentation mask for the ray tracer scene from the camera position to the target position. Each pixel
         in the mask corresponds to the index of a body in the scene or -1 if no body is hit at that pixel.
@@ -141,7 +142,7 @@ class RayTracer:
         return a
 
     def create_depth_map(
-        self, camera_pose: SpatialType, resolution: int = 512
+        self, camera_pose: GenericSpatialType, resolution: int = 512
     ) -> np.ndarray:
         """
         Creates a depth map for the ray tracer scene from the camera position to the target position. Each pixel in the
@@ -175,7 +176,7 @@ class RayTracer:
         return a
 
     def create_camera_rays(
-        self, camera_pose: SpatialType, resolution: int = 512, fov=90
+        self, camera_pose: GenericSpatialType, resolution: int = 512, fov=90
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Creates camera rays for the ray tracer scene from the camera position to the target position. Places the camera

@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 
 import matplotlib.pyplot as plt
-from .geometry import BoundingBox, BoundingBoxCollection
+from .geometry import BoundingBox
+from .shape_collection import BoundingBoxCollection
 from ..datastructures.variables import SpatialVariables
 from ..world import World
 from .world_entity import View, EnvironmentView
@@ -240,15 +241,20 @@ class GraphOfConvexSets:
         Create the default search space if it is not given.
         """
         if search_space is None:
-            search_space = BoundingBox(
-                min_x=-np.inf,
-                min_y=-np.inf,
-                min_z=-np.inf,
-                max_x=np.inf,
-                max_y=np.inf,
-                max_z=np.inf,
-                origin=TransformationMatrix(reference_frame=world.root),
-            ).as_collection()
+            search_space = BoundingBoxCollection(
+                shapes=[
+                    BoundingBox(
+                        min_x=-np.inf,
+                        min_y=-np.inf,
+                        min_z=-np.inf,
+                        max_x=np.inf,
+                        max_y=np.inf,
+                        max_z=np.inf,
+                        origin=TransformationMatrix(reference_frame=world.root),
+                    )
+                ],
+                reference_frame=world.root,
+            )
         return search_space
 
     @classmethod
@@ -286,24 +292,24 @@ class GraphOfConvexSets:
         world_root = search_space.reference_frame
 
         bloated_obstacles: BoundingBoxCollection = BoundingBoxCollection(
-            world_root,
             [
                 bloat_obstacle(bb)
                 for bb in obstacle_view.as_bounding_box_collection_at_origin(
                     TransformationMatrix(reference_frame=world_root)
                 )
             ],
+            world_root,
         )
 
         if wall_view is not None:
             bloated_walls: BoundingBoxCollection = BoundingBoxCollection(
-                world_root,
                 [
                     bloat_wall(bb)
                     for bb in wall_view.as_bounding_box_collection_at_origin(
                         TransformationMatrix(reference_frame=world_root)
                     )
                 ],
+                world_root,
             )
             bloated_obstacles.merge(bloated_walls)
 
@@ -382,7 +388,8 @@ class GraphOfConvexSets:
 
         if obstacles is None or obstacles.is_empty():
             return cls(
-                search_space=search_space, world=search_space.reference_frame._world
+                search_space=search_space,
+                world=search_space.reference_frame._world,
             )
 
         search_event = search_space.event
@@ -399,7 +406,8 @@ class GraphOfConvexSets:
         [
             result.add_node(bb)
             for bb in BoundingBoxCollection.from_event(
-                reference_frame=search_space.reference_frame, event=free_space
+                reference_frame=search_space.reference_frame,
+                event=free_space,
             )
         ]
 
@@ -497,7 +505,8 @@ class GraphOfConvexSets:
 
         # create a connectivity graph from the free space and calculate the edges
         result = cls(
-            world=search_space.reference_frame._world, search_space=search_space
+            world=search_space.reference_frame._world,
+            search_space=search_space,
         )
         free_space_boxes = BoundingBoxCollection.from_event(
             search_space.reference_frame, free_space

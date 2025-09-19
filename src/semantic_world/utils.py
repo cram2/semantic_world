@@ -6,7 +6,7 @@ from copy import deepcopy
 from functools import lru_cache, wraps
 from typing_extensions import Any, Tuple, Iterable
 from xml.etree import ElementTree as ET
-
+import weakref
 from sqlalchemy import Engine, inspect, text, MetaData
 
 
@@ -20,7 +20,10 @@ class IDGenerator:
     The counter of the unique IDs.
     """
 
-    @lru_cache(maxsize=None)
+    def __init__(self):
+        self._counter = 0
+        self._by_obj = weakref.WeakKeyDictionary()  # type: ignore[var-annotated]
+
     def __call__(self, obj: Any) -> int:
         """
         Creates a unique ID and caches it for every object this is called on.
@@ -28,8 +31,12 @@ class IDGenerator:
         :param obj: The object to generate a unique ID for, must be hashable.
         :return: The unique ID.
         """
-        self._counter += 1
-        return self._counter
+        try:
+            return self._by_obj[obj]
+        except KeyError:
+            self._counter += 1
+            self._by_obj[obj] = self._counter
+            return self._counter
 
 
 class suppress_stdout_stderr(object):

@@ -9,6 +9,7 @@ from semantic_world.adapters.urdf import URDFParser
 from semantic_world.world_description.geometry import Box, Scale, Color
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
+from semantic_world.world_description.shape_collection import ShapeCollection
 from semantic_world.world_description.world_entity import Body
 from semantic_world.orm.ormatic_interface import *
 from ormatic.dao import to_dao
@@ -61,7 +62,7 @@ class ORMTest(unittest.TestCase):
         scale = Scale(1.0, 1.0, 1.0)
         color = Color(0.0, 1.0, 1.0)
         shape1 = Box(origin=origin, scale=scale, color=color)
-        b1 = Body(name=PrefixedName("b1"), collision=[shape1])
+        b1 = Body(name=PrefixedName("b1"), collision=ShapeCollection([shape1]))
 
         dao: BodyDAO = to_dao(b1)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Iterable, Tuple, Union
+
 from typing_extensions import Optional, List, Type, TYPE_CHECKING
 
 from .datastructures.prefixed_name import PrefixedName
@@ -7,6 +9,7 @@ from .datastructures.prefixed_name import PrefixedName
 if TYPE_CHECKING:
     from .world import World
     from .world_description.world_entity import View, WorldEntity
+    from .spatial_types.spatial_types import Symbol
 
 
 class LogicalError(Exception):
@@ -36,9 +39,40 @@ class DuplicateViewError(UsageError):
         msg = f"Views {views} are duplicates, while views elements should be unique."
         super().__init__(msg)
 
+
 class DuplicateKinematicStructureEntityError(UsageError):
     def __init__(self, names: List[PrefixedName]):
         msg = f"Kinematic structure entities with names {names} are duplicates, while kinematic structure entity names should be unique."
+        super().__init__(msg)
+
+
+class SpatialTypesError(UsageError):
+    pass
+
+
+class WrongDimensionsError(SpatialTypesError):
+    def __init__(
+        self,
+        expected_dimensions: Union[Tuple[int, int], str],
+        actual_dimensions: Tuple[int, int],
+    ):
+        msg = f"Expected {expected_dimensions} dimensions, but got {actual_dimensions}."
+        super().__init__(msg)
+
+
+class NotSquareMatrixError(SpatialTypesError):
+    def __init__(self, actual_dimensions: Tuple[int, int]):
+        msg = f"Expected a square matrix, but got {actual_dimensions} dimensions."
+        super().__init__(msg)
+
+
+class HasFreeSymbolsError(SpatialTypesError):
+    """
+    Raised when an operation can't be performed on an expression with free symbols.
+    """
+
+    def __init__(self, symbols: Iterable[Symbol]):
+        msg = f"Operation can't be performed on expression with free symbols: {list(symbols)}."
         super().__init__(msg)
 
 

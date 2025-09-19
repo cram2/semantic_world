@@ -11,7 +11,8 @@ from ..world_description.connections import (
     RevoluteConnection,
 )
 from ..world_description.degree_of_freedom import DegreeOfFreedom
-from ..world_description.geometry import Scale, BoundingBoxCollection, Box
+from ..world_description.geometry import Scale, Box
+from ..world_description.shape_collection import BoundingBoxCollection, ShapeCollection
 from ..world_description.world_entity import Body, Region
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
@@ -695,7 +696,7 @@ class DresserFactory(ViewFactory[Dresser]):
         :param world: The world containing the dresser body as its root.
         """
         dresser_body: Body = world.root
-        container_event = dresser_body.as_bounding_box_collection_at_origin(
+        container_event = dresser_body.collision.as_bounding_box_collection_at_origin(
             TransformationMatrix(reference_frame=dresser_body)
         ).event
 
@@ -731,7 +732,7 @@ class DresserFactory(ViewFactory[Dresser]):
         for body in world.bodies:
             if body == dresser_body:
                 continue
-            body_footprint = body.as_bounding_box_collection_at_origin(
+            body_footprint = body.collision.as_bounding_box_collection_at_origin(
                 TransformationMatrix(reference_frame=dresser_body)
             ).event.marginal(SpatialVariables.yz)
             container_footprint -= body_footprint
@@ -849,7 +850,7 @@ class WallFactory(ViewFactory[Wall]):
 
         return wall_world
 
-    def _create_wall_collision(self, reference_frame: Body) -> List[Box]:
+    def _create_wall_collision(self, reference_frame: Body) -> ShapeCollection:
         """
         Return the collision shapes for the wall. A wall event is created based on the scale of the wall, and
         doors are removed from the wall event. The resulting bounding box collection is converted to shapes.
@@ -911,7 +912,7 @@ class WallFactory(ViewFactory[Wall]):
             door_thickness_spatial_variable = SpatialVariables.x.value
 
             for door in doors:
-                door_event = door.body.as_bounding_box_collection_at_origin(
+                door_event = door.body.collision.as_bounding_box_collection_at_origin(
                     TransformationMatrix(reference_frame=temp_world.root)
                 ).event
                 door_event = door_event.marginal(door_plane_spatial_variables)

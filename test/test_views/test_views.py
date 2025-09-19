@@ -32,6 +32,7 @@ try:
 except ImportError as e:
     world_rdr = None
 from semantic_world.world import World
+from semantic_world.testing import apartment_world
 
 
 @dataclass
@@ -91,6 +92,19 @@ class TestView(View):
                 self.tip_entity_2,
             )
         )
+
+
+def test_view_hash(apartment_world):
+    view1 = Handle(body=apartment_world.bodies[0])
+    apartment_world.add_view(view1)
+    assert hash(view1) == hash(
+        (
+            Handle,
+            apartment_world.bodies[0].index,
+        )
+    )
+    view2 = Handle(body=apartment_world.bodies[0])
+    assert (view1) == (view2)
 
 
 class ViewTestCase(unittest.TestCase):

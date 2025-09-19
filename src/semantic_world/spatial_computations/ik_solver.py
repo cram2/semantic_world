@@ -366,7 +366,7 @@ class QPProblem:
         self.lower_box_constraints, self.upper_box_constraints = (
             self.constraint_builder.build_box_constraints(self.active_dofs)
         )
-        self.box_constraint_matrix = cas.eye(len(self.lower_box_constraints))
+        self.box_constraint_matrix = cas.Expression.eye(len(self.lower_box_constraints))
 
         # Goal constraints
         self.eq_bound_expr, self.neq_matrix = (
@@ -374,9 +374,9 @@ class QPProblem:
         )
 
         # Combine constraints
-        self.l = cas.vstack([self.lower_box_constraints, self.eq_bound_expr])
-        self.u = cas.vstack([self.upper_box_constraints, self.eq_bound_expr])
-        self.A = cas.vstack([self.box_constraint_matrix, self.neq_matrix])
+        self.l = cas.Expression.vstack([self.lower_box_constraints, self.eq_bound_expr])
+        self.u = cas.Expression.vstack([self.upper_box_constraints, self.eq_bound_expr])
+        self.A = cas.Expression.vstack([self.box_constraint_matrix, self.neq_matrix])
 
     def _setup_weights(self):
         """Setup quadratic and linear weights for the QP problem."""
@@ -387,7 +387,7 @@ class QPProblem:
         slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
 
         self.quadratic_weights = cas.Expression(dof_weights + slack_weights)
-        self.linear_weights = cas.zeros(*self.quadratic_weights.shape)
+        self.linear_weights = cas.Expression.zeros(*self.quadratic_weights.shape)
 
     def _compile_functions(self):
         """Compile all symbolic expressions into functions."""
@@ -403,16 +403,16 @@ class QPProblem:
         """Evaluate QP matrices at the current solver state."""
         return QPMatrices(
             H=np.diag(
-                self.quadratic_weights_f.fast_call(
+                self.quadratic_weights_f(
                     solver_state.position, solver_state.passive_position
                 )
             ),
-            g=self.linear_weights_f.fast_call(
+            g=self.linear_weights_f(
                 solver_state.position, solver_state.passive_position
             ),
-            A=self.A_f.fast_call(solver_state.position, solver_state.passive_position),
-            l=self.l_f.fast_call(solver_state.position, solver_state.passive_position),
-            u=self.u_f.fast_call(solver_state.position, solver_state.passive_position),
+            A=self.A_f(solver_state.position, solver_state.passive_position),
+            l=self.l_f(solver_state.position, solver_state.passive_position),
+            u=self.u_f(solver_state.position, solver_state.passive_position),
         )
 
 
@@ -493,11 +493,13 @@ class ConstraintBuilder:
         rotation_state, rotation_error = self._compute_rotation_error(root_T_tip)
 
         # Current state and jacobian
-        current_expr = cas.vstack([position_state, rotation_state])
-        eq_bound_expr = cas.vstack([position_error, rotation_error])
+        current_expr = cas.Expression.vstack([position_state, rotation_state])
+        eq_bound_expr = cas.Expression.vstack([position_error, rotation_error])
 
-        J = cas.jacobian(current_expr, active_symbols)
-        neq_matrix = cas.hstack([J * self.dt, cas.eye(6) * self.dt])
+        J = current_expr.jacobian(active_symbols)
+        neq_matrix = cas.Expression.hstack(
+            [J * self.dt, cas.Expression.eye(6) * self.dt]
+        )
 
         return eq_bound_expr, neq_matrix
 
@@ -534,11 +536,11 @@ class ConstraintBuilder:
         rotation_cap = self.max_rotation_velocity * self.dt
 
         hack = cas.RotationMatrix.from_axis_angle(cas.Vector3.Z(), -0.0001)
-        root_R_tip = root_T_tip.to_rotation().dot(hack)
+        root_R_tip = root_T_tip.to_rotation_matrix().dot(hack)
         q_actual = cas.TransformationMatrix(self.target).to_quaternion()
         q_goal = root_R_tip.to_quaternion()
         q_goal = cas.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
-        q_error = cas.quaternion_multiply(q_goal, cas.quaternion_conjugate(q_actual))
+        q_error = q_actual.diff(q_goal)
 
         rotation_error = -q_error
         for i in range(3):

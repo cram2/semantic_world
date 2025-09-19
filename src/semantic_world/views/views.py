@@ -7,14 +7,14 @@ from entity_query_language import symbol
 from probabilistic_model.probabilistic_circuit.rx.helper import uniform_measure_of_event
 from typing_extensions import List
 
-from ..world_description.geometry import BoundingBoxCollection
+from ..world_description.shape_collection import BoundingBoxCollection
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import Point3
 from ..datastructures.variables import SpatialVariables
 from ..world_description.world_entity import View, Body, Region
 
 
-@dataclass
+@dataclass(eq=False)
 class HasDrawers:
     """
     A mixin class for views that have drawers.
@@ -23,7 +23,7 @@ class HasDrawers:
     drawers: List[Drawer] = field(default_factory=list, hash=False)
 
 
-@dataclass
+@dataclass(eq=False)
 class HasDoors:
     """
     A mixin class for views that have doors.
@@ -33,26 +33,18 @@ class HasDoors:
 
 
 @symbol
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Handle(View):
     body: Body
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
-
 
 @symbol
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Container(View):
     body: Body
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
-
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Door(View):  # Door has a Footprint
     """
     Door in a body that has a Handle and can open towards or away from the user.
@@ -61,11 +53,8 @@ class Door(View):  # Door has a Footprint
     handle: Handle
     body: Body
 
-    def __post_init__(self):
-        self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
-
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Fridge(View):
     """
     A view representing a fridge that has a door and a body.
@@ -74,12 +63,8 @@ class Fridge(View):
     body: Body
     door: Door
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
-
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Table(View):
     """
     A view that represents a table.
@@ -108,22 +93,19 @@ class Table(View):
         samples = np.concatenate((samples, z_coordinate), axis=1)
         return [Point3(*s, reference_frame=self.top) for s in samples]
 
-    def __post_init__(self):
-        self.name = self.top.name
-
 
 ################################
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Components(View): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Furniture(View): ...
 
 
-@dataclass
+@dataclass(eq=False)
 class SupportingSurface(View):
     """
     A view that represents a supporting surface.
@@ -134,89 +116,59 @@ class SupportingSurface(View):
     The region that represents the supporting surface.
     """
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.region.name
-
 
 #################### subclasses von Components
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class EntryWay(Components):
     body: Body
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
-
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Door(EntryWay):
     handle: Handle
 
-    def __post_init__(self):
-        self.name = self.body.name
 
-
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Fridge(View):
     body: Body
     door: Door
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
 
-
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class DoubleDoor(EntryWay):
     left_door: Door
     right_door: Door
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = PrefixedName(str(self.body.name), self.__class__.__name__)
-
 
 @symbol
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Drawer(Components):
     container: Container
     handle: Handle
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.container.name
-
 
 ############################### subclasses to Furniture
-@dataclass
+@dataclass(eq=False)
 class Cupboard(Furniture): ...
 
 
-@dataclass
+@dataclass(eq=False)
 class Dresser(Furniture):
     container: Container
     drawers: List[Drawer] = field(default_factory=list, hash=False)
     doors: List[Door] = field(default_factory=list, hash=False)
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.container.name
-
 
 ############################### subclasses to Cupboard
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class Cabinet(Cupboard):
     container: Container
     drawers: list[Drawer] = field(default_factory=list, hash=False)
 
-    def __post_init__(self):
-        self.name = self.container.name
 
-
-@dataclass
+@dataclass(eq=False)
 class Wardrobe(Cupboard):
     doors: List[Door] = field(default_factory=list)
 
@@ -224,7 +176,7 @@ class Wardrobe(Cupboard):
 class Floor(SupportingSurface): ...
 
 
-@dataclass
+@dataclass(eq=False)
 class Room(View):
     """
     A view that represents a closed area with a specific purpose
@@ -235,16 +187,8 @@ class Room(View):
     The room's floor.
     """
 
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.floor.name
 
-
-@dataclass
+@dataclass(eq=False)
 class Wall(View):
     body: Body
     doors: List[Door] = field(default_factory=list)
-
-    def __post_init__(self):
-        if self.name is None:
-            self.name = self.body.name

@@ -10,7 +10,6 @@ from .. import spatial_types as cas
 from .degree_of_freedom import DegreeOfFreedom
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types.derivatives import DerivativeMap
-from ..spatial_types.math import quaternion_from_rotation_matrix
 from ..datastructures.types import NpMatrix4x4
 from .world_entity import CollisionCheckingConfig, Connection
 
@@ -211,7 +210,7 @@ class PrismaticConnection(ActiveConnection1DOF):
         super().__post_init__()
 
         motor_expression = self.dof.symbols.position * self.multiplier + self.offset
-        translation_axis = cas.Vector3.from_iterable(self.axis) * motor_expression
+        translation_axis = self.axis * motor_expression
         parent_T_child = cas.TransformationMatrix.from_xyz_rpy(
             x=translation_axis[0], y=translation_axis[1], z=translation_axis[2]
         )
@@ -235,7 +234,7 @@ class RevoluteConnection(ActiveConnection1DOF):
         motor_expression = self.dof.symbols.position * self.multiplier + self.offset
         parent_R_child = cas.RotationMatrix.from_axis_angle(self.axis, motor_expression)
         self.origin_expression = self.origin_expression @ cas.TransformationMatrix(
-            parent_R_child
+            data=parent_R_child
         )
         self.origin_expression.reference_frame = self.parent
         self.origin_expression.child_frame = self.child
@@ -279,15 +278,15 @@ class Connection6DoF(PassiveConnection):
         super().__post_init__()
         self._post_init_world_part()
         parent_P_child = cas.Point3(
-            x=self.x.symbols.position,
-            y=self.y.symbols.position,
-            z=self.z.symbols.position,
+            x_init=self.x.symbols.position,
+            y_init=self.y.symbols.position,
+            z_init=self.z.symbols.position,
         )
         parent_R_child = cas.Quaternion(
-            x=self.qx.symbols.position,
-            y=self.qy.symbols.position,
-            z=self.qz.symbols.position,
-            w=self.qw.symbols.position,
+            x_init=self.qx.symbols.position,
+            y_init=self.qy.symbols.position,
+            z_init=self.qz.symbols.position,
+            w_init=self.qw.symbols.position,
         ).to_rotation_matrix()
         self.origin_expression = cas.TransformationMatrix.from_point_rotation_matrix(
             point=parent_P_child,
@@ -339,12 +338,13 @@ class Connection6DoF(PassiveConnection):
     def origin(
         self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]
     ) -> None:
-        if isinstance(transformation, cas.TransformationMatrix):
-            transformation = transformation.to_np()
-        orientation = quaternion_from_rotation_matrix(transformation)
-        self._world.state[self.x.name].position = transformation[0, 3]
-        self._world.state[self.y.name].position = transformation[1, 3]
-        self._world.state[self.z.name].position = transformation[2, 3]
+        if not isinstance(transformation, cas.TransformationMatrix):
+            transformation = cas.TransformationMatrix(data=transformation)
+        position = transformation.to_position().to_np()
+        orientation = transformation.to_rotation_matrix().to_quaternion().to_np()
+        self._world.state[self.x.name].position = position[0]
+        self._world.state[self.y.name].position = position[1]
+        self._world.state[self.z.name].position = position[2]
         self._world.state[self.qx.name].position = orientation[0]
         self._world.state[self.qy.name].position = orientation[1]
         self._world.state[self.qz.name].position = orientation[2]
@@ -476,14 +476,22 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
         return super().origin
 
     @origin.setter
-    def origin(self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]) -> None:
+    def origin(
+        self, transformation: Union[NpMatrix4x4, cas.TransformationMatrix]
+    ) -> None:
         if isinstance(transformation, np.ndarray):
-            transformation = cas.TransformationMatrix(transformation)
+            transformation = cas.TransformationMatrix(data=transformation)
         position = transformation.to_position()
-        roll, pitch, yaw = transformation.to_rotation().to_rpy()
-        assert position.z.to_np() == 0.0, "OmniDrive only supports planar movement in the XY plane, z must be 0"
-        assert roll.to_np() == 0.0, "OmniDrive only supports planar movement in the XY plane, roll must be 0"
-        assert pitch.to_np() == 0.0, "OmniDrive only supports planar movement in the XY plane, pitch must be 0"
+        roll, pitch, yaw = transformation.to_rotation_matrix().to_rpy()
+        assert (
+            position.z.to_np() == 0.0
+        ), "OmniDrive only supports planar movement in the XY plane, z must be 0"
+        assert (
+            roll.to_np() == 0.0
+        ), "OmniDrive only supports planar movement in the XY plane, roll must be 0"
+        assert (
+            pitch.to_np() == 0.0
+        ), "OmniDrive only supports planar movement in the XY plane, pitch must be 0"
         self._world.state[self.x.name].position = position.x.to_np()
         self._world.state[self.y.name].position = position.y.to_np()
         self._world.state[self.yaw.name].position = yaw.to_np()

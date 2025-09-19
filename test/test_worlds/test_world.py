@@ -13,12 +13,18 @@ from semantic_world.world_description.connections import (
 from semantic_world.exceptions import (
     AddingAnExistingViewError,
     DuplicateViewError,
-    ViewNotFoundError, DuplicateKinematicStructureEntityError,
+    ViewNotFoundError,
+    DuplicateKinematicStructureEntityError,
 )
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.derivatives import Derivatives
-from semantic_world.spatial_types.math import rotation_matrix_from_rpy
-from semantic_world.spatial_types.spatial_types import TransformationMatrix, Point3, RotationMatrix
+
+# from semantic_world.spatial_types.math import rotation_matrix_from_rpy
+from semantic_world.spatial_types.spatial_types import (
+    TransformationMatrix,
+    Point3,
+    RotationMatrix,
+)
 from semantic_world.spatial_types.symbol_manager import symbol_manager
 from semantic_world.testing import world_setup, pr2_world
 from semantic_world.world_description.world_entity import View, Body
@@ -33,7 +39,7 @@ def test_set_state(world_setup):
     c2.position = 1337
     assert c2.position == 1337
     c3: Connection6DoF = world.get_connection(world.root, bf)
-    transform = rotation_matrix_from_rpy(1, 0, 0)
+    transform = RotationMatrix.from_rpy(1, 0, 0).to_np()
     transform[0, 3] = 69
     c3.origin = transform
     assert np.allclose(world.compute_forward_kinematics_np(world.root, bf), transform)
@@ -231,7 +237,7 @@ def test_compute_fk_expression(world_setup):
     fk = world.compute_forward_kinematics_np(r2, l2)
     fk_expr = world.compose_forward_kinematics_expression(r2, l2)
     fk_expr_compiled = fk_expr.compile()
-    fk2 = fk_expr_compiled.fast_call(
+    fk2 = fk_expr_compiled(
         *symbol_manager.resolve_symbols(fk_expr_compiled.symbol_parameters)
     )
     np.testing.assert_array_almost_equal(fk, fk2)
@@ -504,7 +510,9 @@ def test_merge_with_pose_rotation(world_setup, pr2_world):
     assert fk_base[1, 3] == pytest.approx(1.0, abs=1e-6)
     assert fk_base[2, 3] == pytest.approx(0.0, abs=1e-6)
     np.testing.assert_array_almost_equal(
-        rotation_matrix_from_rpy(0, 0, np.pi / 2)[:3, :3], fk_base[:3, :3], decimal=6
+        RotationMatrix.from_rpy(0, 0, np.pi / 2).to_np()[:3, :3],
+        fk_base[:3, :3],
+        decimal=6,
     )
 
 
@@ -533,22 +541,30 @@ def test_copy_world(world_setup):
     world_copy = deepcopy(world)
     assert l2 not in world_copy.bodies
     assert bf.parent_connection not in world_copy.connections
-    bf.parent_connection.origin = np.array([[1, 0, 0, 1.5],
-                                            [0, 1, 0, 0],
-                                            [0, 0, 1, 0],
-                                            [0, 0, 0, 1]])
-    assert float(world_copy.get_kinematic_structure_entity_by_name("bf").global_pose.to_np()[0, 3]) == 0.0
+    bf.parent_connection.origin = np.array(
+        [[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+    )
+    assert (
+        float(
+            world_copy.get_kinematic_structure_entity_by_name("bf").global_pose.to_np()[
+                0, 3
+            ]
+        )
+        == 0.0
+    )
     assert float(bf.global_pose.to_np()[0, 3]) == 1.5
+
 
 def test_copy_world_state(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connection(r1, r2)
-    world.state[connection.dof.name].position = 1.
+    world.state[connection.dof.name].position = 1.0
     world.notify_state_change()
     world_copy = deepcopy(world)
 
     assert world.get_connection(r1, r2).position == 1.0
     assert world_copy.get_connection(r1, r2).position == 1.0
+
 
 def test_match_index(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
@@ -556,6 +572,7 @@ def test_match_index(world_setup):
     for body in world.bodies:
         new_body = world_copy.get_kinematic_structure_entity_by_name(body.name)
         assert body.index == new_body.index
+
 
 def test_copy_dof(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
@@ -566,8 +583,11 @@ def test_copy_dof(world_setup):
         assert dof.lower_limits == new_dof.lower_limits
         assert dof.upper_limits == new_dof.upper_limits
 
+
 def test_copy_pr2_world(pr2_world):
-    pr2_world.state[pr2_world.get_degree_of_freedom_by_name("torso_lift_joint").name].position = 0.3
+    pr2_world.state[
+        pr2_world.get_degree_of_freedom_by_name("torso_lift_joint").name
+    ].position = 0.3
     pr2_world.notify_state_change()
     pr2_copy = deepcopy(pr2_world)
 
@@ -582,16 +602,22 @@ def test_world_different_entities(world_setup):
     for dof in world_copy.state:
         assert dof not in world.degrees_of_freedom
 
-@unittest.skip("This test still fails because the origin of connections cannot be deepcopied properly.")
+
+@unittest.skip(
+    "This test still fails because the origin of connections cannot be deepcopied properly."
+)
 def test_copy_pr2(pr2_world):
-    pr2_world.state[pr2_world.get_degree_of_freedom_by_name("torso_lift_joint").name].position = 0.3
+    pr2_world.state[
+        pr2_world.get_degree_of_freedom_by_name("torso_lift_joint").name
+    ].position = 0.3
     pr2_world.notify_state_change()
     pr2_copy = deepcopy(pr2_world)
-    assert pr2_world.get_kinematic_structure_entity_by_name("head_tilt_link").global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
-    assert pr2_copy.get_kinematic_structure_entity_by_name("head_tilt_link").global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
-
-
-
+    assert pr2_world.get_kinematic_structure_entity_by_name(
+        "head_tilt_link"
+    ).global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
+    assert pr2_copy.get_kinematic_structure_entity_by_name(
+        "head_tilt_link"
+    ).global_pose.to_np()[2, 3] == pytest.approx(1.472, abs=1e-3)
 
 
 def test_add_entity_with_duplicate_name(world_setup):

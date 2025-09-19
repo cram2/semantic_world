@@ -172,7 +172,6 @@ class Manipulator(RobotView, ABC):
     The axis of the manipulator's tool frame that is facing forward.
     """
 
-
     def assign_to_robot(self, robot: AbstractRobot):
         """
         Assigns the manipulator to the given robot. This method ensures that the manipulator is only assigned
@@ -192,8 +191,6 @@ class Manipulator(RobotView, ABC):
         This allows for proper comparison and storage in sets or dictionaries.
         """
         return hash((self.name, self.root, self.tool_frame))
-
-
 
 
 @dataclass
@@ -541,7 +538,14 @@ class PR2(AbstractRobot):
         """
         Loads the SRDF file for the PR2 robot, if it exists.
         """
-        srdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "collision_configs", "pr2.srdf")
+        srdf_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "resources",
+            "collision_configs",
+            "pr2.srdf",
+        )
         self._world.load_collision_srdf(srdf_path)
 
     @classmethod
@@ -583,14 +587,18 @@ class PR2(AbstractRobot):
             _world=world,
         )
 
-        left_gripper = ParallelGripper(name=PrefixedName('left_gripper', prefix=robot.name.name),
-                                       root=world.get_kinematic_structure_entity_by_name("l_gripper_palm_link"),
-                                       tool_frame=world.get_kinematic_structure_entity_by_name("l_gripper_tool_frame"),
-                                       front_facing_orientation=Quaternion(0, 0, 0, 1),
-                                       front_facing_axis=Vector3(1, 0, 0),
-                                       thumb=left_gripper_thumb,
-                                       finger=left_gripper_finger,
-                                       _world=world)
+        left_gripper = ParallelGripper(
+            name=PrefixedName("left_gripper", prefix=robot.name.name),
+            root=world.get_kinematic_structure_entity_by_name("l_gripper_palm_link"),
+            tool_frame=world.get_kinematic_structure_entity_by_name(
+                "l_gripper_tool_frame"
+            ),
+            front_facing_orientation=Quaternion(0, 0, 0, 1),
+            front_facing_axis=Vector3(1, 0, 0),
+            thumb=left_gripper_thumb,
+            finger=left_gripper_finger,
+            _world=world,
+        )
         left_arm = Arm(
             name=PrefixedName("left_arm", prefix=robot.name.name),
             root=world.get_kinematic_structure_entity_by_name("torso_lift_link"),

@@ -36,7 +36,8 @@ from .exceptions import (
     DuplicateViewError,
     AddingAnExistingViewError,
     ViewNotFoundError,
-    AlreadyBelongsToAWorldError, DuplicateKinematicStructureEntityError,
+    AlreadyBelongsToAWorldError,
+    DuplicateKinematicStructureEntityError,
 )
 from .robots import AbstractRobot
 from .spatial_computations.forward_kinematics import ForwardKinematicsVisitor
@@ -591,7 +592,9 @@ class World:
             ke.name for ke in self.kinematic_structure_entities
         ]:
             if not handle_duplicates:
-                raise DuplicateKinematicStructureEntityError([kinematic_structure_entity.name])
+                raise DuplicateKinematicStructureEntityError(
+                    [kinematic_structure_entity.name]
+                )
             kinematic_structure_entity.name.name = (
                 kinematic_structure_entity.name.name
                 + f"_{id_generator(kinematic_structure_entity)}"
@@ -1477,7 +1480,9 @@ class World:
         :param tip: Tip KinematicStructureEntity to which the kinematics are computed.
         :return: Transformation matrix representing the relative pose of the tip KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
-        return cas.TransformationMatrix(self.compute_forward_kinematics_np(root, tip), reference_frame=root)
+        return cas.TransformationMatrix(
+            data=self.compute_forward_kinematics_np(root, tip), reference_frame=root
+        )
 
     def compute_forward_kinematics_np(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
@@ -1503,9 +1508,9 @@ class World:
 
     def transform(
         self,
-        spatial_object: cas.SpatialType,
+        spatial_object: cas.GenericSpatialType,
         target_frame: KinematicStructureEntity,
-    ) -> cas.SpatialType:
+    ) -> cas.GenericSpatialType:
         """
         Transform a given spatial object from its reference frame to a target frame.
 
@@ -1614,11 +1619,19 @@ class World:
         dof_mapping = {}
         with new_world.modify_world():
             for body in self.bodies:
-                new_body = Body(visual=body.visual, collision=body.collision, name=body.name, )
+                new_body = Body(
+                    visual=body.visual,
+                    collision=body.collision,
+                    name=body.name,
+                )
                 new_world.add_kinematic_structure_entity(new_body)
                 body_mapping[body] = new_body
             for dof in self.degrees_of_freedom:
-                new_dof = DegreeOfFreedom(name=dof.name, lower_limits=dof.lower_limits, upper_limits=dof.upper_limits)
+                new_dof = DegreeOfFreedom(
+                    name=dof.name,
+                    lower_limits=dof.lower_limits,
+                    upper_limits=dof.upper_limits,
+                )
                 new_world.add_degree_of_freedom(new_dof)
                 dof_mapping[dof] = new_dof
             for connection in self.connections:
@@ -1742,7 +1755,9 @@ class World:
         """
         The complement of disabled_collision_pairs with respect to all possible body combinations with enabled collision.
         """
-        all_combinations = set(combinations_with_replacement(self.bodies_with_enabled_collision, 2))
+        all_combinations = set(
+            combinations_with_replacement(self.bodies_with_enabled_collision, 2)
+        )
         return all_combinations - self.disabled_collision_pairs
 
     def add_disabled_collision_pair(

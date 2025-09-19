@@ -2,7 +2,8 @@ from typing_extensions import Dict, Callable, Union, Tuple, List
 
 import numpy as np
 
-from . import spatial_types as cas
+from . import Point3, Vector3, Quaternion, TransformationMatrix
+from .spatial_types import Symbol, Expression
 from ..datastructures.types import AnyMatrix4x4
 
 Provider = Union[float, Callable[[], float]]
@@ -47,25 +48,25 @@ class SymbolManager(metaclass=SingletonMeta):
     use in mathematical and symbolic computations.
     """
 
-    symbol_to_provider: Dict[cas.Symbol, Callable[[], float]]
+    symbol_to_provider: Dict[Symbol, Callable[[], float]]
     """
-    A dictionary mapping symbolic variables (`cas.Symbol`) to callable functions that provide numeric values for those symbols.
+    A dictionary mapping symbolic variables (`Symbol`) to callable functions that provide numeric values for those symbols.
     """
 
     def __init__(self):
         self.symbol_to_provider = {}
 
-    def register_symbol_provider(self, name: str, provider: Provider) -> cas.Symbol:
+    def register_symbol_provider(self, name: str, provider: Provider) -> Symbol:
         """
         Creates a new symbol with the given name and associates it with a provider.
         """
-        symbol = cas.Symbol(name)
+        symbol = Symbol(name=name)
         self.symbol_to_provider[symbol] = provider
         return symbol
 
     def register_point3(
         self, name: str, provider: Callable[[], Tuple[float, float, float]]
-    ) -> cas.Point3:
+    ) -> Point3:
         """
         :param name: Used as prefix for the symbols x, y, and z.
         :param provider: A provider that returns a tuple of floats for x, y, and z.
@@ -74,12 +75,12 @@ class SymbolManager(metaclass=SingletonMeta):
         sx = self.register_symbol_provider(f"{name}.x", lambda: provider()[0])
         sy = self.register_symbol_provider(f"{name}.y", lambda: provider()[1])
         sz = self.register_symbol_provider(f"{name}.z", lambda: provider()[2])
-        p = cas.Point3(sx, sy, sz)
+        p = Point3(x_init=sx, y_init=sy, z_init=sz)
         return p
 
     def register_vector3(
         self, name: str, provider: Callable[[], Tuple[float, float, float]]
-    ) -> cas.Vector3:
+    ) -> Vector3:
         """
         :param name: Used as prefix for the symbols x, y, and z.
         :param provider: A provider that returns a tuple of floats for x, y, and z.
@@ -88,12 +89,12 @@ class SymbolManager(metaclass=SingletonMeta):
         sx = self.register_symbol_provider(f"{name}.x", lambda: provider()[0])
         sy = self.register_symbol_provider(f"{name}.y", lambda: provider()[1])
         sz = self.register_symbol_provider(f"{name}.z", lambda: provider()[2])
-        v = cas.Vector3(sx, sy, sz)
+        v = Vector3(x_init=sx, y_init=sy, z_init=sz)
         return v
 
     def register_quaternion(
         self, name: str, provider: Callable[[], Tuple[float, float, float, float]]
-    ) -> cas.Quaternion:
+    ) -> Quaternion:
         """
         :param name: Used as prefix for the symbols x, y, z, and w.
         :param provider: A provider that returns a tuple of floats for x, y, z, and w.
@@ -103,12 +104,12 @@ class SymbolManager(metaclass=SingletonMeta):
         sy = self.register_symbol_provider(f"{name}.y", lambda: provider()[1])
         sz = self.register_symbol_provider(f"{name}.z", lambda: provider()[2])
         sw = self.register_symbol_provider(f"{name}.w", lambda: provider()[3])
-        q = cas.Quaternion(sx, sy, sz, sw)
+        q = Quaternion(x_init=sx, y_init=sy, z_init=sz, w_init=sw)
         return q
 
     def register_transformation_matrix(
         self, name: str, provider: Callable[[], AnyMatrix4x4]
-    ) -> cas.TransformationMatrix:
+    ) -> TransformationMatrix:
         """
         :param name: Used as prefix for the symbols.
         :param provider: A provider that returns a matrix.
@@ -125,15 +126,15 @@ class SymbolManager(metaclass=SingletonMeta):
                     )
                 )
         symbols.append([0, 0, 0, 1])
-        root_T_tip = cas.TransformationMatrix(symbols)
+        root_T_tip = TransformationMatrix(data=symbols)
         return root_T_tip
 
     def resolve_symbols(
-        self, symbols: Union[List[cas.Symbol], List[List[cas.Symbol]]]
+        self, symbols: Union[List[Symbol], List[List[Symbol]]]
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """
         Given a list of symbols or a list of lists of symbols, returns a list of numeric values for each symbol computed using their providers.
-        Intended to be used in combination with `CompiledFunction.symbol_parameters` and `CompiledFunction.fast_call`.
+        Intended to be used in combination with `CompiledFunction.symbol_parameters` and `CompiledFunction`.
         """
         try:
             if len(symbols) == 0:
@@ -167,7 +168,7 @@ class SymbolManager(metaclass=SingletonMeta):
                     )
             raise e
 
-    def evaluate_expr(self, expr: cas.Expression):
+    def evaluate_expr(self, expr: Expression):
         """
         Compiles and evaluates an arbitrary symbolic expression, using the current symbol providers.
         """
@@ -176,7 +177,7 @@ class SymbolManager(metaclass=SingletonMeta):
         f = expr.compile()
         if len(f.symbol_parameters) == 0:
             return expr.to_np()
-        result = f.fast_call(*self.resolve_symbols(f.symbol_parameters))
+        result = f(*self.resolve_symbols(f.symbol_parameters))
         if len(result) == 1:
             return result[0]
         else:

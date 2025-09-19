@@ -35,6 +35,7 @@ from semantic_world.datastructures.prefixed_name import PrefixedName
 # create of classes that should be mapped
 classes = set(recursive_subclasses(AlternativeMapping))
 classes |= set(classes_of_module(semantic_world.world_description.geometry))
+classes |= set(classes_of_module(semantic_world.world_description.shape_collection))
 classes |= set(classes_of_module(semantic_world.world))
 classes |= set(classes_of_module(semantic_world.datastructures.prefixed_name))
 classes |= set(classes_of_module(semantic_world.world_description.world_entity))

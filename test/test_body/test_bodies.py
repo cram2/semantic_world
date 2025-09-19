@@ -7,6 +7,7 @@ from semantic_world.adapters.mesh import STLParser
 from semantic_world.world_description.geometry import Box
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
+from semantic_world.world_description.shape_collection import ShapeCollection
 from semantic_world.world_description.world_entity import Body
 
 
@@ -17,7 +18,7 @@ class JSONTestCase(unittest.TestCase):
         collision = [
             Box(origin=TransformationMatrix.from_xyz_rpy(0, 1, 0, 0, 0, 1, body))
         ]
-        body.collision = collision
+        body.collision = ShapeCollection(collision, reference_frame=body)
 
         json_data = body.to_json()
         body2 = Body.from_json(json_data)

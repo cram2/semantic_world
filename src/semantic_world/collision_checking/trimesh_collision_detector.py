@@ -43,7 +43,7 @@ class TrimeshCollisionDetector(CollisionDetector):
         )
         for body in bodies_to_be_added:
             self._collision_objects[body] = fcl.CollisionObject(
-                mesh_to_BVH(body.combined_collision_mesh),
+                mesh_to_BVH(body.collision.combined_mesh),
                 fcl.Transform(
                     body.global_pose.to_np()[:3, :3], body.global_pose.to_np()[:3, 3]
                 ),
@@ -89,8 +89,13 @@ class TrimeshCollisionDetector(CollisionDetector):
         ]
         result = []
         for body_a, body_b, distance in collision_pairs:
-            if body_a not in self._collision_objects or body_b not in self._collision_objects:
-                raise ValueError(f"One of the bodies {body_a.name}, {body_b.name} does not have collision enabled or is not part of the world.")
+            if (
+                body_a not in self._collision_objects
+                or body_b not in self._collision_objects
+            ):
+                raise ValueError(
+                    f"One of the bodies {body_a.name}, {body_b.name} does not have collision enabled or is not part of the world."
+                )
             distance_request = fcl.DistanceRequest(
                 enable_nearest_points=True, enable_signed_distance=True
             )

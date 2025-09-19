@@ -1,20 +1,39 @@
 import keyword
+from typing import Union, Iterable
 
-import casadi as ca
 import hypothesis.strategies as st
 import numpy as np
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
-from semantic_world.spatial_types.math import shortest_angular_distance
-from semantic_world.spatial_types.spatial_types import Expression, if_else
-
-# from giskardpy.middleware import get_middleware
-# from giskardpy.utils.math import shortest_angular_distance
+import semantic_world.spatial_types.spatial_types as cas
+from .reference_implementations import shortest_angular_distance
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
+
+all_expressions_float_np = Union[
+    cas.SymbolicType, float, np.ndarray, Iterable[float], Iterable[Iterable[float]]
+]
+
+
+def to_float_or_np(x: all_expressions_float_np) -> Union[float, np.ndarray]:
+    if isinstance(x, cas.SymbolicType):
+        return x.to_np()
+    return x
+
+
+def assert_allclose(
+    a: all_expressions_float_np,
+    b: all_expressions_float_np,
+    atol: float = 1e-3,
+    rtol: float = 1e-3,
+    equal_nan: bool = False,
+):
+    a = to_float_or_np(a)
+    b = to_float_or_np(b)
+    assert np.allclose(a, b, atol=atol, rtol=rtol, equal_nan=equal_nan)
 
 
 def vector(x):
@@ -30,51 +49,40 @@ def random_angle():
 
 
 def compare_axis_angle(
-    actual_angle, actual_axis, expected_angle, expected_axis, decimal=3
+    actual_angle: all_expressions_float_np,
+    actual_axis: all_expressions_float_np,
+    expected_angle: cas.ScalarData,
+    expected_axis: all_expressions_float_np,
 ):
+    actual_angle = to_float_or_np(actual_angle)
+    actual_axis = to_float_or_np(actual_axis)
+    expected_angle = to_float_or_np(expected_angle)
+    expected_axis = to_float_or_np(expected_axis)
     try:
-        np.testing.assert_array_almost_equal(
-            actual_axis, expected_axis, decimal=decimal
-        )
-        np.testing.assert_almost_equal(
-            shortest_angular_distance(actual_angle, expected_angle), 0, decimal=decimal
-        )
+        assert_allclose(actual_axis, expected_axis)
+        assert_allclose(shortest_angular_distance(actual_angle, expected_angle), 0.0)
     except AssertionError:
         try:
-            np.testing.assert_array_almost_equal(
-                actual_axis, -expected_axis, decimal=decimal
-            )
-            np.testing.assert_almost_equal(
+            assert_allclose(actual_axis, -expected_axis)
+            assert_allclose(
                 shortest_angular_distance(actual_angle, abs(expected_angle - 2 * pi)),
-                0,
-                decimal=decimal,
+                0.0,
             )
         except AssertionError:
-            np.testing.assert_almost_equal(
-                shortest_angular_distance(actual_angle, 0), 0, decimal=decimal
-            )
-            np.testing.assert_almost_equal(
-                shortest_angular_distance(0, expected_angle), 0, decimal=decimal
-            )
+            assert_allclose(shortest_angular_distance(actual_angle, 0), 0.0)
+            assert_allclose(shortest_angular_distance(0, expected_angle), 0.0)
             assert not np.any(np.isnan(actual_axis))
             assert not np.any(np.isnan(expected_axis))
 
 
 def compare_orientations(
-    actual_orientation: np.ndarray, desired_orientation: np.ndarray, decimal: int = 2
+    actual_orientation: all_expressions_float_np,
+    desired_orientation: all_expressions_float_np,
 ) -> None:
-    q1 = actual_orientation
-    q2 = desired_orientation
     try:
-        np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
-        np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
-        np.testing.assert_almost_equal(q1[2], q2[2], decimal=decimal)
-        np.testing.assert_almost_equal(q1[3], q2[3], decimal=decimal)
+        assert_allclose(actual_orientation, desired_orientation)
     except:
-        np.testing.assert_almost_equal(q1[0], -q2[0], decimal=decimal)
-        np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
-        np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
-        np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
+        assert_allclose(actual_orientation, -desired_orientation)
 
 
 @composite

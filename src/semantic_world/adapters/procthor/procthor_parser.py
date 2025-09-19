@@ -475,7 +475,7 @@ def unity_to_semantic_digital_twin_transform(
     unity_transform_matrix = np.asarray(unity_transform_matrix, float).reshape(4, 4)
 
     return TransformationMatrix(
-        conjugation_matrix @ unity_transform_matrix @ inverse_conjugation_matrix
+        data=conjugation_matrix @ unity_transform_matrix @ inverse_conjugation_matrix
     )
 
 

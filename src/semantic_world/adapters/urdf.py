@@ -2,27 +2,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing_extensions import Optional, Tuple, Union, List, Dict
 
+from typing_extensions import Optional, Tuple, Union, List, Dict
 from urdf_parser_py import urdf as urdfpy
 
-from ..world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
-    FixedConnection,
-)
-from ..world_description.degree_of_freedom import DegreeOfFreedom
-from ..exceptions import ParsingError
-from ..world_description.geometry import (
-    Box,
-    Sphere,
-    Cylinder,
-    FileMesh,
-    Scale,
-    Shape,
-    Color,
-)
 from ..datastructures.prefixed_name import PrefixedName
+from ..exceptions import ParsingError
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.derivatives import Derivatives, DerivativeMap
 from ..spatial_types.spatial_types import TransformationMatrix, Vector3
@@ -32,6 +17,21 @@ from ..utils import (
     robot_name_from_urdf_string,
 )
 from ..world import World
+from ..world_description.connections import (
+    RevoluteConnection,
+    PrismaticConnection,
+    FixedConnection,
+)
+from ..world_description.degree_of_freedom import DegreeOfFreedom
+from ..world_description.geometry import (
+    Box,
+    Sphere,
+    Cylinder,
+    FileMesh,
+    Scale,
+    Color,
+)
+from ..world_description.shape_collection import ShapeCollection
 from ..world_description.world_entity import Body, Connection
 
 connection_type_map = {  # 'unknown': JointType.UNKNOWN,
@@ -267,19 +267,22 @@ class URDFParser:
         :return: The parsed link object.
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
-        visuals = self.parse_geometry(link.visuals, parent_frame)
-        collisions = self.parse_geometry(link.collisions, parent_frame)
-        return Body(name=name, visual=visuals, collision=collisions)
+        body = Body(name=name)
+        visuals = self.parse_geometry(link.visuals, body)
+        collisions = self.parse_geometry(link.collisions, body)
+        body.visual = visuals
+        body.collision = collisions
+        return body
 
     def parse_geometry(
         self,
         geometry: Union[List[urdfpy.Collision], List[urdfpy.Visual]],
-        parent_frame: PrefixedName,
-    ) -> List[Shape]:
+        body: Body,
+    ) -> ShapeCollection:
         """
         Parses a URDF geometry to the corresponding shapes.
         :param geometry: The URDF geometry to parse either the collisions of visuals.'
-        :param parent_frame: The parent frame of the geometry, used for transformations.
+        :param body: The body of the geometry, used for back referencing.
         :return: A List of shapes corresponding to the URDF geometry.
         """
         res = []
@@ -293,19 +296,10 @@ class URDFParser:
             )
         )
         for i, geom in enumerate(geometry):
-            params = (
-                (*(geom.origin.xyz + geom.origin.rpy),)
-                if geom.origin
-                else (
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                )
+            params = (*(geom.origin.xyz + geom.origin.rpy),) if geom.origin else ()
+            origin_transform = TransformationMatrix.from_xyz_rpy(
+                *params, reference_frame=body
             )
-            origin_transform = TransformationMatrix.from_xyz_rpy(*params)
             if isinstance(geom.geometry, urdfpy.Box):
                 color = (
                     Color(*material_dict.get(geom.material.name, (1, 1, 1, 1)))
@@ -356,7 +350,7 @@ class URDFParser:
                         scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
                     )
                 )
-        return res
+        return ShapeCollection(res, reference_frame=body)
 
     def parse_file_path(self, file_path: str) -> str:
         """

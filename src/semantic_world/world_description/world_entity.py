@@ -2,23 +2,20 @@ from __future__ import annotations
 
 import inspect
 import itertools
-from abc import abstractmethod, ABC
+from abc import ABC
 from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import fields
-from functools import lru_cache, cached_property
+from functools import lru_cache
 
 import numpy as np
 import trimesh
+import trimesh.boolean
 from random_events.utils import SubclassJSONSerializer
 from scipy.stats import geom
-from trimesh import Trimesh
 from trimesh.proximity import closest_point, nearby_faces
 from trimesh.sample import sample_surface
-from trimesh.util import concatenate
-
-import trimesh.boolean
 from typing_extensions import (
     Deque,
     Type,
@@ -30,8 +27,8 @@ from typing_extensions import (
 from typing_extensions import List, Optional, TYPE_CHECKING, Tuple
 from typing_extensions import Set
 
-from .geometry import BoundingBoxCollection, BoundingBox, TriangleMesh
-from .geometry import Shape
+from .geometry import TriangleMesh
+from .shape_collection import ShapeCollection, BoundingBoxCollection
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
@@ -137,29 +134,6 @@ class KinematicStructureEntity(WorldEntity, SubclassJSONSerializer, ABC):
         """
         return self._world.compute_parent_kinematic_structure_entity(self)
 
-    @abstractmethod
-    def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
-    ) -> BoundingBoxCollection:
-        """
-        Provides the bounding box collection for this entity given a transformation matrix as origin.
-        :param origin: The origin to express the bounding boxes from.
-        :returns: A collection of bounding boxes in world-space coordinates.
-        """
-        pass
-
-    def as_bounding_box_collection_in_frame(
-        self, reference_frame: KinematicStructureEntity
-    ) -> BoundingBoxCollection:
-        """
-        Provides the bounding box collection for this entity in the given reference frame.
-        :param reference_frame: The reference frame to express the bounding boxes in.
-        :returns: A collection of bounding boxes in world-space coordinates.
-        """
-        return self.as_bounding_box_collection_at_origin(
-            TransformationMatrix(reference_frame=reference_frame)
-        )
-
 
 @dataclass
 class Body(KinematicStructureEntity, SubclassJSONSerializer):
@@ -168,13 +142,13 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
     A body is a semantic atom, meaning that it cannot be decomposed into meaningful smaller parts.
     """
 
-    visual: List[Shape] = field(default_factory=list, repr=False)
+    visual: ShapeCollection = field(default_factory=ShapeCollection, repr=False)
     """
     List of shapes that represent the visual appearance of the link.
     The poses of the shapes are relative to the link.
     """
 
-    collision: List[Shape] = field(default_factory=list, repr=False)
+    collision: ShapeCollection = field(default_factory=ShapeCollection, repr=False)
     """
     List of shapes that represent the collision geometry of the link.
     The poses of the shapes are relative to the link.
@@ -197,19 +171,17 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
     The index of the entity in `_world.kinematic_structure`.
     """
 
-    @cached_property
-    def combined_collision_mesh(self) -> Trimesh:
-        """
-        Combines all collision meshes into a single mesh, applying the respective transformations.
-        :return: A single Trimesh representing the combined collision geometry.
-        """
-        transformed_meshes = []
-        for shape in self.collision:
-            transform = shape.origin.to_np()
-            mesh = shape.mesh.copy()
-            mesh.apply_transform(transform)
-            transformed_meshes.append(mesh)
-        return concatenate(transformed_meshes)
+    def __post_init__(self):
+        if not self.name:
+            self.name = PrefixedName(f"body_{id_generator(self)}")
+
+        if self._world is not None:
+            self.index = self._world.kinematic_structure.add_node(self)
+
+        self.visual.reference_frame = self
+        self.collision.reference_frame = self
+        self.collision.transform_all_shapes_to_own_frame()
+        self.visual.transform_all_shapes_to_own_frame()
 
     def get_collision_config(self) -> CollisionCheckingConfig:
         if self.temp_collision_config is not None:
@@ -245,22 +217,12 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
     def reset_temporary_collision_config(self):
         self.temp_collision_config = None
 
-    def __post_init__(self):
-        if not self.name:
-            self.name = PrefixedName(f"body_{id_generator(self)}")
-
-        if self._world is not None:
-            self.index = self._world.kinematic_structure.add_node(self)
-
-        for c in self.collision:
-            c.origin.reference_frame = self
-        for v in self.visual:
-            v.origin.reference_frame = self
-
     def __hash__(self):
         return hash(self.name)
 
     def __eq__(self, other):
+        if other is None:
+            return False
         return self.name == other.name and self._world is other._world
 
     def has_collision(
@@ -357,30 +319,11 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
         ]
         return points_min_self, points_min_other, dist_min
 
-    def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
-    ) -> BoundingBoxCollection:
-        """
-        Provides the bounding box collection for this entity given a transformation matrix as origin.
-        :param origin: The origin to express the bounding boxes from.
-        :returns: A collection of bounding boxes in world-space coordinates.
-        """
-        world_bboxes = []
-
-        for shape in self.collision:
-            if shape.origin.reference_frame is None:
-                continue
-            local_bb: BoundingBox = shape.local_frame_bounding_box
-            world_bb = local_bb.transform_to_origin(origin)
-            world_bboxes.append(world_bb)
-
-        return BoundingBoxCollection(origin.reference_frame, world_bboxes)
-
     def to_json(self) -> Dict[str, Any]:
         result = super().to_json()
         result["name"] = self.name.to_json()
-        result["collision"] = [shape.to_json() for shape in self.collision]
-        result["visual"] = [shape.to_json() for shape in self.visual]
+        result["collision"] = self.collision.to_json()
+        result["visual"] = self.visual.to_json()
         return result
 
     @classmethod
@@ -388,8 +331,8 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
 
         result = cls(name=PrefixedName.from_json(data["name"]))
 
-        collision = [Shape.from_json(data) for data in data["collision"]]
-        visual = [Shape.from_json(data) for data in data["visual"]]
+        collision = ShapeCollection.from_json(data["collision"])
+        visual = ShapeCollection.from_json(data["visual"])
 
         for shape in itertools.chain(collision, visual):
             shape.origin.reference_frame = result
@@ -406,23 +349,16 @@ class Region(KinematicStructureEntity):
     Virtual KinematicStructureEntity representing a semantic region in the world.
     """
 
-    area: List[Shape] = field(default_factory=list, hash=False)
+    area: ShapeCollection = field(default_factory=ShapeCollection, hash=False)
     """
-    List of shapes that represent the area of the region.
+    The shapes that represent the area of the region.
     """
+
+    def __post_init__(self):
+        self.area.reference_frame = self
 
     def __hash__(self):
         return id(self)
-
-    def as_bounding_box_collection_at_origin(
-        self, origin: TransformationMatrix
-    ) -> BoundingBoxCollection:
-        """
-        Returns a bounding box collection that contains the bounding boxes of all areas in this region.
-        """
-        bbs = [shape.local_frame_bounding_box for shape in self.area]
-        bbs = [bb.transform_to_origin(origin) for bb in bbs]
-        return BoundingBoxCollection(origin.reference_frame, bbs)
 
     @classmethod
     def from_3d_points(
@@ -497,21 +433,22 @@ class Region(KinematicStructureEntity):
         area_mesh = TriangleMesh(
             mesh=hull, origin=TransformationMatrix(reference_frame=reference_frame)
         )
-        return cls(name=name, area=[area_mesh])
+        return cls(name=name, area=ShapeCollection([area_mesh]))
 
-    @cached_property
-    def combined_area_mesh(self) -> Trimesh:
-        """
-        Combines all collision meshes into a single mesh, applying the respective transformations.
-        :return: A single Trimesh representing the combined collision geometry.
-        """
-        transformed_meshes = []
-        for shape in self.area:
-            transform = shape.origin.to_np()
-            mesh = shape.mesh.copy()
-            mesh.apply_transform(transform)
-            transformed_meshes.append(mesh)
-        return trimesh.boolean.union(transformed_meshes)
+    def to_json(self) -> Dict[str, Any]:
+        result = super().to_json()
+        result["name"] = self.name.to_json()
+        result["area"] = self.area.to_json()
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        result = cls(name=PrefixedName.from_json(data["name"]))
+        area = ShapeCollection.from_json(data["area"])
+        for shape in area:
+            shape.origin.reference_frame = result
+        result.area = area
+        return result
 
 
 GenericKinematicStructureEntity = TypeVar(
@@ -525,7 +462,33 @@ class View(WorldEntity):
     Represents a view on a set of bodies in the world.
 
     This class can hold references to certain bodies that gain meaning in this context.
+
+    .. warning::
+
+        The hash of a view is based on the hash of its type and kinematic structure entities.
+        Overwrite this with extreme care and only if you know what you are doing. Hashes are used inside rules to check if
+        a new view has been created. If you, for instance, just use the object identity, this will fail since python assigns
+        new memory pointers always. The same holds for the equality operator.
+        If you do not want to change the behavior, make sure to use @dataclass(eq=False) to decorate your class.
     """
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = PrefixedName(
+                name=f"{self.__class__.__name__}_{id_generator(self)}",
+                prefix=self._world.name if self._world is not None else None,
+            )
+
+    def __hash__(self):
+        return hash(
+            tuple(
+                [self.__class__]
+                + sorted([kse.index for kse in self.kinematic_structure_entities])
+            )
+        )
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
     def _kinematic_structure_entities(
         self, visited: Set[int], aggregation_type: Type[GenericKinematicStructureEntity]
@@ -603,11 +566,11 @@ class View(WorldEntity):
         """
 
         collections = iter(
-            entity.as_bounding_box_collection_at_origin(origin)
+            entity.collision.as_bounding_box_collection_at_origin(origin)
             for entity in self.kinematic_structure_entities
             if isinstance(entity, Body) and entity.has_collision()
         )
-        bbs = BoundingBoxCollection(origin.reference_frame, [])
+        bbs = BoundingBoxCollection([], origin.reference_frame)
 
         for bb_collection in collections:
             bbs = bbs.merge(bb_collection)
@@ -615,7 +578,7 @@ class View(WorldEntity):
         return bbs
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class RootedView(View):
     """
     Represents a view that is rooted in a specific KinematicStructureEntity.
@@ -644,7 +607,7 @@ class RootedView(View):
         )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class EnvironmentView(RootedView):
     """
     Represents a view of the environment.
@@ -733,7 +696,7 @@ class Connection(WorldEntity):
     def origin_as_position_quaternion(self) -> Expression:
         position = self.origin_expression.to_position()[:3]
         orientation = self.origin_expression.to_quaternion()
-        return cas.vstack([position, orientation]).T
+        return cas.Expression.vstack([position, orientation]).T
 
     @property
     def dofs(self) -> Set[DegreeOfFreedom]:

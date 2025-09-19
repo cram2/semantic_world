@@ -14,6 +14,7 @@ from semantic_world.spatial_types import TransformationMatrix, Point3, RotationM
 from semantic_world.world import World
 from semantic_world.world_description.connections import FixedConnection
 from semantic_world.world_description.geometry import TriangleMesh
+from semantic_world.world_description.shape_collection import ShapeCollection
 from semantic_world.world_description.world_entity import Body
 
 
@@ -173,7 +174,9 @@ class FBXParser(MeshParser):
 
                             meshes.append(t_mesh)
                     body = Body(
-                        name=PrefixedName(name), collision=meshes, visual=meshes
+                        name=PrefixedName(name),
+                        collision=ShapeCollection(meshes),
+                        visual=ShapeCollection(meshes),
                     )
                     world.add_body(body)
 
