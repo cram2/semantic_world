@@ -157,5 +157,49 @@ def test_model_synchronization_creation_only(rclpy_node):
     synchronizer_2.close()
 
 
+def test_callback_pausing(rclpy_node):
+
+    w1 = World(name="w1")
+    w2 = World(name="w2")
+
+    model_synchronizer_1 = ModelSynchronizer(node=rclpy_node, world=w1)
+    model_synchronizer_2 = ModelSynchronizer(node=rclpy_node, world=w2)
+    state_synchronizer_1 = StateSynchronizer(node=rclpy_node, world=w1)
+    state_synchronizer_2 = StateSynchronizer(node=rclpy_node, world=w2)
+
+    model_synchronizer_2.pause()
+    state_synchronizer_2.pause()
+    assert model_synchronizer_2._is_paused
+    assert state_synchronizer_2._is_paused
+
+    with w1.modify_world():
+        b2 = Body(name=PrefixedName("b2"))
+        w1.add_kinematic_structure_entity(b2)
+
+        new_body = Body(name=PrefixedName("b3"))
+        w1.add_kinematic_structure_entity(new_body)
+
+        c = Connection6DoF(b2, new_body, _world=w1)
+        w1.add_connection(c)
+
+    time.sleep(0.1)
+    assert len(model_synchronizer_2.missed_messages) == 1
+    assert len(w1.kinematic_structure_entities) == 2
+    assert len(w2.kinematic_structure_entities) == 0
+    assert len(w1.connections) == 1
+    assert len(w2.connections) == 0
+
+    state_synchronizer_2.resume()
+    model_synchronizer_2.resume()
+    state_synchronizer_2.apply_missed_messages()
+    model_synchronizer_2.apply_missed_messages()
+
+    time.sleep(0.1)
+    assert len(w1.kinematic_structure_entities) == 2
+    assert len(w2.kinematic_structure_entities) == 2
+    assert len(w1.connections) == 1
+    assert len(w2.connections) == 1
+
+
 if __name__ == "__main__":
     unittest.main()

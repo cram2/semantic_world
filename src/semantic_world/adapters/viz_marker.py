@@ -32,6 +32,7 @@ from ..world_description.geometry import (
 )
 from ..world import World
 
+
 @dataclass
 class VizMarkerPublisher(StateChangeCallback):
     """
@@ -62,7 +63,7 @@ class VizMarkerPublisher(StateChangeCallback):
         time.sleep(0.2)
         self.notify()
 
-    def notify(self):
+    def _notify(self):
         """
         Publishes the Marker Array on world changes.
         """

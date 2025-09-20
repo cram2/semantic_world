@@ -29,12 +29,46 @@ class Callback(ABC):
     The world this callback is listening on.
     """
 
-    @abstractmethod
+    _is_paused = False
+    """
+    Flag that indicates if the callback is paused.
+    """
+
     def notify(self):
         """
         Notify the callback of a change in the world.
         """
+        if self._is_paused:
+            pass
+        else:
+            self._notify()
+
+    @abstractmethod
+    def _notify(self):
+        """
+        Notify the callback of a change in the world.
+        Override this method to implement custom behaviors.
+        """
         raise NotImplementedError
+
+    @abstractmethod
+    def stop(self):
+        """
+        Stop the callback.
+        """
+        raise NotImplementedError
+
+    def pause(self):
+        """
+        Pause the callback such that notify does not trigger anymore.
+        """
+        self._is_paused = True
+
+    def resume(self):
+        """
+        Resume the callback such that notify does trigger again.
+        """
+        self._is_paused = False
 
 
 @dataclass
@@ -46,6 +80,12 @@ class StateChangeCallback(Callback, ABC):
     def __post_init__(self):
         self.world.state_change_callbacks.append(self)
 
+    def stop(self):
+        try:
+            self.world.state_change_callbacks.remove(self)
+        except ValueError:
+            pass
+
 
 @dataclass
 class ModelChangeCallback(Callback, ABC):
@@ -55,3 +95,9 @@ class ModelChangeCallback(Callback, ABC):
 
     def __post_init__(self):
         self.world.model_change_callbacks.append(self)
+
+    def stop(self):
+        try:
+            self.world.model_change_callbacks.remove(self)
+        except ValueError:
+            pass

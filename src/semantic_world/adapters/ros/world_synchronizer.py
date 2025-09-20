@@ -91,7 +91,7 @@ class Synchronizer(ABC):
         self._subscription_callback(msg)
 
     @abstractmethod
-    def _subscription_callback(self, msg):
+    def _subscription_callback(self, msg: message_type):
         """
         Callback function called when receiving new messages from other publishers.
         """
@@ -132,7 +132,12 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
     If the callback is triggered by a message, this synchronizer should not republish the change.
     """
 
-    def notify(self):
+    missed_messages: List = field(default_factory=list, init=False, repr=False)
+    """
+    The messages that the callback did not trigger due to being paused.
+    """
+
+    def _notify(self):
         """
         Wrapper method around world_callback that checks if this time the callback should be triggered.
         """
@@ -141,12 +146,36 @@ class SynchronizerOnCallback(Synchronizer, Callback, ABC):
         else:
             self.world_callback()
 
+    def _subscription_callback(self, msg):
+        if self._is_paused:
+            self.missed_messages.append(msg)
+        else:
+            self.apply_message(msg)
+
+    @abstractmethod
+    def apply_message(self, msg):
+        """
+        Apply the received message to the world.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def world_callback(self):
         """
         Called when the world notifies and update that is not caused by this synchronizer.
         """
         raise NotImplementedError
+
+    def apply_missed_messages(self):
+        """
+        Applies the missed messages to the world.
+        """
+        self._skip_next_world_callback = True
+        with self.world.modify_world():
+            for msg in self.missed_messages:
+                self.apply_message(msg)
+
+        self.missed_messages = []
 
 
 @dataclass
@@ -175,7 +204,7 @@ class StateSynchronizer(StateChangeCallback, SynchronizerOnCallback):
         """
         self.previous_world_state_data = np.copy(self.world.state.positions)
 
-    def _subscription_callback(self, msg: WorldStateUpdate):
+    def apply_message(self, msg: WorldStateUpdate):
         """
         Update the world state with the provided message.
 
@@ -231,7 +260,7 @@ class ModelSynchronizer(
         super().__post_init__()
         SynchronizerOnCallback.__post_init__(self)
 
-    def _subscription_callback(self, msg: ModificationBlock):
+    def apply_message(self, msg: ModificationBlock):
         msg.modifications.apply(self.world)
 
     def world_callback(self):
