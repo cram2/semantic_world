@@ -2,6 +2,7 @@ import json
 import os
 import unittest
 from dataclasses import asdict
+from time import sleep
 
 import numpy as np
 from sqlalchemy import create_engine
@@ -295,6 +296,19 @@ class ProcTHORTestCase(unittest.TestCase):
                 "house_987654321.json",
             )
         ).parse()
+
+        from semantic_world.adapters.viz_marker import VizMarkerPublisher
+        import threading
+        import rclpy
+
+        rclpy.init()
+
+        node = rclpy.create_node("semantic_world")
+
+        viz = VizMarkerPublisher(world=world, node=node)
+        sleep(3)
+
+        assert world is not None
 
 
 if __name__ == "__main__":
