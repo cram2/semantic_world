@@ -9,7 +9,7 @@ from functools import cached_property
 import numpy as np
 import trimesh
 import trimesh.exchange.stl
-from random_events.interval import SimpleInterval, Bound
+from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from random_events.utils import SubclassJSONSerializer
 from typing_extensions import Optional, List, TYPE_CHECKING, Dict, Any
@@ -132,6 +132,16 @@ class Scale(SubclassJSONSerializer):
         self.x = float(self.x)
         self.y = float(self.y)
         self.z = float(self.z)
+
+    @property
+    def simple_event(self) -> SimpleEvent:
+        return SimpleEvent(
+            {
+                SpatialVariables.x.value: closed(-self.x / 2, self.x / 2),
+                SpatialVariables.y.value: closed(-self.y / 2, self.y / 2),
+                SpatialVariables.z.value: closed(-self.z / 2, self.z / 2),
+            }
+        )
 
 
 @dataclass

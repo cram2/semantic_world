@@ -146,22 +146,19 @@ class ProcthorDoor:
             single_door_name = PrefixedName(
                 f"{self.name.name}_{index}", self.name.prefix
             )
+            handle_offset = y_direction - 0.1 if direction == Direction.Y else -(y_direction - 0.1)
+            door_T_handle = TransformationMatrix.from_xyz_rpy(
+                        y = handle_offset
+            )
             door_factory = self._get_single_door_factory(
-                single_door_name, one_door_scale, direction
+                door_T_handle, single_door_name, one_door_scale
             )
 
             door_factories.append(door_factory)
 
-            parent_T_door = TransformationMatrix.from_point_rotation_matrix(
-                Point3(
-                    x_direction,
-                    (
-                        y_direction
-                        if door_factory.handle_direction == Direction.NEGATIVE_Y
-                        else -y_direction
-                    ),
-                    z_direction,
-                )
+            parent_T_door = TransformationMatrix.from_xyz_rpy(
+                    x=x_direction,
+                    y=y_direction if direction == Direction.NEGATIVE_Y else -y_direction
             )
             door_transforms.append(parent_T_door)
 
@@ -174,9 +171,9 @@ class ProcthorDoor:
 
     def _get_single_door_factory(
         self,
+        door_T_handle: TransformationMatrix,
         name: Optional[PrefixedName] = None,
         scale: Optional[Scale] = None,
-        handle_direction: Direction = Direction.Y,
     ):
         """
         Parses the parameters according to the single door assumptions, and returns a single door factory.
@@ -188,7 +185,7 @@ class ProcthorDoor:
             name=name,
             scale=scale,
             handle_factory=HandleFactory(name=handle_name),
-            handle_direction=handle_direction,
+            parent_T_handle=door_T_handle,
         )
         return door_factory
 
@@ -201,7 +198,7 @@ class ProcthorDoor:
         if "double" in self.name.name.lower():
             return self._get_double_door_factory()
         else:
-            return self._get_single_door_factory()
+            return self._get_single_door_factory(TransformationMatrix.from_xyz_rpy(y=-(self.scale.y / 2 - 0.1)))
 
 
 @dataclass
@@ -344,8 +341,10 @@ class ProcthorWall:
 
         for door in self.door_dicts:
             door = ProcthorDoor(door_dict=door, parent_wall_width=self.scale.y)
-            door_factories.append(door.get_factory())
-            list_wall_T_door.append(door.wall_T_door)
+            factory = door.get_factory()
+            if factory is not None:
+                door_factories.append(door.get_factory())
+                list_wall_T_door.append(door.wall_T_door)
 
         wall_factory = WallFactory(
             name=self.name,

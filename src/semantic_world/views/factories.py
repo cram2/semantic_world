@@ -1,11 +1,37 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import IntEnum, Enum
+from functools import reduce
+from operator import or_
 
+from entity_query_language import (
+    symbolic_mode,
+    let,
+    an,
+    entity,
+    not_,
+    in_,
+    From,
+    merge,
+)
 from numpy import ndarray
+from probabilistic_model.distributions import (
+    UnivariateDistribution,
+)
+from probabilistic_model.distributions.helper import make_dirac
+from probabilistic_model.probabilistic_circuit.rx.helper import (
+    uniform_measure_of_simple_event,
+)
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    ProductUnit,
+    leaf,
+    ProbabilisticCircuit,
+)
+from random_events.interval import Bound
 from random_events.product_algebra import *
-from typing_extensions import TypeVar, Generic
+from typing_extensions import Generic, TypeVar
 
 from ..datastructures.prefixed_name import PrefixedName
 from ..datastructures.variables import SpatialVariables
@@ -50,83 +76,100 @@ class Direction(IntEnum):
     NEGATIVE_Z = 5
 
 
-def event_from_scale(scale: Scale):
-    return SimpleEvent(
-        {
-            SpatialVariables.x.value: closed(-scale.x / 2, scale.x / 2),
-            SpatialVariables.y.value: closed(-scale.y / 2, scale.y / 2),
-            SpatialVariables.z.value: closed(-scale.z / 2, scale.z / 2),
-        }
-    )
-
-
 @dataclass
-class HasDoorFactories(ABC):
+class HasDoorLikeFactories(ABC):
 
-    door_factories: List[DoorFactory] = field(default_factory=list, hash=False)
+    door_factories: List[DoorLikeFactory] = field(default_factory=list, hash=False)
     """
-    The factories used to create the doors of the dresser.
+    The factories used to create the doors.
     """
 
     door_transforms: List[TransformationMatrix] = field(
         default_factory=list, hash=False
     )
     """
-    The transformations for the doors relative to the dresser container.
+    The transformations for the doors relative their parent container.
     """
 
-    def create_door_upper_lower_limits(
-        self, door_factory: DoorFactory
+    def _create_door_upper_lower_limits(
+        self, door_view: Door
     ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
-
+        """
+        Return the upper and lower limits for the door's degree of freedom.
+        """
         lower_limits = DerivativeMap[float]()
         upper_limits = DerivativeMap[float]()
         lower_limits.position = -np.pi / 2
         upper_limits.position = 0.0
 
-        if door_factory.handle_direction in {
-            Direction.NEGATIVE_X,
-            Direction.NEGATIVE_Y,
-        }:
+        parent_connection = door_view.handle.body.parent_connection
+        door_P_handle: ndarray[float] = (
+            parent_connection.origin_expression.to_position().to_np()
+        )
+        if np.sign(door_P_handle[1]) < 0:
             lower_limits.position = 0.0
             upper_limits.position = np.pi / 2
         return upper_limits, lower_limits
 
-    def add_door_to_world(
+    def _add_hinge_to_door(
+        self, door_factory: DoorFactory, parent_T_door: TransformationMatrix
+    ):
+        """
+        Adds a hinge to the door. The hinge's pivot point is on the opposite side of the handle.
+        :param door_factory: The factory used to create the door.
+        :param parent_T_door: The transformation matrix defining the door's position and orientation relative
+        """
+        door_world = door_factory.create()
+        root = door_world.root
+        door_view: Door = door_world.get_views_by_type(Door)[0]
+
+        door_hinge = Body(
+            name=PrefixedName(f"{root.name.name}_door_hinge", root.name.prefix)
+        )
+        parent_T_hinge = self._calculate_door_pivot_point(
+            door_view, parent_T_door, door_factory.scale
+        )
+        hinge_T_door = parent_T_hinge.inverse() @ parent_T_door
+
+        hinge_door_connection = FixedConnection(
+            parent=door_hinge, child=root, origin_expression=hinge_T_door
+        )
+        with door_world.modify_world():
+            door_world.add_connection(hinge_door_connection)
+
+        return door_world, parent_T_hinge
+
+    def _add_door_to_world(
         self,
         door_factory: DoorFactory,
         parent_T_door: TransformationMatrix,
         parent_world: World,
     ):
         """
-        Adds a door to the parent world with a revolute connection. The Door's pivot point is on the opposite side of the
-        handle.
+        Adds a door to the parent world using a new door hinge body with a revolute connection.
 
         :param door_factory: The factory used to create the door.
         :param parent_T_door: The transformation matrix defining the door's position and orientation relative
         to the parent world.
         :param parent_world: The world to which the door will be added.
         """
-        door_world = door_factory.create()
-        root = door_world.root
-
-        upper_limits, lower_limits = self.create_door_upper_lower_limits(door_factory)
-
-        dof = DegreeOfFreedom(
-            name=PrefixedName(f"{root.name.name}_connection", root.name.prefix),
-            lower_limits=lower_limits,
-            upper_limits=upper_limits,
-        )
         with parent_world.modify_world():
-            door_view: Door = door_world.get_views_by_type(Door)[0]
-            pivot_point = self.calculate_door_pivot_point(
-                door_view, parent_T_door, door_factory.scale
+            door_world, parent_T_hinge = self._add_hinge_to_door(
+                door_factory, parent_T_door
             )
+            door_view: Door = door_world.get_views_by_type(Door)[0]
+            upper_limits, lower_limits = self._create_door_upper_lower_limits(door_view)
 
+            root = door_world.root
+            dof = DegreeOfFreedom(
+                name=PrefixedName(f"{root.name.name}_connection", root.name.prefix),
+                lower_limits=lower_limits,
+                upper_limits=upper_limits,
+            )
             connection = RevoluteConnection(
                 parent=parent_world.root,
                 child=root,
-                origin_expression=pivot_point,
+                origin_expression=parent_T_hinge,
                 multiplier=1.0,
                 offset=0.0,
                 axis=Vector3.Z(),
@@ -135,117 +178,337 @@ class HasDoorFactories(ABC):
 
             parent_world.merge_world(door_world, connection)
 
-    def add_doors_to_world(
+    def add_doorlike_views_to_world(
         self,
         parent_world: World,
     ):
         """
-        Adds doors to the parent world.
+        Adds door-like views to the parent world.
         """
         for door_factory, door_transform in zip(
             self.door_factories, self.door_transforms
         ):
-            self.add_door_to_world(
-                door_factory=door_factory,
-                parent_T_door=door_transform,
-                parent_world=parent_world,
-            )
+            if isinstance(door_factory, DoorFactory):
+                self._add_door_to_world(
+                    door_factory=door_factory,
+                    parent_T_door=door_transform,
+                    parent_world=parent_world,
+                )
+            elif isinstance(door_factory, DoubleDoorFactory):
+                self._add_double_door_to_world(
+                    door_factory=door_factory,
+                    parent_T_door=door_transform,
+                    parent_world=parent_world,
+                )
 
-    def calculate_door_pivot_point(
-        self, door_view: Door, door_transform: TransformationMatrix, scale: Scale
+    def _calculate_door_pivot_point(
+        self, door_view: Door, parent_T_door: TransformationMatrix, scale: Scale
     ) -> TransformationMatrix:
         """
         Calculate the door pivot point based on the handle position and the door scale. The pivot point is on the opposite
         side of the handle.
 
         :param door_view: The door view containing the handle.
-        :param door_transform: The transformation matrix defining the door's position and orientation.
+        :param parent_T_door: The transformation matrix defining the door's position and orientation.
         :param scale: The scale of the door.
 
         :return: The transformation matrix defining the door's pivot point.
         """
-        parent_connection = door_view.handle.body.parent_connection
-        if parent_connection is None:
-            raise ValueError(
-                "Handle's body does not have a parent_connection; cannot compute handle_position."
+        connection = door_view.handle.body.parent_connection
+        door_P_handle: ndarray[float] = (
+            connection.origin_expression.to_position().to_np()
+        )
+
+        sign = np.sign(door_P_handle[1]) if door_P_handle[1] != 0 else 1
+        offset = sign * (scale.y / 2)
+        parent_P_hinge = parent_T_door.to_np()[:3, 3] + np.array([0, offset, 0])
+
+        parent_T_hinge = TransformationMatrix.from_point_rotation_matrix(
+            Point3(*parent_P_hinge)
+        )
+
+        return parent_T_hinge
+
+    def _add_double_door_to_world(
+        self,
+        door_factory: DoubleDoorFactory,
+        parent_T_door: TransformationMatrix,
+        parent_world: World,
+    ):
+        door_world = door_factory.create()
+        connection = FixedConnection(
+            parent=parent_world.root,
+            child=door_world.root,
+            origin_expression=parent_T_door,
+        )
+
+        parent_world.merge_world(door_world, connection)
+
+    def remove_doors_from_world(
+        self, parent_world: World, wall_event_thickness: float = 0.1
+    ):
+        doors: List[Door] = parent_world.get_views_by_type(Door)
+        if not doors:
+            return
+        all_doors_event = self._build_all_doors_event_from_views(
+            doors, wall_event_thickness
+        )
+
+        all_bodies_not_door = self._get_all_bodies_excluding_doors_from_world(
+            parent_world
+        )
+
+        if not all_doors_event.is_empty():
+            self._remove_doors_from_bodies(all_bodies_not_door, all_doors_event)
+
+    def _get_all_bodies_excluding_doors_from_world(self, world: World) -> List[Body]:
+        with symbolic_mode():
+            all_doors = Door(From(world.views))
+            door_bodies = merge(all_doors.bodies)
+            other_body = let(type_=Body, domain=world.bodies_with_enabled_collision)
+            bodies_without_excluded_bodies_query = an(
+                entity(other_body, not_(in_(other_body, door_bodies)))
             )
-        handle_position: ndarray[float] = (
-            parent_connection.origin_expression.to_position().to_np()
-        )
 
-        offset = -np.sign(handle_position[1]) * (scale.y / 2)
-        door_position = door_transform.to_np()[:3, 3] + np.array([0, offset, 0])
+        filtered_bodies = list(bodies_without_excluded_bodies_query.evaluate())
+        return filtered_bodies
 
-        door_transform = TransformationMatrix.from_point_rotation_matrix(
-            Point3(*door_position)
-        )
+    def _build_all_doors_event_from_views(
+        self, doors: List[Door], wall_event_thickness: float = 0.1
+    ) -> Event:
+        door_events = [
+            self._build_single_door_event(door, wall_event_thickness) for door in doors
+        ]
+        if door_events:
+            return reduce(or_, door_events)
+        return Event()
 
-        return door_transform
+    def _build_single_door_event(
+        self, door: Door, wall_event_thickness: float = 0.1
+    ) -> Event:
+        door_event = door.body.collision.as_bounding_box_collection_in_frame(
+            door._world.root
+        ).event
 
-    def get_door_transforms(
-        self, doors, door_factory, door_transform
-    ) -> TransformationMatrix:
-        """
-        Calculate the door pivot point based on the door factory and the door transform.
-        """
-        match door_factory:
-            case DoorFactory():
-                door_transform = self.calculate_door_pivot_point(
-                    doors[0], door_transform, door_factory.scale
+        door_plane_spatial_variables = SpatialVariables.yz
+        door_thickness_spatial_variable = SpatialVariables.x.value
+        door_event = door_event.marginal(door_plane_spatial_variables)
+        door_event.fill_missing_variables([door_thickness_spatial_variable])
+        thickness_event = SimpleEvent(
+            {
+                door_thickness_spatial_variable: closed(
+                    -wall_event_thickness / 2, wall_event_thickness / 2
                 )
-            case DoubleDoorFactory():
-                translation = door_transform.to_position().to_np()
-                door_transform = TransformationMatrix.from_point_rotation_matrix(
-                    Point3(translation[0], translation[1], 0)
-                )
+            }
+        ).as_composite_set()
+        thickness_event.fill_missing_variables(door_plane_spatial_variables)
+        door_event = door_event & thickness_event
 
-        return door_transform
+        return door_event
+
+    def _remove_doors_from_bodies(self, bodies: List[Body], all_doors_event: Event):
+        for body in bodies:
+            self._remove_door_from_body(body, all_doors_event)
+
+    def _remove_door_from_body(self, body: Body, all_doors_event: Event):
+        root = body._world.root
+        body_event = (
+            body.collision.as_bounding_box_collection_in_frame(root).event
+            - all_doors_event
+        )
+        new_collision = BoundingBoxCollection.from_event(root, body_event).as_shapes()
+        body.collision = new_collision
+        body.visual = new_collision
+
+
+class SemanticDirection(Enum): ...
+
+
+class HorizontalSemanticDirection(SemanticDirection): ...
+
+
+class VerticalSemanticDirection(SemanticDirection): ...
+
+
+class DirectionDirac(float): ...
+
+
+class ProabilisticHorizontalDirection(SimpleInterval, HorizontalSemanticDirection):
+    LEFT = (0, 1 / 3, Bound.CLOSED, Bound.CLOSED)
+    CENTER = (1 / 3, 2 / 3, Bound.OPEN, Bound.OPEN)
+    RIGHT = (2 / 3, 1, Bound.CLOSED, Bound.CLOSED)
+
+
+class ExactHorizontalDirection(DirectionDirac, HorizontalSemanticDirection):
+    LEFT = 0
+    CENTER = 0.5
+    RIGHT = 1
+
+
+class ProabilisticVerticalDirection(SimpleInterval, VerticalSemanticDirection):
+    TOP = (0, 1 / 3, Bound.CLOSED, Bound.CLOSED)
+    CENTER = (1 / 3, 2 / 3, Bound.OPEN, Bound.OPEN)
+    BOTTOM = (2 / 3, 1, Bound.CLOSED, Bound.CLOSED)
+
+
+class ExactVerticalDirection(DirectionDirac, VerticalSemanticDirection):
+    TOP = 0
+    CENTER = 0.5
+    BOTTOM = 1
+
+
+@dataclass
+class SemanticPositionDescription:
+    """
+    Describes a position by mapping semantic concepts (RIGHT, CENTER, LEFT, TOP, BOTTOM) to instances of
+    random_events.intervals.SimpleInterval, which are then used to "zoom" into specific regions of an event.
+    Each DirectionInterval divides the original event into three parts, either vertically or horizontally, and zooms into
+    one of them depending on which specific direction was chosen.
+    The sequence of zooms is defined by the order of directions in the horizontal_direction_chain and
+    vertical_direction_chain lists.
+    Finally, we can sample aa 2d pose from the resulting event
+    """
+
+    horizontal_direction_chain: List[HorizontalSemanticDirection]
+    """
+    Describes the sequence of zooms in the horizontal direction (Y axis).
+    """
+
+    vertical_direction_chain: List[VerticalSemanticDirection]
+    """
+    Describes the sequence of zooms in the vertical direction (Z axis).
+    """
+
+    @staticmethod
+    def _zoom_interval(base: SimpleInterval, target: SimpleInterval) -> SimpleInterval:
+        """
+        Zoom 'base' interval by the percentage interval 'target' (0..1),
+        preserving the base's boundary styles.
+        """
+        span = base.upper - base.lower
+        new_lower = base.lower + span * target.lower
+        new_upper = base.lower + span * target.upper
+        return SimpleInterval(new_lower, new_upper, base.left, base.right)
+
+    @staticmethod
+    def _zoom_dirac(base: SimpleInterval, target: DirectionDirac) -> float:
+        """
+        Zoom 'base' interval to the dirac point 'target' (0..1),
+        preserving the base's boundary styles.
+        """
+        span = base.upper - base.lower
+        new_point = base.lower + span * target
+        return new_point
+
+    def _apply_zoom(
+        self, simple_event: SimpleEvent
+    ) -> Tuple[SimpleEvent, List[UnivariateDistribution]]:
+        """
+        Apply zooms in order and return the resulting intervals.
+        """
+
+        areas = [
+            self._apply_zoom_in_one_direction(
+                axis,
+                assignment.simple_sets[0],
+            )
+            for axis, assignment in simple_event.items()
+        ]
+
+        simple_events = [area for area in areas if isinstance(area, SimpleEvent)]
+        simple_event = reduce(or_, simple_events) if simple_events else SimpleEvent()
+        distributions = [
+            area for area in areas if isinstance(area, UnivariateDistribution)
+        ]
+
+        return simple_event, distributions
+
+    def _build_circuit(
+        self, simple_event: SimpleEvent, distributions: List[UnivariateDistribution]
+    ) -> ProbabilisticCircuit:
+
+        event_circuit = uniform_measure_of_simple_event(simple_event)
+        root: ProductUnit = event_circuit.root
+        for distribution in distributions:
+            root.add_subcircuit(leaf(distribution, event_circuit))
+        return event_circuit
+
+    def _apply_zoom_in_one_direction(
+        self, axis: Continuous, current_interval: SimpleInterval
+    ) -> Union[SimpleEvent, UnivariateDistribution]:
+        current_dirac = None
+        if axis == SpatialVariables.y.value:
+            directions = self.horizontal_direction_chain
+        elif axis == SpatialVariables.z.value:
+            directions = self.vertical_direction_chain
+        else:
+            raise NotImplementedError
+
+        for step in directions:
+            match step:
+                case SimpleInterval():
+                    current_interval = self._zoom_interval(current_interval, step)
+                case DirectionDirac():
+                    current_dirac = self._zoom_dirac(current_interval, step)
+                    current_dirac = make_dirac(axis, float(current_dirac))
+                    break
+
+        return current_dirac or SimpleEvent({axis: current_interval})
+
+    def sample_point_from_event(self, event: Event):
+        simple_event, distributions = self._apply_zoom(event.bounding_box())
+        event_circuit = self._build_circuit(simple_event, distributions)
+
+        return event_circuit.sample(amount=1)[0]
 
 
 @dataclass
 class HasHandleFactory(ABC):
+    """
+    Mixin for factories receiving a HandleFactory.
+    If both parent_T_handle and semantic_position are set, parent_T_handle will be
+    prioritized.
+    """
+
     handle_factory: HandleFactory = field(kw_only=True)
     """
     The factory used to create the handle of the door.
     """
 
-    handle_direction: Direction = field(default=Direction.Y)
+    semantic_position: Optional[SemanticPositionDescription] = field(default=None)
     """
     The direction on the door in which the handle positioned.
     """
+
+    parent_T_handle: Optional[TransformationMatrix] = field(default=None)
+    """
+    The transformation matrix of the handle from the parent
+    """
+
+    def __post_init__(self):
+        assert (
+            self.parent_T_handle is not None or self.semantic_position is not None
+        ), "Either parent_T_handle or semantic_position must be set."
+        if self.parent_T_handle is not None and self.semantic_position is not None:
+            logging.warning(
+                f"During the creation of a factory, both parent_T_handle and semantic_position were set. Prioritizing parent_T_handle."
+            )
 
     def create_parent_T_handle_from_parent_scale(
         self, scale: Scale
     ) -> Optional[TransformationMatrix]:
         """
-        Return a transformation matrix that defines the position and orientation of the handle relative to the door.
+        Return a transformation matrix that defines the position and orientation of the handle relative to its parent.
         :raises: NotImplementedError if the handle direction is Z or NEGATIVE_Z.
         """
-        match self.handle_direction:
-            case Direction.X:
-                return TransformationMatrix.from_xyz_rpy(
-                    scale.x - 0.1, 0.05, 0, 0, 0, np.pi / 2
-                )
-            case Direction.Y:
-                return TransformationMatrix.from_xyz_rpy(
-                    0.05, (scale.y - 0.1), 0, 0, 0, 0
-                )
-            case Direction.Z:
-                raise NotImplementedError(
-                    f"Handle Creation for handle_direction Z is not implemented yet"
-                )
-            case Direction.NEGATIVE_X:
-                return TransformationMatrix.from_xyz_rpy(
-                    -(scale.x - 0.1), 0.05, 0, 0, 0, np.pi / 2
-                )
-            case Direction.NEGATIVE_Y:
-                return TransformationMatrix.from_xyz_rpy(
-                    0.05, -(scale.y - 0.1), 0, 0, 0, 0
-                )
-            case Direction.NEGATIVE_Z:
-                raise NotImplementedError(
-                    f"Handle Creation for handle_direction NEGATIVE_Z is not implemented yet"
-                )
+        assert self.semantic_position is not None
+        sampled_2d_point = self.semantic_position.sample_point_from_event(
+            scale.simple_event.as_composite_set().marginal(SpatialVariables.yz)
+        )
+
+        return TransformationMatrix.from_xyz_rpy(
+            x=0.05, y=sampled_2d_point[0], z=sampled_2d_point[1]
+        )
 
     def add_handle_to_world(
         self,
@@ -275,24 +538,24 @@ class HasDrawerFactories(ABC):
 
     drawers_factories: List[DrawerFactory] = field(default_factory=list, hash=False)
     """
-    The factories used to create the drawers of the dresser.
+    The factories used to create drawers.
     """
 
     drawer_transforms: List[TransformationMatrix] = field(
         default_factory=list, hash=False
     )
     """
-    The transformations for the drawers relative to the dresser container.
+    The transformations for the drawers their parent container.
     """
 
-    def add_drawer_to_world(
+    def _add_drawer_to_world(
         self,
         drawer_factory: DrawerFactory,
         parent_T_drawer: TransformationMatrix,
         parent_world: World,
     ):
 
-        lower_limits, upper_limits = self.create_drawer_upper_lower_limits(
+        lower_limits, upper_limits = self._create_drawer_upper_lower_limits(
             drawer_factory
         )
         drawer_world = drawer_factory.create()
@@ -324,14 +587,14 @@ class HasDrawerFactories(ABC):
         for drawer_factory, transform in zip(
             self.drawers_factories, self.drawer_transforms
         ):
-            self.add_drawer_to_world(
+            self._add_drawer_to_world(
                 drawer_factory=drawer_factory,
                 parent_T_drawer=transform,
                 parent_world=parent_world,
             )
 
     @staticmethod
-    def create_drawer_upper_lower_limits(
+    def _create_drawer_upper_lower_limits(
         drawer_factory: DrawerFactory,
     ) -> Tuple[DerivativeMap[float], DerivativeMap[float]]:
         """
@@ -408,7 +671,7 @@ class ContainerFactory(ViewFactory[Container]):
         Return a world with a container body at its root.
         """
 
-        container_event = self.create_container_event()
+        container_event = self._create_container_event()
 
         container_body = Body(name=self.name)
         collision_shapes = BoundingBoxCollection.from_event(
@@ -424,19 +687,19 @@ class ContainerFactory(ViewFactory[Container]):
 
         return world
 
-    def create_container_event(self) -> Event:
+    def _create_container_event(self) -> Event:
         """
         Return an event representing a container with walls of a specified thickness.
         """
-        outer_box = event_from_scale(self.scale)
+        outer_box = self.scale.simple_event
         inner_scale = Scale(
             self.scale.x - self.wall_thickness,
             self.scale.y - self.wall_thickness,
             self.scale.z - self.wall_thickness,
         )
-        inner_box = event_from_scale(inner_scale)
+        inner_box = inner_scale.simple_event
 
-        inner_box = self.extend_inner_event_in_direction(
+        inner_box = self._extend_inner_event_in_direction(
             inner_event=inner_box, inner_scale=inner_scale
         )
 
@@ -444,7 +707,7 @@ class ContainerFactory(ViewFactory[Container]):
 
         return container_event
 
-    def extend_inner_event_in_direction(
+    def _extend_inner_event_in_direction(
         self, inner_event: SimpleEvent, inner_scale: Scale
     ) -> SimpleEvent:
         """
@@ -507,7 +770,7 @@ class HandleFactory(ViewFactory[Handle]):
         Create a world with a handle body at its root.
         """
 
-        handle_event = self.create_handle_event()
+        handle_event = self._create_handle_event()
 
         handle = Body(name=self.name)
         collision = BoundingBoxCollection.from_event(handle, handle_event).as_shapes()
@@ -520,20 +783,20 @@ class HandleFactory(ViewFactory[Handle]):
         world.add_view(handle_view)
         return world
 
-    def create_handle_event(self) -> Event:
+    def _create_handle_event(self) -> Event:
         """
         Return an event representing a handle.
         """
 
-        handle_event = self.create_outer_box_event().as_composite_set()
+        handle_event = self._create_outer_box_event().as_composite_set()
 
-        inner_box = self.create_inner_box_event().as_composite_set()
+        inner_box = self._create_inner_box_event().as_composite_set()
 
         handle_event -= inner_box
 
         return handle_event
 
-    def create_outer_box_event(self) -> SimpleEvent:
+    def _create_outer_box_event(self) -> SimpleEvent:
         """
         Return an event representing the main body of a handle.
         """
@@ -551,7 +814,7 @@ class HandleFactory(ViewFactory[Handle]):
 
         return handle_event
 
-    def create_inner_box_event(self) -> SimpleEvent:
+    def _create_inner_box_event(self) -> SimpleEvent:
         """
         Return an event used to cut out the inner part of the handle.
         """
@@ -573,7 +836,14 @@ class HandleFactory(ViewFactory[Handle]):
 
 
 @dataclass
-class DoorFactory(ViewFactory[Door], HasHandleFactory):
+class DoorLikeFactory(ViewFactory[T], ABC):
+    """
+    Abstract factory for creating door-like factories such as doors or double doors.
+    """
+
+
+@dataclass
+class DoorFactory(DoorLikeFactory[Door], HasHandleFactory):
     """
     Factory for creating a door with a handle. The door is defined by its scale and handle direction.
     The doors origin is at the pivot point of the door, not at the center.
@@ -589,7 +859,7 @@ class DoorFactory(ViewFactory[Door], HasHandleFactory):
         Return a world with a door body at its root. The door has a handle and is defined by its scale and handle direction.
         """
 
-        door_event = self.create_door_event().as_composite_set()
+        door_event = self.scale.simple_event.as_composite_set()
 
         body = Body(name=self.name)
         bounding_box_collection = BoundingBoxCollection.from_event(body, door_event)
@@ -599,57 +869,27 @@ class DoorFactory(ViewFactory[Door], HasHandleFactory):
 
         world.add_kinematic_structure_entity(body)
 
-        door_T_handle = self.create_parent_T_handle_from_parent_scale(self.scale)
+        door_T_handle = (
+            self.parent_T_handle
+            or self.create_parent_T_handle_from_parent_scale(self.scale)
+        )
         self.add_handle_to_world(door_T_handle, world)
         handle_view: Handle = world.get_views_by_type(Handle)[0]
         world.add_view(Door(name=self.name, handle=handle_view, body=body))
 
         return world
 
-    def create_door_event(self) -> SimpleEvent:
-        """
-        Return an event representing a door with a specified scale and handle direction. The origin of the door is not
-        at the center of the door, but at the pivot point of the door.
-        """
-
-        x_interval = closed(-self.scale.x / 2, self.scale.x / 2)
-        y_interval = closed(-self.scale.y / 2, self.scale.y / 2)
-        z_interval = closed(-self.scale.z / 2, self.scale.z / 2)
-
-        match self.handle_direction:
-            case Direction.X:
-                x_interval = closed(0, self.scale.x)
-            case Direction.Y:
-                y_interval = closed(0, self.scale.y)
-            case Direction.Z:
-                raise NotImplementedError(
-                    f"Door Creation for handle_direction Z is not implemented yet"
-                )
-            case Direction.NEGATIVE_X:
-                x_interval = closed(-self.scale.x, 0)
-            case Direction.NEGATIVE_Y:
-                y_interval = closed(-self.scale.y, 0)
-            case Direction.NEGATIVE_Z:
-                raise NotImplementedError(
-                    f"Door Creation for handle_direction NEGATIVE_Z is not implemented yet"
-                )
-
-        door_event = SimpleEvent(
-            {
-                SpatialVariables.x.value: x_interval,
-                SpatialVariables.y.value: y_interval,
-                SpatialVariables.z.value: z_interval,
-            }
-        )
-
-        return door_event
-
 
 @dataclass
-class DoubleDoorFactory(ViewFactory[DoubleDoor], HasDoorFactories):
+class DoubleDoorFactory(DoorLikeFactory[DoubleDoor], HasDoorLikeFactories):
     """
     Factory for creating a double door with two doors and their handles.
     """
+
+    def __post_init__(self):
+        assert (
+            len(self.door_factories) == len(self.door_transforms) == 2
+        ), "Double door must have exactly two door factories and transforms"
 
     def _create(self, world: World) -> World:
         """
@@ -659,11 +899,7 @@ class DoubleDoorFactory(ViewFactory[DoubleDoor], HasDoorFactories):
         double_door_body = Body(name=self.name)
         world.add_kinematic_structure_entity(double_door_body)
 
-        assert (
-            len(self.door_factories) == 2
-        ), "Double door must have exactly two door factories"
-
-        self.add_doors_to_world(
+        self.add_doorlike_views_to_world(
             parent_world=world,
         )
 
@@ -703,11 +939,7 @@ class DrawerFactory(ViewFactory[Drawer], HasHandleFactory):
         container_world = self.container_factory.create()
         world.merge_world(container_world)
 
-        drawer_T_handle = TransformationMatrix.from_xyz_rpy(
-            self.container_factory.scale.x / 2, 0, 0, 0, 0, 0
-        )
-
-        self.add_handle_to_world(drawer_T_handle, world)
+        self.add_handle_to_world(self.parent_T_handle, world)
 
         container_view: Container = world.get_views_by_type(Container)[0]
         handle_view: Handle = world.get_views_by_type(Handle)[0]
@@ -720,7 +952,7 @@ class DrawerFactory(ViewFactory[Drawer], HasHandleFactory):
 
 
 @dataclass
-class DresserFactory(ViewFactory[Dresser], HasDoorFactories, HasDrawerFactories):
+class DresserFactory(ViewFactory[Dresser], HasDoorLikeFactories, HasDrawerFactories):
     """
     Factory for creating a dresser with drawers, and doors.
     """
@@ -739,18 +971,18 @@ class DresserFactory(ViewFactory[Dresser], HasDoorFactories, HasDrawerFactories)
             self.drawer_transforms
         ), "Number of drawers must match number of transforms"
 
-        dresser_world = self.make_dresser_world()
+        dresser_world = self._make_dresser_world()
         dresser_world.name = world.name
-        return self.make_interior(dresser_world)
+        return self._make_interior(dresser_world)
 
-    def make_dresser_world(self) -> World:
+    def _make_dresser_world(self) -> World:
         """
         Create a world with a dresser view that contains a container, drawers, and doors, but no interior yet.
         """
         dresser_world = self.container_factory.create()
         container_view: Container = dresser_world.get_views_by_type(Container)[0]
 
-        self.add_doors_to_world(dresser_world)
+        self.add_doorlike_views_to_world(dresser_world)
 
         self.add_drawers_to_world(dresser_world)
 
@@ -765,7 +997,7 @@ class DresserFactory(ViewFactory[Dresser], HasDoorFactories, HasDrawerFactories)
 
         return dresser_world
 
-    def make_interior(self, world: World) -> World:
+    def _make_interior(self, world: World) -> World:
         """
         Create the interior of the dresser by subtracting the drawers and doors from the container, and filling  with
         the remaining space.
@@ -777,11 +1009,13 @@ class DresserFactory(ViewFactory[Dresser], HasDoorFactories, HasDrawerFactories)
             TransformationMatrix(reference_frame=dresser_body)
         ).event
 
-        container_footprint = self.subtract_bodies_from_container_footprint(
+        container_footprint = self._subtract_bodies_from_container_footprint(
             world, container_event
         )
 
-        container_event = self.fill_container_body(container_footprint, container_event)
+        container_event = self._fill_container_body(
+            container_footprint, container_event
+        )
 
         collision_shapes = BoundingBoxCollection.from_event(
             dresser_body, container_event
@@ -790,7 +1024,7 @@ class DresserFactory(ViewFactory[Dresser], HasDoorFactories, HasDrawerFactories)
         dresser_body.visual = collision_shapes
         return world
 
-    def subtract_bodies_from_container_footprint(
+    def _subtract_bodies_from_container_footprint(
         self, world: World, container_event: Event
     ) -> Event:
         """
@@ -816,7 +1050,7 @@ class DresserFactory(ViewFactory[Dresser], HasDoorFactories, HasDrawerFactories)
 
         return container_footprint
 
-    def fill_container_body(
+    def _fill_container_body(
         self, container_footprint: Event, container_event: Event
     ) -> Event:
         """
@@ -883,7 +1117,7 @@ class RoomFactory(ViewFactory[Room]):
 
 
 @dataclass
-class WallFactory(ViewFactory[Wall], HasDoorFactories):
+class WallFactory(ViewFactory[Wall], HasDoorLikeFactories):
 
     scale: Scale = field(kw_only=True)
     """
@@ -894,22 +1128,30 @@ class WallFactory(ViewFactory[Wall], HasDoorFactories):
         """
         Return a world with the wall body at its root and potentially doors and double doors as children of the wall body.
         """
+        wall_world = self._create_wall_world()
+        self.add_doorlike_views_to_world(wall_world)
+        self.remove_doors_from_world(wall_world)
+        world.merge_world(wall_world)
+
+        return world
+
+    def _create_wall_world(self) -> World:
+        wall_world = World()
         wall_body = Body(name=self.name)
         wall_collision = self._create_wall_collision(wall_body)
         wall_body.collision = wall_collision
         wall_body.visual = wall_collision
-        world.add_kinematic_structure_entity(wall_body)
-
-        self.add_doors_and_double_doors_to_world(world)
+        with wall_world.modify_world():
+            wall_world.add_kinematic_structure_entity(wall_body)
 
         wall = Wall(
             name=self.name,
             body=wall_body,
         )
 
-        world.add_view(wall)
+        wall_world.add_view(wall)
 
-        return world
+        return wall_world
 
     def _create_wall_collision(self, reference_frame: Body) -> ShapeCollection:
         """
@@ -917,9 +1159,7 @@ class WallFactory(ViewFactory[Wall], HasDoorFactories):
         doors are removed from the wall event. The resulting bounding box collection is converted to shapes.
         """
 
-        wall_event = self.create_wall_event().as_composite_set()
-
-        wall_event = self.remove_doors_from_wall_event(wall_event)
+        wall_event = self._create_wall_event().as_composite_set()
 
         bounding_box_collection = BoundingBoxCollection.from_event(
             reference_frame, wall_event
@@ -928,7 +1168,7 @@ class WallFactory(ViewFactory[Wall], HasDoorFactories):
         wall_collision = bounding_box_collection.as_shapes()
         return wall_collision
 
-    def create_wall_event(self) -> SimpleEvent:
+    def _create_wall_event(self) -> SimpleEvent:
         """
         Return a wall event created from its scale. The height origin is on the ground, not in the center of the wall.
         """
@@ -944,85 +1184,3 @@ class WallFactory(ViewFactory[Wall], HasDoorFactories):
             }
         )
         return wall_event
-
-    def remove_doors_from_wall_event(self, wall_event: Event) -> Event:
-        """
-        Remove doors from the wall event by subtracting the door events from the wall event.
-        The doors are created from the door factories and their transforms.
-        """
-        for door_factory, door_transform in zip(
-            self.door_factories, self.door_transforms
-        ):
-            door_world = door_factory.create()
-            doors: List[Door] = door_world.get_views_by_type(Door)
-            door_transform = self.get_door_transforms(
-                doors, door_factory, door_transform
-            )
-
-            temp_world = self.build_temp_world(
-                door_world=door_world, door_transform=door_transform
-            )
-
-            if isinstance(door_factory, DoorFactory):
-                assert door_factory.handle_direction in {
-                    Direction.Y,
-                    Direction.NEGATIVE_Y,
-                }, "Currently only handles are only supported in Y direction"
-
-            door_plane_spatial_variables = SpatialVariables.yz
-            door_thickness_spatial_variable = SpatialVariables.x.value
-
-            for door in doors:
-                door_event = door.body.collision.as_bounding_box_collection_at_origin(
-                    TransformationMatrix(reference_frame=temp_world.root)
-                ).event
-                door_event = door_event.marginal(door_plane_spatial_variables)
-                door_event.fill_missing_variables([door_thickness_spatial_variable])
-
-                wall_event -= door_event
-
-        return wall_event
-
-    def build_temp_world(
-        self, door_world: World, door_transform: TransformationMatrix
-    ) -> World:
-        """
-        Create a temporary world to merge the door world into the wall world. This temporary world is used to then cut
-        out the doors from the wall event.
-        """
-        temp_world = World()
-        with temp_world.modify_world():
-            temp_world.add_kinematic_structure_entity(Body())
-
-            connection = FixedConnection(
-                parent=temp_world.root,
-                child=door_world.root,
-                origin_expression=door_transform,
-            )
-
-            temp_world.merge_world(door_world, connection)
-
-        return temp_world
-
-    def add_doors_and_double_doors_to_world(self, wall_world: World):
-        """
-        Adds doors and double doors to the wall world.
-        """
-        for door_factory, transform in zip(self.door_factories, self.door_transforms):
-            match door_factory:
-                case DoorFactory():
-                    self.add_door_to_world(door_factory, transform, wall_world)
-                case DoubleDoorFactory():
-                    # This code is reachable, not sure why pycharm says its not
-                    door_world = door_factory.create()
-                    translation = transform.to_position().to_np()
-                    transform = TransformationMatrix.from_point_rotation_matrix(
-                        Point3(translation[0], translation[1], 0)
-                    )
-                    connection = FixedConnection(
-                        parent=wall_world.root,
-                        child=door_world.root,
-                        origin_expression=transform,
-                    )
-
-                    wall_world.merge_world(door_world, connection)

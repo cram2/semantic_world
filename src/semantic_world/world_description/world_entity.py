@@ -579,6 +579,18 @@ class View(WorldEntity):
 
         return bbs
 
+    def as_bounding_box_collection_in_frame(
+        self, reference_frame: KinematicStructureEntity
+    ) -> BoundingBoxCollection:
+        """
+        Provides the bounding box collection for this entity in the given reference frame.
+        :param reference_frame: The reference frame to express the bounding boxes in.
+        :returns: A collection of bounding boxes in world-space coordinates.
+        """
+        return self.as_bounding_box_collection_at_origin(
+            TransformationMatrix(reference_frame=reference_frame)
+        )
+
 
 @dataclass(eq=False)
 class RootedView(View):
