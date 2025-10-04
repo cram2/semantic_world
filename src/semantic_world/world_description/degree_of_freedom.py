@@ -38,6 +38,9 @@ class DegreeOfFreedom(WorldEntity, SubclassJSONSerializer):
     def __post_init__(self):
         self.lower_limits = self.lower_limits or DerivativeMap()
         self.upper_limits = self.upper_limits or DerivativeMap()
+
+    def create_and_register_symbols(self):
+        assert self._world is not None
         for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
             s = symbol_manager.register_symbol_provider(
                 f"{self.name}_{derivative}",

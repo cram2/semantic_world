@@ -429,6 +429,7 @@ class World:
         :return: None
         """
         dof._world = self
+        dof.create_and_register_symbols()
 
         initial_position = 0
         lower_limit = dof.lower_limits.position

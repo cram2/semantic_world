@@ -184,6 +184,8 @@ class ActiveConnection1DOF(ActiveConnection, Has1DOFState, ABC):
                 name=self.name,
             )
             self._world.add_degree_of_freedom(self.dof)
+        if self.dof._world is None:
+           self._world.add_degree_of_freedom(self.dof)
 
     def _post_init_without_world(self):
         if self.dof is None:
