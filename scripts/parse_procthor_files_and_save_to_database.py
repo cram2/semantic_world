@@ -107,7 +107,7 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> List[WorldMappin
 
 def parse_procthor_files_and_save_to_database(
     fbx_file_pattern: re.Pattern[str] = re.compile(r".*_grp\.fbx$", re.IGNORECASE),
-    drop_existing_database: bool = False,
+    drop_existing_database: bool = True,
 ):
     """
     Parse all Procthor FBX files and store the resulting WorldMappingDAO objects in a database.
@@ -120,7 +120,7 @@ def parse_procthor_files_and_save_to_database(
     ), "Please set the SEMANTIC_WORLD_DATABASE_URI environment variable."
 
     procthor_root = os.path.join(os.path.expanduser("~"), "ai2thor")
-    procthor_root = os.path.join(os.path.expanduser("~"), "work", "ai2thor")
+    # procthor_root = os.path.join(os.path.expanduser("~"), "work", "ai2thor")
 
     files = []
     for root, dirs, filenames in os.walk(procthor_root):

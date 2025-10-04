@@ -163,6 +163,7 @@ class Shape(ABC, SubclassJSONSerializer):
         return {
             **super().to_json(),
             "origin": transformation_to_json(self.origin),
+            "color": self.color.to_json(),
         }
 
     def __eq__(self, other: Shape) -> bool:
@@ -184,19 +185,6 @@ class Shape(ABC, SubclassJSONSerializer):
             return False
 
         return True
-
-
-@dataclass(eq=False)
-class Primitive(Shape, ABC):
-    """
-    A primitive shape.
-    """
-
-    def to_json(self) -> Dict[str, Any]:
-        return {
-            **super().to_json(),
-            "origin": transformation_to_json(self.origin),
-        }
 
 
 @dataclass(eq=False)
@@ -302,19 +290,7 @@ class TriangleMesh(Mesh):
 
 
 @dataclass(eq=False)
-class Primitive(Shape, ABC):
-    """
-    A primitive shape.
-    """
-
-    color: Color = field(default_factory=Color)
-
-    def to_json(self) -> Dict[str, Any]:
-        return {**super().to_json(), "color": self.color.to_json()}
-
-
-@dataclass(eq=False)
-class Sphere(Primitive):
+class Sphere(Shape):
     """
     A sphere shape.
     """
@@ -359,7 +335,7 @@ class Sphere(Primitive):
 
 
 @dataclass(eq=False)
-class Cylinder(Primitive):
+class Cylinder(Shape):
     """
     A cylinder shape.
     """
@@ -408,7 +384,7 @@ class Cylinder(Primitive):
 
 
 @dataclass(eq=False)
-class Box(Primitive):
+class Box(Shape):
     """
     A box shape. Pivot point is at the center of the box.
     """

@@ -27,7 +27,6 @@ from ..world_description.geometry import (
     Box,
     Sphere,
     Cylinder,
-    Primitive,
     TriangleMesh,
 )
 from ..world import World
@@ -92,15 +91,11 @@ class VizMarkerPublisher(StateChangeCallback):
                         @ collision.origin
                     ).to_np()
                 )
-                msg.color = (
-                    ColorRGBA(
-                        r=float(collision.color.R),
-                        g=float(collision.color.G),
-                        b=float(collision.color.B),
-                        a=float(collision.color.A),
-                    )
-                    if isinstance(collision, Primitive)
-                    else ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+                msg.color = ColorRGBA(
+                    r=float(collision.color.R),
+                    g=float(collision.color.G),
+                    b=float(collision.color.B),
+                    a=float(collision.color.A),
                 )
                 msg.lifetime = Duration(sec=100)
 
