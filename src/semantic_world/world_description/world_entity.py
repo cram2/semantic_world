@@ -664,6 +664,10 @@ class Connection(WorldEntity):
     def origin_expression(self) -> TransformationMatrix:
         return self.parent_T_connection_expression @ self.connection_T_child_expression
 
+    @property
+    def has_hardware_interface(self) -> bool:
+        return False
+
     def add_to_world(self, world: World):
         self._world = world
 
@@ -714,7 +718,6 @@ class Connection(WorldEntity):
         """
         return self._world.compute_forward_kinematics(self.parent, self.child)
 
-    # @lru_cache(maxsize=None)
     def origin_as_position_quaternion(self) -> Expression:
         position = self.origin_expression.to_position()[:3]
         orientation = self.origin_expression.to_quaternion()

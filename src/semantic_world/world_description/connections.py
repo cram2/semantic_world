@@ -96,23 +96,30 @@ class ActiveConnection(Connection):
     Has one or more degrees of freedom that can be actively controlled, e.g., robot joints.
     """
 
-    is_controlled: bool = False
-    """
-    Whether this connection is linked to a controller and can therefore respond to control commands.
-    
-    E.g. the caster wheels of a PR2 are active, because they have a DOF, but they are not directly controlled. 
-    Instead a the omni drive connection is directly controlled and a low level controller translates these commands
-    to commands for the caster wheels.
-    
-    A door hinge is also active but cannot be controlled.
-    """
-
     frozen_for_collision_avoidance: bool = False
     """
     Should be treated as fixed for collision avoidance.
     Common example are gripper joints, you generally don't want to avoid collisions by closing the fingers, 
     but by moving the whole hand away.
     """
+
+    @property
+    def has_hardware_interface(self) -> bool:
+        """
+        Whether this connection is linked to a controller and can therefore respond to control commands.
+
+        E.g. the caster wheels of a PR2 are active, because they have a DOF, but they are not directly controlled.
+        Instead a the omni drive connection is directly controlled and a low level controller translates these commands
+        to commands for the caster wheels.
+
+        A door hinge is also active but cannot be controlled.
+        """
+        return len([dof for dof in self.dofs if dof.has_hardware_interface]) > 0
+
+    @has_hardware_interface.setter
+    def has_hardware_interface(self, value: bool) -> None:
+        for dof in self.dofs:
+            dof.has_hardware_interface = value
 
     @property
     def active_dofs(self) -> List[DegreeOfFreedom]:
@@ -505,3 +512,13 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
 
     def __hash__(self):
         return hash(self.name)
+
+    @property
+    def has_hardware_interface(self) -> bool:
+        return self.x_vel.has_hardware_interface
+
+    @has_hardware_interface.setter
+    def has_hardware_interface(self, value: bool) -> None:
+        self.x_vel.has_hardware_interface = value
+        self.y_vel.has_hardware_interface = value
+        self.yaw.has_hardware_interface = value

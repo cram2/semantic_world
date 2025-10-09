@@ -35,6 +35,17 @@ class DegreeOfFreedom(WorldEntity, SubclassJSONSerializer):
     Symbolic representations for each derivative
     """
 
+    has_hardware_interface: bool = False
+    """
+    Whether this DOF is linked to a controller and can therefore respond to control commands.
+
+    E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled. 
+    Instead a the omni drive connection is directly controlled and a low level controller translates these commands
+    to commands for the caster wheels.
+
+    A door hinge also has a dof that cannot be controlled.
+    """
+
     def __post_init__(self):
         self.lower_limits = self.lower_limits or DerivativeMap()
         self.upper_limits = self.upper_limits or DerivativeMap()

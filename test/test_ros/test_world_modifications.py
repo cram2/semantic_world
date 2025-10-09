@@ -6,11 +6,13 @@ from semantic_world.world import World
 from semantic_world.world_description.connection_factories import (
     ConnectionFactory,
     FixedConnectionFactory,
+    RevoluteConnectionFactory,
 )
 from semantic_world.world_description.connections import (
     FixedConnection,
     Connection6DoF,
     PrismaticConnection,
+    RevoluteConnection,
 )
 from semantic_world.world_description.world_entity import Body
 from semantic_world.world_description.world_modification import (
@@ -38,6 +40,29 @@ class ConnectionModificationTestCase(unittest.TestCase):
         connection = w.connections[0]
         factory = ConnectionFactory.from_connection(connection)
         assert isinstance(factory, FixedConnectionFactory)
+
+    def test_ChangeDofHasHardwareInterface(self):
+        w = World()
+
+        with w.modify_world():
+            b1 = Body(name=PrefixedName("b1"))
+            b2 = Body(name=PrefixedName("b2"))
+            w.add_kinematic_structure_entity(b1)
+            w.add_kinematic_structure_entity(b2)
+
+            connection = RevoluteConnection(
+                b1, b2, _world=w, axis=Vector3.from_iterable([0, 0, 1])
+            )
+            w.add_connection(connection)
+        assert connection.dof.has_hardware_interface is False
+
+        with w.modify_world():
+            w.set_dofs_has_hardware_interface(connection.dofs, True)
+        assert connection.dof.has_hardware_interface is True
+
+        connection = w.connections[0]
+        factory = ConnectionFactory.from_connection(connection)
+        assert isinstance(factory, RevoluteConnectionFactory)
 
     def test_many_modifications(self):
         w = World()

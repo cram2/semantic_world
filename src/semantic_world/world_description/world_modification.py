@@ -48,6 +48,9 @@ class WorldModelModification(SubclassJSONSerializer, ABC):
     This includes add/remove body and add/remove connection.
 
     All modifications are compared via the names of the objects they reference.
+
+    This class is referenced by the `atomic_world_modification` decorator and should be used for a method that
+    applies such a modification to the world.
     """
 
     @abstractmethod
@@ -62,7 +65,8 @@ class WorldModelModification(SubclassJSONSerializer, ABC):
     @abstractmethod
     def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
         """
-        Factory to construct this change from the kwargs of a function call.
+        Factory to construct this change from the kwargs of its corresponding method in World decorated with
+        `atomic_world_modification(modification=cls)`.
 
         :param kwargs: The kwargs of the function call.
         :return: A new instance.
@@ -291,3 +295,23 @@ class WorldModelModificationBlock(SubclassJSONSerializer):
 
     def append(self, modification: WorldModelModification):
         self.modifications.append(modification)
+
+
+@dataclass
+class SetDofHasHardwareInterface(WorldModelModification):
+    degree_of_freedom_names: List[PrefixedName]
+    value: bool
+
+    def apply(self, world: World):
+        for dof_name in self.degree_of_freedom_names:
+            world.get_degree_of_freedom_by_name(dof_name).has_hardware_interface = (
+                self.value
+            )
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]) -> Self:
+        dofs = kwargs["dofs"]
+        degree_of_freedom_names = [dof.name for dof in dofs]
+        return cls(
+            degree_of_freedom_names=degree_of_freedom_names, value=kwargs["value"]
+        )
