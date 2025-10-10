@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import itertools
 from abc import ABC
 from collections import deque
 from collections.abc import Iterable, Mapping
@@ -8,7 +9,6 @@ from dataclasses import dataclass, field
 from dataclasses import fields
 from functools import lru_cache
 
-import itertools
 import numpy as np
 import trimesh
 import trimesh.boolean
@@ -33,10 +33,9 @@ from .shape_collection import ShapeCollection, BoundingBoxCollection
 from ..datastructures.prefixed_name import PrefixedName
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
-from ..utils import IDGenerator
+from ..utils import IDGenerator, type_string_to_type
 
 if TYPE_CHECKING:
-
     from ..world_description.degree_of_freedom import DegreeOfFreedom
     from ..world import World
 
@@ -326,6 +325,7 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
         result["name"] = self.name.to_json()
         result["collision"] = self.collision.to_json()
         result["visual"] = self.visual.to_json()
+        result["index"] = self.index
         return result
 
     @classmethod
@@ -341,6 +341,7 @@ class Body(KinematicStructureEntity, SubclassJSONSerializer):
 
         result.collision = collision
         result.visual = visual
+        result.index = data["index"]
 
         return result
 
@@ -459,7 +460,7 @@ GenericKinematicStructureEntity = TypeVar(
 
 
 @dataclass
-class View(WorldEntity):
+class View(WorldEntity, SubclassJSONSerializer):
     """
     Represents a view on a set of bodies in the world.
 
@@ -491,6 +492,32 @@ class View(WorldEntity):
 
     def __eq__(self, other):
         return hash(self) == hash(other)
+
+    def to_json(self) -> Dict[str, Any]:
+        result = {
+            **super().to_json(),
+        }
+
+        for view_field in fields(self):
+            value = getattr(self, view_field.name)
+            if issubclass(type(value), SubclassJSONSerializer):
+                result[view_field.name] = value.to_json()
+        return result
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        view_fields = {f.name: f for f in fields(cls)}
+
+        init_args = {}
+
+        for k, v in view_fields.items():
+            if k not in data.keys():
+                continue
+            field_type = type_string_to_type(data[k]["type"])
+            if issubclass(field_type, SubclassJSONSerializer):
+                init_args[k] = field_type.from_json(data[k])
+
+        return cls(**init_args)
 
     def _kinematic_structure_entities(
         self, visited: Set[int], aggregation_type: Type[GenericKinematicStructureEntity]
