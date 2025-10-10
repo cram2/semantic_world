@@ -157,13 +157,13 @@ class WorldModelUpdateContextManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.first:
-            self.world.world_is_being_modified = False
             self.world._model_modification_blocks.append(
                 self.world._current_model_modification_block
             )
             self.world._current_model_modification_block = None
             if exc_type is None:
                 self.world._notify_model_change()
+            self.world.world_is_being_modified = False
 
 
 class AtomicWorldModificationNotAtomic(Exception):
@@ -502,18 +502,25 @@ class World:
         and forward kinematics expressions while also triggering registered callbacks
         for model changes.
         """
-        if not self.world_is_being_modified:
-            self.compile_forward_kinematics_expressions()
-            self.clear_all_lru_caches()
-            self.notify_state_change()
-            self._model_version += 1
+        # if not self.world_is_being_modified:
+        self.compile_forward_kinematics_expressions()
+        self.clear_all_lru_caches()
+        self.notify_state_change()
+        self._model_version += 1
 
-            for callback in self.model_change_callbacks:
-                callback.notify()
+        for callback in self.model_change_callbacks:
+            callback.notify()
 
-            self.validate()
-            self.disable_non_robot_collisions()
-            self.disable_collisions_for_adjacent_bodies()
+        for callback in self.state_change_callbacks:
+            try:
+                callback.update_previous_world_state()
+            except AttributeError:
+                # can't import the class for isinstance check, because then the world gets a ros dep
+                pass
+
+        self.validate()
+        self.disable_non_robot_collisions()
+        self.disable_collisions_for_adjacent_bodies()
 
     def delete_orphaned_dofs(self):
         actual_dofs = set()
