@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import field, dataclass
 from typing import Self
 
@@ -138,4 +139,8 @@ class Tracy(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
 
         robot.add_kinematic_chain(neck)
         world.add_view(robot, exists_ok=True)
+
+        vel_limits = defaultdict(lambda: 0.2)
+        robot.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+
         return robot

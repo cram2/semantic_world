@@ -19,7 +19,6 @@ from semantic_world.spatial_computations.forward_kinematics import (
 from semantic_world.world_description.connections import (
     FixedConnection,
     HasUpdateState,
-    Has1DOFState,
 )
 from semantic_world.orm.model import *
 from semantic_world.datastructures.prefixed_name import PrefixedName
@@ -52,7 +51,6 @@ classes -= {
     HasUpdateState,
     World,
     ForwardKinematicsVisitor,
-    Has1DOFState,
     DegreeOfFreedom,
 }
 classes -= set(recursive_subclasses(Enum))

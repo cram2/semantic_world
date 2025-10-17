@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -15,51 +16,6 @@ from ..spatial_types.derivatives import DerivativeMap
 
 if TYPE_CHECKING:
     from ..world import World
-
-
-class Has1DOFState:
-    """
-    Mixin class that implements state access for connections with 1 degree of freedom.
-    """
-
-    dof: DegreeOfFreedom
-    _world: World
-
-    @property
-    def position(self) -> float:
-        return self._world.state[self.dof.name].position
-
-    @position.setter
-    def position(self, value: float) -> None:
-        self._world.state[self.dof.name].position = value
-        self._world.notify_state_change()
-
-    @property
-    def velocity(self) -> float:
-        return self._world.state[self.dof.name].velocity
-
-    @velocity.setter
-    def velocity(self, value: float) -> None:
-        self._world.state[self.dof.name].velocity = value
-        self._world.notify_state_change()
-
-    @property
-    def acceleration(self) -> float:
-        return self._world.state[self.dof.name].acceleration
-
-    @acceleration.setter
-    def acceleration(self, value: float) -> None:
-        self._world.state[self.dof.name].acceleration = value
-        self._world.notify_state_change()
-
-    @property
-    def jerk(self) -> float:
-        return self._world.state[self.dof.name].jerk
-
-    @jerk.setter
-    def jerk(self, value: float) -> None:
-        self._world.state[self.dof.name].jerk = value
-        self._world.notify_state_change()
 
 
 class HasUpdateState(ABC):
@@ -146,7 +102,7 @@ class PassiveConnection(Connection):
 
 
 @dataclass
-class ActiveConnection1DOF(ActiveConnection, Has1DOFState, ABC):
+class ActiveConnection1DOF(ActiveConnection, ABC):
     """
     Superclass for active connections with 1 degree of freedom.
     """
@@ -167,9 +123,9 @@ class ActiveConnection1DOF(ActiveConnection, Has1DOFState, ABC):
     Movement along the axis is offset by this value. Useful if Connections share DoFs.
     """
 
-    dof: DegreeOfFreedom = field(default=None)
+    dof_name: PrefixedName = field(default=None)
     """
-    Degree of freedom to control movement along the axis.
+    Name of a Degree of freedom to control movement along the axis.
     """
 
     def add_to_world(self, world: World):
@@ -186,27 +142,104 @@ class ActiveConnection1DOF(ActiveConnection, Has1DOFState, ABC):
         self._post_init_world_part()
 
     def _post_init_with_world(self):
-        if self.dof is None:
-            self.dof = DegreeOfFreedom(
+        try:
+            dof = self._world.get_degree_of_freedom_by_name(self.dof_name)
+        except KeyError:
+            # catch the case where the dof_name is set, but a dof of that name doesn't exist in the world (anymore)
+            # can happen if you remove and readd a connection
+            self.dof_name = None
+        if self.dof_name is None:
+            dof = DegreeOfFreedom(
                 name=self.name,
             )
-            self._world.add_degree_of_freedom(self.dof)
-        if self.dof._world is None:
-            self._world.add_degree_of_freedom(self.dof)
+            self._world.add_degree_of_freedom(dof)
+            self.dof_name = dof.name
+            return
+
+        if dof._world is None:
+            self._world.add_degree_of_freedom(dof)
 
     def _post_init_without_world(self):
-        if self.dof is None:
+        if self.dof_name is None:
             raise ValueError(
-                "RevoluteConnection cannot be created without a world "
+                f"{self.__class__.__name__} cannot be created without a world "
                 "if the dof is not provided."
             )
 
     @property
+    def dof(self) -> DegreeOfFreedom:
+        """
+        A reference to the Degree of Freedom associated with this connection, WITH multiplier and offset applied.
+        """
+        result = deepcopy(self.raw_dof)
+        result.symbols = result.symbols * self.multiplier
+        if self.multiplier < 0:
+            # if multiplier is negative, we need to swap the limits
+            result.lower_limits, result.upper_limits = (
+                result.upper_limits,
+                result.lower_limits,
+            )
+        result.lower_limits = result.lower_limits * self.multiplier
+        result.upper_limits = result.upper_limits * self.multiplier
+
+        result.symbols.position += self.offset
+        if result.lower_limits.position is not None:
+            result.lower_limits.position = result.lower_limits.position + self.offset
+        if result.upper_limits.position is not None:
+            result.upper_limits.position = result.upper_limits.position + self.offset
+        return result
+
+    @property
+    def raw_dof(self) -> DegreeOfFreedom:
+        """
+        A reference to the Degree of Freedom associated with this connection, WITHOUT multiplier and offset applied.
+        """
+        return self._world.get_degree_of_freedom_by_name(self.dof_name)
+
+    @property
     def active_dofs(self) -> List[DegreeOfFreedom]:
-        return [self.dof]
+        return [self.raw_dof]
 
     def __hash__(self):
         return hash((self.parent, self.child))
+
+    @property
+    def position(self) -> float:
+        return self._world.state[self.dof.name].position * self.multiplier + self.offset
+
+    @position.setter
+    def position(self, value: float) -> None:
+        self._world.state[self.dof.name].position = (
+            value - self.offset
+        ) / self.multiplier
+        self._world.notify_state_change()
+
+    @property
+    def velocity(self) -> float:
+        return self._world.state[self.dof.name].velocity * self.multiplier
+
+    @velocity.setter
+    def velocity(self, value: float) -> None:
+        self._world.state[self.dof.name].velocity = value / self.multiplier
+        self._world.notify_state_change()
+
+    @property
+    def acceleration(self) -> float:
+        return self._world.state[self.dof.name].acceleration * self.multiplier
+
+    @acceleration.setter
+    def acceleration(self, value: float) -> None:
+        self._world.state[self.dof.name].acceleration = value / self.multiplier
+        self._world.notify_state_change()
+
+    @property
+    def jerk(self) -> float:
+        return self._world.state[self.dof.name].jerk * self.multiplier
+
+    @jerk.setter
+    def jerk(self, value: float) -> None:
+        self._world.state[self.dof.name].jerk = value / self.multiplier
+        self._world.notify_state_change()
 
 
 @dataclass
@@ -218,8 +251,7 @@ class PrismaticConnection(ActiveConnection1DOF):
     def add_to_world(self, world: World):
         super().add_to_world(world)
 
-        motor_expression = self.dof.symbols.position * self.multiplier + self.offset
-        translation_axis = self.axis * motor_expression
+        translation_axis = self.axis * self.dof.symbols.position
         self.connection_T_child_expression = cas.TransformationMatrix.from_xyz_rpy(
             x=translation_axis[0],
             y=translation_axis[1],
@@ -240,11 +272,10 @@ class RevoluteConnection(ActiveConnection1DOF):
     def add_to_world(self, world: World):
         super().add_to_world(world)
 
-        motor_expression = self.dof.symbols.position * self.multiplier + self.offset
         self.connection_T_child_expression = (
             cas.TransformationMatrix.from_xyz_axis_angle(
                 axis=self.axis,
-                angle=motor_expression,
+                angle=self.dof.symbols.position,
                 child_frame=self.child,
             )
         )
@@ -476,10 +507,10 @@ class OmniDrive(ActiveConnection, PassiveConnection, HasUpdateState):
         x_vel = state[self.x_vel.name].velocity
         y_vel = state[self.y_vel.name].velocity
         delta = state[self.yaw.name].position
-        state[self.x.name].velocity = np.cos(delta) * x_vel - np.sin(delta) * y_vel
-        state[self.x.name].position += state[self.x.name].velocity * dt
-        state[self.y.name].velocity = np.sin(delta) * x_vel + np.cos(delta) * y_vel
-        state[self.y.name].position += state[self.y.name].velocity * dt
+        x_velocity = np.cos(delta) * x_vel - np.sin(delta) * y_vel
+        state[self.x.name].position += x_velocity * dt
+        y_velocity = np.sin(delta) * x_vel + np.cos(delta) * y_vel
+        state[self.y.name].position += y_velocity * dt
 
     @property
     def origin(self) -> cas.TransformationMatrix:

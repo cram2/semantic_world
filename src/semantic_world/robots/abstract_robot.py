@@ -10,13 +10,19 @@ from typing_extensions import (
     TYPE_CHECKING,
     Optional,
     Self,
+    DefaultDict,
 )
 
+from ..spatial_types.derivatives import DerivativeMap
 from ..spatial_types.spatial_types import (
     Vector3,
     Quaternion,
 )
-from ..world_description.connections import ActiveConnection, OmniDrive
+from ..world_description.connections import (
+    ActiveConnection,
+    OmniDrive,
+    ActiveConnection1DOF,
+)
 from ..world_description.world_entity import (
     Body,
     RootedView,
@@ -433,6 +439,32 @@ class AbstractRobot(RootedView, ABC):
         except AttributeError:
             pass
 
+    def tighten_dof_velocity_limits_of_1dof_connections(
+        self,
+        new_limits: DefaultDict[ActiveConnection1DOF, float],
+    ):
+        """
+        Convenience method for tightening the velocity limits of all one degree-of-freedom (1DOF)
+        active connections in the system.
+
+        The method iterates through all connections of type `ActiveConnection1DOF`
+        and configures their velocity limits by overwriting the existing
+        lower and upper limit values with the provided ones.
+
+        :param new_limits: A dictionary linking 1DOF connections to their corresponding
+            new velocity limits. The keys are of type `ActiveConnection1DOF`, and the
+            values represent the new velocity limits specific to each connection.
+        """
+        for connection in self._world.get_connections_by_type(ActiveConnection1DOF):
+            connection.raw_dof._overwrite_dof_limits(
+                new_lower_limits=DerivativeMap(
+                    [None, -new_limits[connection], None, None]
+                ),
+                new_upper_limits=DerivativeMap(
+                    [None, new_limits[connection], None, None]
+                ),
+            )
+
     def add_manipulator(self, manipulator: Manipulator):
         """
         Adds a manipulator to the robot's collection of manipulators.
@@ -477,5 +509,3 @@ class AbstractRobot(RootedView, ABC):
             self.sensor_chains.add(kinematic_chain)
         self._views.add(kinematic_chain)
         kinematic_chain.assign_to_robot(self)
-
-

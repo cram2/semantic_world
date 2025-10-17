@@ -167,7 +167,7 @@ class HasDoorLikeFactories(ABC):
                 multiplier=1.0,
                 offset=0.0,
                 axis=Vector3.Z(),
-                dof=dof,
+                dof_name=dof.name,
             )
 
             parent_world.merge_world(door_world, connection)
@@ -577,7 +577,7 @@ class HasDrawerFactories(ABC):
     The factories used to create drawers.
     """
 
-    drawer_transforms: List[TransformationMatrix] = field(
+    parent_T_drawers: List[TransformationMatrix] = field(
         default_factory=list, hash=False
     )
     """
@@ -595,22 +595,25 @@ class HasDrawerFactories(ABC):
             drawer_factory
         )
         drawer_world = drawer_factory.create()
-        root = drawer_world.root
+        parent_root = parent_world.root
+        child_root = drawer_world.root
+
+        parent_T_drawer.reference_frame = parent_root
 
         dof = DegreeOfFreedom(
-            name=PrefixedName(f"{root.name.name}_connection", root.name.prefix),
+            name=PrefixedName(f"{child_root.name.name}_connection", child_root.name.prefix),
             lower_limits=lower_limits,
             upper_limits=upper_limits,
         )
 
         connection = PrismaticConnection(
-            parent=parent_world.root,
-            child=root,
+            parent=parent_root,
+            child=child_root,
             parent_T_connection_expression=parent_T_drawer,
             multiplier=1.0,
             offset=0.0,
             axis=Vector3.X(),
-            dof=dof,
+            dof_name=dof.name,
         )
 
         parent_world.merge_world(drawer_world, connection)
@@ -621,7 +624,7 @@ class HasDrawerFactories(ABC):
         """
 
         for drawer_factory, transform in zip(
-            self.drawers_factories, self.drawer_transforms
+            self.drawers_factories, self.parent_T_drawers
         ):
             self._add_drawer_to_world(
                 drawer_factory=drawer_factory,
@@ -1010,7 +1013,7 @@ class DresserFactory(ViewFactory[Dresser], HasDoorLikeFactories, HasDrawerFactor
         Assumes that the number of drawers matches the number of drawer transforms.
         """
         assert len(self.drawers_factories) == len(
-            self.drawer_transforms
+            self.parent_T_drawers
         ), "Number of drawers must match number of transforms"
 
         dresser_world = self._make_dresser_world()

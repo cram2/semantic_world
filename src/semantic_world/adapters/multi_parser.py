@@ -259,7 +259,7 @@ class MultiParser:
                     multiplier=multiplier,
                     offset=offset,
                     axis=axis,
-                    dof=dof,
+                    dof_name=dof.name,
                 )
             else:
                 connection = PrismaticConnection(
@@ -269,7 +269,7 @@ class MultiParser:
                     multiplier=multiplier,
                     offset=offset,
                     axis=axis,
-                    dof=dof,
+                    dof_name=dof.name,
                 )
             return connection
         else:

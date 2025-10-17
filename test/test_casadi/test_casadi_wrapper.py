@@ -5,7 +5,11 @@ import scipy
 from hypothesis import given, assume
 
 import semantic_world.spatial_types.spatial_types as cas
-from semantic_world.exceptions import HasFreeSymbolsError, WrongDimensionsError
+from semantic_world.exceptions import (
+    HasFreeSymbolsError,
+    WrongDimensionsError,
+    SpatialTypesError,
+)
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
     axis_angle_from_rotation_matrix,
@@ -900,6 +904,34 @@ class TestRotationMatrix:
                 shortest_angular_distance(actual_angle.to_np()[0], -expected_angle),
                 0,
             )
+
+    def test_reference_frames(self):
+        reference_frame = "muh"
+        reference_frame2 = "muh2"
+        m1 = cas.RotationMatrix(reference_frame=reference_frame)
+        m2 = cas.RotationMatrix(reference_frame=reference_frame2)
+        q = cas.Quaternion(reference_frame=reference_frame)
+
+        assert m1.reference_frame == reference_frame
+        assert m1.to_quaternion().reference_frame == reference_frame
+        assert m1.to_axis_angle()[0].reference_frame == reference_frame
+        assert (
+            cas.RotationMatrix.from_rpy(reference_frame=reference_frame).reference_frame
+            == reference_frame
+        )
+        assert (m1 @ m2).reference_frame == reference_frame
+        assert (m2 @ m1).reference_frame == reference_frame2
+        assert m1.x_vector().reference_frame == reference_frame
+        assert m1.y_vector().reference_frame == reference_frame
+        assert m1.z_vector().reference_frame == reference_frame
+        assert m1.from_quaternion(q).reference_frame == reference_frame
+        assert (
+            m1.from_vectors(
+                x=cas.Vector3.X(), y=cas.Vector3.Y(), reference_frame=reference_frame
+            ).reference_frame
+            == reference_frame
+        )
+        assert m1.inverse().reference_frame == reference_frame
 
     def test_matmul_type_preservation(self):
         s = cas.Symbol(name="s")
@@ -1961,6 +1993,73 @@ class TestVector3:
 
 
 class TestTransformationMatrix:
+    def test_reference_frames(self):
+        reference_frame = "muh"
+        child_frame = "kikariki"
+        reference_frame2 = "muh2"
+        child_frame2 = "kikariki2"
+        t1 = cas.TransformationMatrix(
+            reference_frame=reference_frame, child_frame=child_frame
+        )
+        t2 = cas.TransformationMatrix(
+            reference_frame=reference_frame2, child_frame=child_frame2
+        )
+
+        p = cas.Point3(reference_frame=reference_frame)
+        v = cas.Vector3(reference_frame=reference_frame)
+        r = cas.RotationMatrix(reference_frame=reference_frame)
+
+        assert t1.reference_frame == reference_frame
+        assert t1.child_frame == child_frame
+
+        t = cas.TransformationMatrix.from_point_rotation_matrix(p, r)
+        assert t.reference_frame == reference_frame
+        assert t.child_frame == None
+
+        with pytest.raises(SpatialTypesError):
+            t = cas.TransformationMatrix.from_point_rotation_matrix(
+                cas.Point3(reference_frame=reference_frame2), r
+            )
+
+        t = cas.TransformationMatrix.from_point_rotation_matrix(
+            p, r, reference_frame=reference_frame2, child_frame=child_frame2
+        )
+        assert t.reference_frame == reference_frame2
+        assert t.child_frame == child_frame2
+
+        t = cas.TransformationMatrix.from_xyz_rpy(
+            reference_frame=reference_frame, child_frame=child_frame
+        )
+        assert t.reference_frame == reference_frame
+        assert t.child_frame == child_frame
+
+        t = cas.TransformationMatrix.from_xyz_quaternion(
+            reference_frame=reference_frame, child_frame=child_frame
+        )
+        assert t.reference_frame == reference_frame
+        assert t.child_frame == child_frame
+
+        t = cas.TransformationMatrix.from_xyz_axis_angle(
+            reference_frame=reference_frame, child_frame=child_frame
+        )
+        assert t.reference_frame == reference_frame
+        assert t.child_frame == child_frame
+
+        assert (t1 @ t2).reference_frame == reference_frame
+        assert (t1 @ t2).child_frame == child_frame2
+        assert (t2 @ t1).reference_frame == reference_frame2
+        assert (t2 @ t1).child_frame == child_frame
+        assert t1.inverse().reference_frame == child_frame
+        assert t1.inverse().child_frame == reference_frame
+        assert t1.to_position().reference_frame == reference_frame
+        assert t1.to_quaternion().reference_frame == reference_frame
+        assert t1.to_translation().reference_frame == reference_frame
+        assert t1.to_rotation_matrix().reference_frame == reference_frame
+
+        assert (t1 @ p).reference_frame == reference_frame
+        assert (t1 @ v).reference_frame == reference_frame
+        assert (t1 @ r).reference_frame == reference_frame
+
     def test_matmul_type_preservation(self):
         """Test that @ operator preserves correct types for TransformationMatrix"""
         s = cas.Symbol(name="s")

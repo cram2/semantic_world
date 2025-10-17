@@ -114,7 +114,7 @@ def dresser_factory_from_body(dresser: Body) -> DresserFactory:
         name=dresser.name,
         container_factory=dresser_container_factory,
         drawers_factories=drawer_factories,
-        drawer_transforms=drawer_transforms,
+        parent_T_drawers=drawer_transforms,
         door_factories=door_factories,
         door_transforms=door_transforms,
     )

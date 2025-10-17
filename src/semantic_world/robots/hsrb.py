@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Self
 
@@ -161,5 +162,8 @@ class HSRB(AbstractRobot, HasArms, HasNeck):
         hsrb.add_torso(torso)
 
         world.add_view(hsrb, exists_ok=True)
+
+        vel_limits = defaultdict(lambda: 1)
+        hsrb.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
         return hsrb

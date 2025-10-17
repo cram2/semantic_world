@@ -14,8 +14,7 @@ from ..spatial_types import spatial_types as cas
 
 if TYPE_CHECKING:
     from ..world import World
-    from ..world_description.world_entity import Body
-
+    from ..world_description.world_entity import KinematicStructureEntity
 
 _large_value = np.inf
 """
@@ -143,8 +142,8 @@ class InverseKinematicsSolver:
 
     def solve(
         self,
-        root: Body,
-        tip: Body,
+        root: KinematicStructureEntity,
+        tip: KinematicStructureEntity,
         target: cas.TransformationMatrix,
         dt: float = 0.05,
         max_iterations: int = 200,
@@ -268,7 +267,7 @@ class InverseKinematicsSolver:
         if vel_below_threshold and slack_below_threshold:
             return True
         if vel_below_threshold and not slack_below_threshold:
-            raise UnreachableException(self.iteration)
+            raise UnreachableException(self.iterations)
         return False
 
 
@@ -283,12 +282,12 @@ class QPProblem:
     Backreference to semantic world.
     """
 
-    root: Body
+    root: KinematicStructureEntity
     """
     Root body of the kinematic chain.
     """
 
-    tip: Body
+    tip: KinematicStructureEntity
     """
     Tip body of the kinematic chain.
     """
@@ -427,12 +426,12 @@ class ConstraintBuilder:
     Backreference to semantic world.
     """
 
-    root: Body
+    root: KinematicStructureEntity
     """
     Root body of the kinematic chain.
     """
 
-    tip: Body
+    tip: KinematicStructureEntity
     """
     Tip body of the kinematic chain.
     """

@@ -1,4 +1,6 @@
 import os
+from collections import defaultdict
+
 from typing_extensions import List
 
 import numpy as np
@@ -257,12 +259,12 @@ def test_apply_control_commands_omni_drive_pr2(pr2_world):
 
     assert pr2_world.state[omni_drive.x.name].jerk == 0.0
     assert pr2_world.state[omni_drive.x.name].acceleration == 0.0
-    assert pr2_world.state[omni_drive.x.name].velocity == 0.8951707486311977
+    assert pr2_world.state[omni_drive.x.name].velocity == 0.0
     assert pr2_world.state[omni_drive.x.name].position == 0.08951707486311977
 
     assert pr2_world.state[omni_drive.y.name].jerk == 0.0
     assert pr2_world.state[omni_drive.y.name].acceleration == 0.0
-    assert pr2_world.state[omni_drive.y.name].velocity == 1.094837581924854
+    assert pr2_world.state[omni_drive.y.name].velocity == 0.0
     assert pr2_world.state[omni_drive.y.name].position == 0.1094837581924854
 
 
@@ -326,6 +328,7 @@ def test_pr2_view(pr2_world):
     assert pr2.left_arm and pr2.right_arm
     assert pr2.left_arm != pr2.right_arm
 
+
 def test_specifies_left_right_arm_mixin(pr2_world):
     pr2 = PR2.from_world(pr2_world)
     left_arm_chain = list(pr2.left_arm.bodies)
@@ -373,6 +376,7 @@ def test_tracy_view(tracy_world):
     assert tracy.torso is None
     assert list(tracy.sensor_chains)[0].sensors == tracy.sensors
 
+
 def test_hsrb_view(hsrb_world):
     hsrb = HSRB.from_world(hsrb_world)
 
@@ -386,3 +390,31 @@ def test_hsrb_view(hsrb_world):
     assert len(hsrb.sensors) == 5
     assert len(hsrb.sensor_chains) == 2
     assert hsrb.torso is not None
+
+
+def test_pr2_tighten_dof_velocity_limits_of_1dof_connections(pr2_world):
+    pr2 = PR2.from_world(pr2_world)
+
+    # set all joints to vel limit 1
+    pr2.tighten_dof_velocity_limits_of_1dof_connections(defaultdict(lambda: 1))
+
+    # try spacial case for specific joint
+    new_limits = defaultdict(
+        lambda: 0.5, {pr2._world.get_connection_by_name("head_pan_joint"): 23}
+    )
+    pr2.tighten_dof_velocity_limits_of_1dof_connections(new_limits)
+    # if spacial case triggers, but the new limit is above the old one, nothing happens
+    assert (
+        pr2._world.get_connection_by_name("head_pan_joint").dof.upper_limits.velocity
+        == 1
+    )
+    # new limit is applied to joint without spacial case
+    assert (
+        pr2._world.get_connection_by_name("head_tilt_joint").dof.upper_limits.velocity
+        == 0.5
+    )
+    # non-spacial case where the old limit is below 1
+    assert (
+        pr2._world.get_connection_by_name("torso_lift_joint").dof.upper_limits.velocity
+        == 0.013
+    )

@@ -31,6 +31,7 @@ from typing_extensions import Set
 from .geometry import TriangleMesh
 from .shape_collection import ShapeCollection, BoundingBoxCollection
 from ..datastructures.prefixed_name import PrefixedName
+from ..exceptions import ReferenceFrameMismatchError
 from ..spatial_types import spatial_types as cas
 from ..spatial_types.spatial_types import TransformationMatrix, Expression, Point3
 from ..utils import IDGenerator
@@ -135,6 +136,22 @@ class KinematicStructureEntity(WorldEntity, SubclassJSONSerializer, ABC):
         Returns the parent KinematicStructureEntity of this entity.
         """
         return self._world.compute_parent_kinematic_structure_entity(self)
+
+    def get_first_parent_connection_of_type(
+        self, connection_type: Type[GenericConnection]
+    ) -> GenericConnection:
+        """
+        Traverse the chain up until an active connection is found.
+        """
+        if self == self._world.root:
+            raise ValueError(
+                f"Cannot get controlled parent connection for root body {self._world.root.name}."
+            )
+        if isinstance(self.parent_connection, connection_type):
+            return self.parent_connection
+        return self.parent_connection.parent.get_first_parent_connection_of_type(
+            connection_type
+        )
 
 
 @dataclass
@@ -684,14 +701,22 @@ class Connection(WorldEntity):
         self._world = world
 
     def __post_init__(self):
-        self.parent_T_connection_expression.reference_frame = self.parent
-        self.connection_T_child_expression.child_frame = self.child
-
         if self.name is None:
             self.name = PrefixedName(
                 f"{self.parent.name.name}_T_{self.child.name.name}",
                 prefix=self.child.name.prefix,
             )
+
+        if (
+            self.parent_T_connection_expression.reference_frame is not None
+            and self.parent_T_connection_expression.reference_frame != self.parent
+        ):
+            raise ReferenceFrameMismatchError(
+                self.parent, self.parent_T_connection_expression.reference_frame
+            )
+
+        self.parent_T_connection_expression.reference_frame = self.parent
+        self.connection_T_child_expression.child_frame = self.child
 
     def _post_init_world_part(self):
         """
@@ -748,6 +773,9 @@ class Connection(WorldEntity):
             dofs.update(set(self.passive_dofs))
 
         return dofs
+
+
+GenericConnection = TypeVar("GenericConnection", bound=Connection)
 
 
 def _is_entity_view_or_iterable(

@@ -29,7 +29,7 @@ import threading
 import time
 
 import numpy as np
-from entity_query_language import the, entity, let, symbolic_mode
+from entity_query_language import the, entity, let, symbolic_mode, in_
 
 from semantic_world.datastructures.prefixed_name import PrefixedName
 from semantic_world.spatial_types.spatial_types import TransformationMatrix
@@ -71,7 +71,7 @@ container_factory = ContainerFactory(
 
 dresser_factory = DresserFactory(
     name=PrefixedName("dresser"),
-    drawer_transforms=[drawer_transform],
+    parent_T_drawers=[drawer_transform],
     drawers_factories=[drawer_factory],
     container_factory=container_factory,
 )
@@ -107,7 +107,7 @@ Note that this only works in this simple way for connections that only have one 
 To show this we first create a new root for the world and make a free connection from the new root to the dresser.
 
 ```{code-cell} ipython2
-from semantic_world.world_description.connections import Connection6DoF
+from semantic_world.world_description.connections import Connection6DoF, PrismaticConnection
 from semantic_world.world_description.world_entity import Body
 
 with world.modify_world():
@@ -135,7 +135,7 @@ from semantic_world.world_description.world_entity import Connection
 with symbolic_mode():
     free_connection = the(entity(connection := let(type_=Connection, domain=world.connections), connection.parent == world.root)).evaluate()
 with world.modify_world():
-    free_connection.parent_T_connection_expression = TransformationMatrix.from_xyz_rpy(1., 1., 0, 0., 0., 0.5 * np.pi)
+    free_connection.parent_T_connection_expression = TransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi)
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")
@@ -149,9 +149,9 @@ We can close the drawer again as follows:
 
 ```{code-cell} ipython2
 with symbolic_mode():
-    dof = the(entity(name := let(type_=PrefixedName, domain=world.state.keys()), name.name == "drawer_container_connection")).evaluate()
+    connection = the(entity(connection := let(type_=PrismaticConnection, domain=world.connections), in_("drawer", connection.child.name.name))).evaluate()
 with world.modify_world():
-    world.state[dof] = [0., 0, 0, 0.]
+    world.state[connection.dof.name] = [0., 0., 0., 0.]
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")

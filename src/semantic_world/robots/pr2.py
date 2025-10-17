@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from collections import defaultdict
+from dataclasses import dataclass
 from typing import Self
 
+from .robot_mixins import HasNeck, SpecifiesLeftRightArm
 from ..datastructures.prefixed_name import PrefixedName
 from ..robots.abstract_robot import (
     Neck,
@@ -15,7 +17,6 @@ from ..robots.abstract_robot import (
     Torso,
     AbstractRobot,
 )
-from .robot_mixins import HasNeck, SpecifiesLeftRightArm
 from ..spatial_types import Quaternion, Vector3
 from ..world import World
 
@@ -163,7 +164,19 @@ class PR2(AbstractRobot, SpecifiesLeftRightArm, HasNeck):
             _world=world,
         )
         robot.add_torso(torso)
-        # robot.load_srdf()
 
         world.add_view(robot, exists_ok=True)
+
+        vel_limits = defaultdict(
+            lambda: 1,
+            {
+                world.get_connection_by_name("head_tilt_joint"): 3.5,
+                world.get_connection_by_name("r_shoulder_pan_joint"): 0.15,
+                world.get_connection_by_name("l_shoulder_pan_joint"): 0.15,
+                world.get_connection_by_name("r_shoulder_lift_joint"): 0.2,
+                world.get_connection_by_name("l_shoulder_lift_joint"): 0.2,
+            },
+        )
+        robot.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
+
         return robot

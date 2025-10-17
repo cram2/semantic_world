@@ -44,10 +44,6 @@ class WorldMapping(AlternativeMapping[World]):
         with result.modify_world():
             for entity in self.kinematic_structure_entities:
                 result.add_kinematic_structure_entity(entity)
-            for connection in self.connections:
-                result.add_connection(connection)
-            for view in self.views:
-                result.add_view(view)
             for dof in self.degrees_of_freedom:
                 d = DegreeOfFreedom(
                     name=dof.name,
@@ -55,6 +51,10 @@ class WorldMapping(AlternativeMapping[World]):
                     upper_limits=dof.upper_limits,
                 )
                 result.add_degree_of_freedom(d)
+            for connection in self.connections:
+                result.add_connection(connection)
+            for view in self.views:
+                result.add_view(view)
             result.delete_orphaned_dofs()
 
         return result

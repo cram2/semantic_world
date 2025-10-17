@@ -66,7 +66,7 @@ with world.modify_world():
     c_base_link = RevoluteConnection(
         parent=base,
         child=link,
-        dof=joint,
+        dof_name=joint.name,
         axis=Vector3.Z(reference_frame=base),
         _world=world,
     )

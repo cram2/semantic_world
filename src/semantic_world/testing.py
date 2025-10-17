@@ -58,10 +58,10 @@ def world_setup() -> Tuple[
         world.add_degree_of_freedom(dof)
 
         c_l1_l2 = PrismaticConnection(
-            parent=l1, child=l2, dof=dof, axis=Vector3.X(reference_frame=l1)
+            parent=l1, child=l2, dof_name=dof.name, axis=Vector3.X(reference_frame=l1)
         )
         c_r1_r2 = RevoluteConnection(
-            parent=r1, child=r2, dof=dof, axis=Vector3.Z(reference_frame=r1)
+            parent=r1, child=r2, dof_name=dof.name, axis=Vector3.Z(reference_frame=r1)
         )
         bf_root_l1 = FixedConnection(parent=bf, child=l1)
         bf_root_r1 = FixedConnection(parent=bf, child=r1)
@@ -199,6 +199,7 @@ def tracy_world():
 
     return world
 
+
 @pytest.fixture
 def hsrb_world():
     if not hsrb_installed():
@@ -221,6 +222,7 @@ def hsrb_world():
         world.merge_world(world_with_hsrb, c_root_bf)
 
     return world
+
 
 @pytest.fixture
 def apartment_world() -> World:

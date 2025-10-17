@@ -55,8 +55,9 @@ from .world_description.connections import (
     PassiveConnection,
     FixedConnection,
     Connection6DoF,
+    ActiveConnection1DOF,
 )
-from .world_description.connections import HasUpdateState, Has1DOFState
+from .world_description.connections import HasUpdateState
 from .world_description.degree_of_freedom import DegreeOfFreedom
 from .world_description.world_entity import (
     Connection,
@@ -64,6 +65,7 @@ from .world_description.world_entity import (
     KinematicStructureEntity,
     Region,
     GenericKinematicStructureEntity,
+    GenericConnection,
     CollisionCheckingConfig,
     Body,
 )
@@ -1030,8 +1032,8 @@ class World:
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
 
     def get_connections_by_type(
-        self, connection_type: Union[Type[Connection], Tuple[Type[Connection], ...]]
-    ) -> List[Connection]:
+        self, connection_type: Type[GenericConnection]
+    ) -> List[GenericConnection]:
         return [c for c in self.connections if isinstance(c, connection_type)]
 
     def clear(self):
@@ -1087,9 +1089,7 @@ class World:
             return matches[0]
         raise KeyError(f"KinematicStructureEntity with name {name} not found")
 
-    def get_body_by_name(
-        self, name: Union[str, PrefixedName]
-    ) -> Body:
+    def get_body_by_name(self, name: Union[str, PrefixedName]) -> Body:
         """
         Retrieves a Body from the list of bodies based on its name.
         If the input is of type `PrefixedName`, it checks whether the prefix is specified and looks for an
@@ -1659,7 +1659,7 @@ class World:
         self.notify_state_change()
 
     def set_positions_1DOF_connection(
-        self, new_state: Dict[Has1DOFState, float]
+        self, new_state: Dict[ActiveConnection1DOF, float]
     ) -> None:
         """
         Set the positions of 1DOF connections and notify the world of the state change.
@@ -1866,23 +1866,6 @@ class World:
         rx.dfs_search(self.kinematic_structure, [connection.child.index], visitor)
 
         return visitor.bodies
-
-    @lru_cache(maxsize=None)
-    def get_controlled_parent_connection(
-        self, body: KinematicStructureEntity
-    ) -> Connection:
-        """
-        Traverse the chain up until a controlled active connection is found.
-        :param body: The body where the search starts.
-        :return: The controlled active connection.
-        """
-        if body == self.root:
-            raise ValueError(
-                f"Cannot get controlled parent connection for root body {self.root.name}."
-            )
-        if body.parent_connection in self.controlled_connections:
-            return body.parent_connection
-        return self.get_controlled_parent_connection(body.parent_body)
 
     def compute_chain_reduced_to_controlled_joints(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity

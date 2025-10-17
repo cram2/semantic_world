@@ -152,7 +152,7 @@ class PipelineTestCase(unittest.TestCase):
 
         self.assertEqual(dresser_factory.name.name, "dresser_205")
         self.assertEqual(len(dresser_factory.drawers_factories), 4)
-        self.assertEqual(len(dresser_factory.drawer_transforms), 4)
+        self.assertEqual(len(dresser_factory.parent_T_drawers), 4)
 
     def test_drawer_factory_from_body(self):
         world = FBXParser(self.fbx_path).parse()

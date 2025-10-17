@@ -5,6 +5,7 @@ import numpy as np
 from . import Point3, Vector3, Quaternion, TransformationMatrix
 from .spatial_types import Symbol, Expression
 from ..datastructures.types import AnyMatrix4x4
+from ..exceptions import SymbolResolutionError
 
 Provider = Union[float, Callable[[], float]]
 
@@ -163,9 +164,7 @@ class SymbolManager(metaclass=SingletonMeta):
                 try:
                     np.array([self.symbol_to_provider[s]()])
                 except Exception as e2:
-                    raise KeyError(
-                        f"Cannot resolve {s} ({e2.__class__.__name__}: {str(e2)})"
-                    )
+                    raise SymbolResolutionError(symbol=s, original_exception=e2)
             raise e
 
     def evaluate_expr(self, expr: Expression):

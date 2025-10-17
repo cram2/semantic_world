@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing_extensions import Generic, TypeVar, List, Optional, Dict, Any
@@ -92,3 +93,17 @@ class DerivativeMap(Generic[T], SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, data: Dict[str, Any]) -> DerivativeMap[T]:
         return cls(data=data["data"])
+
+    def __mul__(self, other: float) -> DerivativeMap[T]:
+        result = DerivativeMap()
+        for i, v in enumerate(self.data):
+            if v is not None:
+                result.data[i] = v * other
+        return result
+
+    def __add__(self, other: float) -> DerivativeMap[T]:
+        result = DerivativeMap()
+        for i, v in enumerate(self.data):
+            if v is not None:
+                result.data[i] = v + other
+        return result

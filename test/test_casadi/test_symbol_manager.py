@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import semantic_world.spatial_types.spatial_types as cas
+from semantic_world.exceptions import SymbolResolutionError
 from semantic_world.spatial_types.symbol_manager import SymbolManager, symbol_manager
 
 
@@ -184,7 +185,7 @@ class TestSymbolManager:
         # Create a symbol that's not registered
         unregistered_symbol = cas.Symbol(name="unregistered")
 
-        with pytest.raises(KeyError, match="Cannot resolve"):
+        with pytest.raises(SymbolResolutionError, match="could not be resolved"):
             manager.resolve_symbols([unregistered_symbol])
 
     def test_evaluate_expr_with_number(self):
@@ -233,7 +234,7 @@ class TestSymbolManager:
 
         symbol = manager.register_symbol_provider("failing", failing_provider)
 
-        with pytest.raises(KeyError, match="Cannot resolve"):
+        with pytest.raises(SymbolResolutionError, match="could not be resolved"):
             manager.resolve_symbols([symbol])
 
     def test_symbol_name_consistency(self):

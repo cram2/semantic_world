@@ -172,7 +172,7 @@ class TestFactories(unittest.TestCase):
 
         dresser_factory = DresserFactory(
             name=PrefixedName("dresser"),
-            drawer_transforms=[drawer_transform],
+            parent_T_drawers=[drawer_transform],
             drawers_factories=[drawer_factory],
             door_transforms=[door_transform],
             door_factories=[door_factory],

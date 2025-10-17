@@ -32,7 +32,12 @@ from typing_extensions import (
 import casadi as ca
 from scipy import sparse as sp
 
-from ..exceptions import HasFreeSymbolsError, NotSquareMatrixError, WrongDimensionsError
+from ..exceptions import (
+    HasFreeSymbolsError,
+    NotSquareMatrixError,
+    WrongDimensionsError,
+    SpatialTypesError,
+)
 
 if TYPE_CHECKING:
     from ..world_description.world_entity import KinematicStructureEntity, Connection
@@ -1831,6 +1836,9 @@ class TransformationMatrix(SymbolicType, ReferenceFrameMixin, MatrixOperationsMi
         :return: A `TransformationMatrix` instance initialized with the provided
             parameters or default values.
         """
+        if reference_frame is None:
+            reference_frame = cls._ensure_consistent_frame([point, rotation_matrix])
+
         if rotation_matrix is None:
             a_T_b = cls(reference_frame=reference_frame, child_frame=child_frame)
         else:
@@ -1845,6 +1853,41 @@ class TransformationMatrix(SymbolicType, ReferenceFrameMixin, MatrixOperationsMi
             a_T_b[1, 3] = point.y
             a_T_b[2, 3] = point.z
         return a_T_b
+
+    @staticmethod
+    def _ensure_consistent_frame(
+        spatial_objects: List[Optional[ReferenceFrameMixin]],
+    ) -> Optional[KinematicStructureEntity]:
+        """
+        Ensures that all provided spatial objects have a consistent reference frame. If a mismatch
+        in the reference frames is detected among the non-null spatial objects, an exception is
+        raised. If the list contains only null objects, None is returned.
+
+        This method is primarily used to validate the reference frames of spatial objects before
+        proceeding with further operations.
+
+        :param spatial_objects: A list containing zero or more spatial objects, which can either
+            be instances of ReferenceFrameMixin or None.
+        :return: The common reference frame of the spatial objects if consistent, or None if no
+            valid reference frame exists.
+
+        :raises SpatialTypesError: Raised when the reference frames of provided input spatial
+            objects are inconsistent.
+        """
+        reference_frame = None
+        for spatial_object in spatial_objects:
+            if (
+                spatial_object is not None
+                and spatial_object.reference_frame is not None
+            ):
+                if reference_frame is None:
+                    reference_frame = spatial_object.reference_frame
+                    continue
+                if reference_frame != spatial_object.reference_frame:
+                    raise SpatialTypesError(
+                        f"Reference frames of input parameters don't match ({reference_frame} != {spatial_object.reference_frame})."
+                    )
+        return reference_frame
 
     @classmethod
     def from_xyz_rpy(
@@ -2041,7 +2084,7 @@ class TransformationMatrix(SymbolicType, ReferenceFrameMixin, MatrixOperationsMi
         )
 
     def to_rotation_matrix(self) -> RotationMatrix:
-        return RotationMatrix(data=self)
+        return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
     def to_quaternion(self) -> Quaternion:
         return Quaternion.from_rotation_matrix(self)
@@ -2258,7 +2301,8 @@ class RotationMatrix(SymbolicType, ReferenceFrameMixin, MatrixOperationsMixin):
         - y and z provided: x = y × z
         - x, y, and z provided: all three used directly
         """
-
+        if x is None and y is None and z is None:
+            raise SpatialTypesError("from_vectors requires at least two vectors")
         if x is not None and y is not None and z is None:
             z = x.cross(y)
         elif x is not None and y is None and z is not None:
