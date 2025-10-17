@@ -1,25 +1,13 @@
 import logging
-import os
-import sys
-from dataclasses import dataclass, field
-from typing import Optional, Callable, Type, List
 
-import pytest
-from entity_query_language import an, entity, let, symbolic_mode, in_, infer, rule_mode
+from entity_query_language import entity, let, in_, infer, rule_mode
 from numpy.ma.testutils import (
     assert_equal,
 )  # You could replace this with numpy's regular assert for better compatibility
 
-from semantic_world.world_description.connections import (
-    FixedConnection,
-    PrismaticConnection,
-)
-from semantic_world.world_description.world_entity import KinematicStructureEntity
 from semantic_world.reasoning.world_reasoner import WorldReasoner
-from semantic_world.world import World
-from semantic_world.adapters.urdf import URDFParser
-from semantic_world.views.views import *
 from semantic_world.testing import *
+from semantic_world.views.views import *
 
 try:
     from ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -81,7 +69,7 @@ class TestView(View):
 def test_view_hash(apartment_world):
     view1 = Handle(body=apartment_world.bodies[0])
     apartment_world.add_view(view1)
-    assert hash(view1) == hash((Handle, apartment_world.bodies[0].index))
+    assert hash(view1) == hash((Handle, apartment_world.bodies[0].name))
 
     view2 = Handle(body=apartment_world.bodies[0])
     assert view1 == view2
@@ -192,3 +180,46 @@ def fit_rules_and_assert_views(world, view_type, update_existing_views, scenario
 
     found_views = world_reasoner.infer_views()
     assert any(isinstance(v, view_type) for v in found_views)
+
+
+def test_view_serde_once(apartment_world):
+    handle_body = apartment_world.bodies[0]
+    door_body = apartment_world.bodies[1]
+
+    handle = Handle(body=handle_body)
+    door = Door(body=door_body, handle=handle)
+
+    apartment_world.add_view(handle)
+    apartment_world.add_view(door)
+
+    door_se = door.to_json()
+    door_de = Door.from_json(door_se)
+
+    assert door == door_de
+    assert type(door.handle) == type(door_de.handle)
+    assert type(door.body) == type(door_de.body)
+
+
+def test_view_serde_multiple(apartment_world):
+    handle_body = apartment_world.bodies[0]
+    door_body = apartment_world.bodies[1]
+
+    handle = Handle(body=handle_body)
+    door = Door(body=door_body, handle=handle)
+
+    apartment_world.add_view(handle)
+    apartment_world.add_view(door)
+
+    door_se1 = door.to_json()
+    door_de1 = Door.from_json(door_se1)
+
+    assert door == door_de1
+    assert type(door.handle) == type(door_de1.handle)
+    assert type(door.body) == type(door_de1.body)
+
+    door_se2 = door_de1.to_json()
+    door_de2 = Door.from_json(door_se2)
+
+    assert door == door_de2
+    assert type(door.handle) == type(door_de2.handle)
+    assert type(door.body) == type(door_de2.body)

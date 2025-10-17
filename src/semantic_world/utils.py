@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import importlib
 import os
-from contextlib import suppress
+import weakref
 from copy import deepcopy
 from functools import lru_cache, wraps
-
 from ament_index_python import PackageNotFoundError
 from typing_extensions import Any, Tuple, Iterable
 from xml.etree import ElementTree as ET
-import weakref
-from sqlalchemy import Engine, inspect, text, MetaData
+
+from typing_extensions import Any, Tuple
 
 
 class IDGenerator:
@@ -187,3 +187,15 @@ def get_semantic_world_directory_root(file_path: str) -> str:
     raise ValueError(
         f"Could not find pyproject.toml in any parent directory of {file_path}"
     )
+
+
+def type_string_to_type(type_string: str) -> type:
+    """
+    Convert a string representation of a type to the actual type.
+
+    :param type_string: The string representation of the type, e.g., 'module.submodule.ClassName'.
+    :return: The actual type.
+    """
+    module_path, class_name = type_string.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, class_name)

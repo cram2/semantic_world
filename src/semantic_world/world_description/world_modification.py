@@ -3,25 +3,23 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 
-from random_events.utils import SubclassJSONSerializer, recursive_subclasses
+from random_events.utils import SubclassJSONSerializer
 from typing_extensions import (
     List,
     Dict,
     Any,
     Self,
-    Optional,
     Callable,
-    ClassVar,
     TYPE_CHECKING,
 )
 
 from .connection_factories import ConnectionFactory
 from .degree_of_freedom import DegreeOfFreedom
-from .world_entity import Body, KinematicStructureEntity
+from .world_entity import KinematicStructureEntity, View
 from ..datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from ..world import World, FunctionStack
+    from ..world import World
 
 
 @dataclass
@@ -256,6 +254,50 @@ class RemoveDegreeOfFreedomModification(WorldModelModification):
     @classmethod
     def _from_json(cls, data: Dict[str, Any]) -> Self:
         return cls(dof_name=PrefixedName.from_json(data["dof"]))
+
+
+@dataclass
+class AddViewModification(WorldModelModification):
+    view: View
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]):
+        return cls(view=kwargs["view"])
+
+    def apply(self, world: World):
+        world.add_view(self.view)
+
+    def to_json(self):
+        return {
+            **super().to_json(),
+            "view": self.view.to_json(),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(view=View.from_json(data["view"]))
+
+
+@dataclass
+class RemoveViewModification(WorldModelModification):
+    view: View
+
+    @classmethod
+    def from_kwargs(cls, kwargs: Dict[str, Any]):
+        return cls(view=kwargs["view"])
+
+    def apply(self, world: World):
+        world.remove_view(self.view)
+
+    def to_json(self):
+        return {
+            **super().to_json(),
+            "view": self.view.to_json(),
+        }
+
+    @classmethod
+    def _from_json(cls, data: Dict[str, Any]) -> Self:
+        return cls(view=View.from_json(data["view"]))
 
 
 @dataclass
